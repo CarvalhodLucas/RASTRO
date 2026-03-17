@@ -1786,28 +1786,17 @@ export const b3Assets: Asset[] = [
         variation: "0.0",
         sector: "Seguros",
         exchange: "B3",
-        sentiment: 75,
-        bullCase: [
-
-        ],
-        bearCase: [
-
-        ],
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
         logo: "https://icons.duckduckgo.com/ip3/caixaseguridade.com.br.ico",
-        description: "A Caixa Seguridade é uma holding que consolida as participações da Caixa Econômica Federal em empresas de seguros, previdência privada, capitalização e consórcios. Opera em um modelo de bancassurance altamente eficiente.",
-        fundamentalData: {
-            pl: 12.71,
-            pvp: 3.5,
-            dy: 7.21,
-            roe: 31.67,
-            margemLiquida: 50.2,
-            dividaPatrimonio: 0.05
-        },
-        aiPulse: "Momento operacional sólido com foco em dividendos e eficiência.",
-        marketCap: "R$ 45 Bi",
-        peRatio: "12.71",
-        dividendYield: "7.21%",
-        lastUpdate: "12/03/2026"
+        size: 10,
+        cgId: "",
+        aiPulse: "Análise automatizada pendente.",
+        marketCap: "--",
+        peRatio: "--",
+        dividendYield: "--",
+        lastUpdate: "10/03/2026"
     },
     {
         ticker: "CYRE3.SA",
