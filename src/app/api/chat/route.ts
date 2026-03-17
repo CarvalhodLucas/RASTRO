@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { LUCAS_KNOWLEDGE } from "@/lib/knowledge";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     try {
         const { prompt, ticker, name, report, indicators, systemInstruction: instructionOverride, systemPrompt, isSummary, isHealth, isSentiment, isRatingRequest } = await req.json();
         console.log("TEXTO RECEBIDO:", report);
