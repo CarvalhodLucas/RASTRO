@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>The Square - RASTRO</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FFBF00", "primary-hover": "#E6AC00",
+                        "background-light": "#000000", "background-dark": "#000000",
+                        "neutral-dark-surface": "#121212", "neutral-dark-border": "#333333",
+                        "accent-blue": "#3b82f6", "market-up": "#11d473",
+                        "market-down": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #121212;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FFBF00;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24
+        }
+
+        .icon-filled {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-black text-slate-100 font-display antialiased min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black">
+    <header
+        class="flex items-center justify-between whitespace-nowrap border-b border-solid border-neutral-dark-border px-10 py-3 bg-black sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-white">
+            <div class="size-8 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined !text-[32px]">candlestick_chart</span>
+            </div>
+            <h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+        </div>
+        <div class="flex flex-1 justify-end gap-8">
+            <nav class="hidden md:flex items-center gap-9">
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/index.html">Inicio</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/mercado.html">Mercados</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/noticias.html">Notícias</a>
+                <a class="text-primary transition-colors text-sm font-bold leading-normal relative after:content-[''] after:absolute after:bottom-[-20px] after:left-0 after:w-full after:h-[2px] after:bg-primary"
+                    href="/square.html">Square</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/portfolio.html">Portfólio</a>
+                <a class="text-primary text-sm font-medium leading-normal flex items-center gap-1" href="#">
+                    <span class="material-symbols-outlined !text-lg">auto_awesome</span>
+                    Ferramentas de IA
+                </a>
+            </nav>
+            <div class="flex gap-2">
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-neutral-dark-border text-white hover:bg-neutral-dark-surface hover:border-primary/50 transition-colors text-sm font-bold leading-normal tracking-[0.015em]">
+                    <span class="truncate">Entrar</span>
+                </a>
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary hover:bg-primary-hover transition-colors text-black text-sm font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/20">
+                    <span class="truncate">Obter Pro</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden relative">
+        <div
+            class="flex-1 overflow-y-auto w-full max-w-3xl mx-auto border-r border-l border-neutral-dark-border bg-black">
+            <div class="sticky top-0 z-10 bg-black/80 backdrop-blur-md border-b border-neutral-dark-border p-4">
+                <div class="relative mb-4">
+                    <span
+                        class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500">search</span>
+                    <input
+                        class="w-full bg-neutral-dark-surface border border-neutral-dark-border rounded-full py-2.5 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                        placeholder="Buscar tickers ($AAPL), analistas ou teses..." type="text" />
+                </div>
+                <div class="flex gap-3">
+                    <div class="h-10 w-10 shrink-0 rounded-full bg-slate-700 bg-cover bg-center"
+                        data-alt="Foto de perfil do usuário"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCXtkD3EMDfRzOAfqxQDjK3vRXZfjaEHjyHKMOMk9kItGKarLDb9yo5ReQdZyPKjRHG2PEt5CpdWha3d4kniMQCCQWgN2M_JdKkI7iWq7_dOxmFTDDCjIv5gUJUH_dHUw9XCfVb4sLYSIpA17v6X5wWPDHc-4M66HSDYUl_dkWJ-glYSD0J5Vrf3zlAlBBu376NH8aOQGkzkavHdiJu-GlpmErfbSzhlcaUHroKAsoyTbWO1inWqD5gkUWYtVVo5f0LAorMElvxim8');">
+                    </div>
+                    <div class="flex-1">
+                        <textarea
+                            class="w-full bg-transparent border-none text-white text-lg placeholder-slate-500 focus:ring-0 resize-none p-0 mb-2"
+                            placeholder="Qual é a sua perspectiva de mercado hoje?" rows="2"></textarea>
+                        <div class="flex items-center justify-between pt-2 border-t border-neutral-dark-border/50">
+                            <div class="flex gap-2 text-primary">
+                                <button class="p-2 hover:bg-neutral-dark-surface rounded-full transition-colors"><span
+                                        class="material-symbols-outlined text-[20px]">image</span></button>
+                                <button class="p-2 hover:bg-neutral-dark-surface rounded-full transition-colors"><span
+                                        class="material-symbols-outlined text-[20px]">bar_chart</span></button>
+                                <button class="p-2 hover:bg-neutral-dark-surface rounded-full transition-colors"><span
+                                        class="material-symbols-outlined text-[20px]">sentiment_satisfied</span></button>
+                            </div>
+                            <button
+                                class="bg-primary text-black px-4 py-1.5 rounded-full font-bold text-sm hover:bg-primary-hover transition-colors shadow-lg shadow-primary/20">Postar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col">
+                <article
+                    class="p-4 border-b border-neutral-dark-border hover:bg-neutral-dark-surface/50 transition-colors cursor-pointer group">
+                    <div class="flex gap-3">
+                        <div class="h-12 w-12 shrink-0 rounded-full bg-cover bg-center border border-neutral-dark-border"
+                            data-alt="Foto de perfil do analista"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBFxTR8_6uZR9BVThFpC5KNh4m3DyCfRQ-6B-d7GxWNw5-rPRrrR9bhxmbSq6y5elzzFwETCmufKUOZhfaS7uFNN0YsTpKFS7oxXmogeBJUWgh3swFCOV1kFAlxEtRPcIO5NchlZkhBxQjjMQu8bmY74MFHzSHLjGTjNVWTbpyMsMSBGA2O-YUW_P_Z734HHSV8nriKGLEgRoHOLUZAsrZMfT_GCiizqpevhnmLpSBpkYLqcRajkajL7e2gQmKB-8ksY08c5Sn6AYM');">
+                        </div>
+                        <div class="flex-1 flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="text-white font-bold text-base hover:text-primary transition-colors">Marcus
+                                        Thorne</span>
+                                    <span class="material-symbols-outlined text-primary text-[18px] icon-filled"
+                                        title="Verificado">verified</span>
+                                    <span
+                                        class="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-primary/20 uppercase tracking-wide">Analista
+                                        Elite</span>
+                                    <span class="text-slate-500 text-sm mx-1">•</span>
+                                    <span class="text-slate-500 text-sm">2h</span>
+                                </div>
+                                <button class="text-slate-500 hover:text-primary transition-colors"><span
+                                        class="material-symbols-outlined">more_horiz</span></button>
+                            </div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span
+                                    class="text-[#ef4444] font-bold text-sm bg-[#ef4444]/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">trending_down</span> Pessimista
+                                </span>
+                                <span class="text-slate-400 text-sm font-medium">$TSLA</span>
+                            </div>
+                            <p class="text-slate-200 text-base leading-relaxed mb-3">
+                                Os números de entrega ficaram significativamente abaixo das expectativas. Com as margens
+                                comprimindo e o estoque acumulando, a relação risco/recompensa para a Tesla nestes
+                                níveis é desfavorável. Esperando um reteste da zona de suporte de $180 antes de qualquer
+                                recuperação significativa.
+                            </p>
+                            <div
+                                class="w-full h-32 bg-neutral-dark-surface rounded-lg border border-neutral-dark-border p-3 mb-3 relative overflow-hidden group-hover:border-primary/50 transition-colors">
+                                <div class="absolute top-3 left-3 flex flex-col">
+                                    <span class="text-xs text-slate-400">TSLA / USD</span>
+                                    <span class="text-lg font-mono text-[#ef4444]">198.42 <span
+                                            class="text-sm">-3.2%</span></span>
+                                </div>
+                                <svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 400 100">
+                                    <defs>
+                                        <lineargradient id="gradientRed" x1="0" x2="0" y1="0" y2="1">
+                                            <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"></stop>
+                                            <stop offset="100%" stop-color="#ef4444" stop-opacity="0"></stop>
+                                        </lineargradient>
+                                    </defs>
+                                    <path d="M0,40 Q50,20 100,50 T200,60 T300,40 T400,80" fill="url(#gradientRed)"
+                                        stroke="#ef4444" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+                                </svg>
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="flex gap-6 text-slate-500">
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn">
+                                        <span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+                                        <span>24</span>
+                                    </button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#11d473] transition-colors text-sm group/btn">
+                                        <span class="material-symbols-outlined text-[18px]">repeat</span>
+                                        <span>12</span>
+                                    </button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#ef4444] transition-colors text-sm group/btn">
+                                        <span class="material-symbols-outlined text-[18px]">favorite</span>
+                                        <span>156</span>
+                                    </button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn">
+                                        <span class="material-symbols-outlined text-[18px]">bar_chart</span>
+                                        <span>2.4k</span>
+                                    </button>
+                                </div>
+                                <button
+                                    class="flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-bold hover:bg-primary hover:text-black transition-all">
+                                    <span class="material-symbols-outlined text-[16px] icon-filled">description</span>
+                                    Citar Relatório
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                <!-- Post 2 -->
+                <article
+                    class="p-4 border-b border-neutral-dark-border hover:bg-neutral-dark-surface/50 transition-colors cursor-pointer group">
+                    <div class="flex gap-3">
+                        <div class="h-12 w-12 shrink-0 rounded-full bg-cover bg-center border border-neutral-dark-border"
+                            data-alt="Foto de perfil do analista"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAbPAGNIJ0mxWuin2Ohr0cyQHSYzUvSAda5cXoyxOjKwSnOAMUjme9auzZ50A1ln_BkV32iElOVOG8hBW1DxtYgcN8OBpi19MRARI-7uScC1J4LClxxTkIjcPfAk2-D9OYnB9oTsnnHqveK7kwFLo9z3cYGajAvy7HzSktq_UHMaSygPQWL2JT0qTUsrkAyFqKD9EpqPwrhBgkd_7ZrS_bO3wNzEucF8ZfXiJnb0naf_XHn_4iWLKIeVSE5CXS_JNHOn2CuvPJ-pNM');">
+                        </div>
+                        <div class="flex-1 flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="text-white font-bold text-base hover:text-primary transition-colors">Sarah
+                                        Lin</span>
+                                    <span class="material-symbols-outlined text-primary text-[18px] icon-filled"
+                                        title="Verificado">verified</span>
+                                    <span class="text-slate-500 text-sm mx-1">•</span>
+                                    <span class="text-slate-500 text-sm">4h</span>
+                                </div>
+                                <button class="text-slate-500 hover:text-primary transition-colors"><span
+                                        class="material-symbols-outlined">more_horiz</span></button>
+                            </div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span
+                                    class="text-[#11d473] font-bold text-sm bg-[#11d473]/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">trending_up</span> Otimista
+                                </span>
+                                <span class="text-slate-400 text-sm font-medium">$NVDA</span>
+                            </div>
+                            <p class="text-slate-200 text-base leading-relaxed mb-2">
+                                Os gastos com infraestrutura de IA não estão diminuindo. Acabei de revisar os últimos
+                                relatórios da cadeia de suprimentos para H100s. A demanda ainda supera a oferta em 3:1.
+                                Manter a longo prazo. 🚀
+                            </p>
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="flex gap-6 text-slate-500">
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">chat_bubble</span> 8</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#11d473] transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">repeat</span> 4</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#ef4444] transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">favorite</span> 86</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">bar_chart</span> 1.1k</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                <!-- Post 3 (Image) -->
+                <article
+                    class="p-4 border-b border-neutral-dark-border hover:bg-neutral-dark-surface/50 transition-colors cursor-pointer group">
+                    <div class="flex gap-3">
+                        <div class="h-12 w-12 shrink-0 rounded-full bg-cover bg-center border border-neutral-dark-border"
+                            data-alt="Foto de perfil do analista"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCwFvQgsNGH-jrZMNvf-noOlxLYNBeSIJhz7BMjmx2cD83DsFtBB6e2-GuHKwoB2T0fO78FIrx61zEBs8S9ZFUVy4geP-m9p_cHlVdI65Wi1UlwQogad91YEKmWFR1qCTO6aJOpl2hr_fyBK5EVSMvD3gyCqD4wvYouAK7jC5FSiMPyDSM8FxMdVYs9QTICch9PGHGymOTDNErxJO1QBSOHIqC5rmFQWR-Ahc3muQ2VpBIIrpaSAzoMxl395eF0FkgzebfWGmAu2RU');">
+                        </div>
+                        <div class="flex-1 flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="text-white font-bold text-base hover:text-primary transition-colors">David
+                                        Chen</span>
+                                    <span
+                                        class="bg-neutral-800 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-neutral-700 uppercase tracking-wide">Contribuidor</span>
+                                    <span class="text-slate-500 text-sm mx-1">•</span>
+                                    <span class="text-slate-500 text-sm">6h</span>
+                                </div>
+                                <button class="text-slate-500 hover:text-primary transition-colors"><span
+                                        class="material-symbols-outlined">more_horiz</span></button>
+                            </div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span
+                                    class="text-slate-300 font-bold text-sm bg-neutral-800 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">balance</span> Neutro
+                                </span>
+                                <span class="text-slate-400 text-sm font-medium">$AAPL</span>
+                            </div>
+                            <p class="text-slate-200 text-base leading-relaxed mb-3">
+                                Os números iniciais de vendas do Vision Pro estão começando a aparecer. É um produto de
+                                nicho por enquanto, mas o potencial de fidelização do ecossistema é enorme para 2026+.
+                                Acompanhando de perto o crescimento da receita de serviços este trimestre.
+                            </p>
+                            <div
+                                class="relative w-full h-48 rounded-xl overflow-hidden mb-3 border border-neutral-dark-border group-hover:border-primary/50 transition-colors">
+                                <div class="absolute inset-0 bg-cover bg-center"
+                                    data-alt="Conceito exterior de vidro da loja Apple"
+                                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDrBc-G7LKhR1IRUjleaZuFtKlmf4RvJIpZwPTOesrb8nPvhSsBTgr59XK52GPMy7H7kFS8sFaUs8Bdl-1H5fuJ5pZnZdZ3G7xJuWJg2plxnl2AnBJq7BaZ7RsXpB4eYJRVz3OE-nzwGq1CA1xLQ8Fs3AA36ZN-gQW28reDsyQsz49UZgDzx6eupacNHG_QBlR5Zf5fm66qw-GJ2mOxH0FKwouydJOlCQaod8BoQLNzRMk0jEiLlrYwHJawDYvDakPLRalcJ8bbvJc');">
+                                </div>
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
+                                    <p class="text-white text-sm font-medium">Relatório de Crescimento de Serviços Apple
+                                        Q3</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="flex gap-6 text-slate-500">
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">chat_bubble</span> 42</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#11d473] transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">repeat</span> 8</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-[#ef4444] transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">favorite</span> 210</button>
+                                    <button
+                                        class="flex items-center gap-1.5 hover:text-primary transition-colors text-sm group/btn"><span
+                                            class="material-symbols-outlined text-[18px]">bar_chart</span> 5k</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <aside
+            class="hidden xl:flex flex-col w-80 h-full border-neutral-dark-border bg-black shrink-0 overflow-y-auto p-6 gap-6">
+            <div class="flex flex-col gap-4">
+                <h2 class="text-white font-bold text-lg flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">trending_up</span>
+                    Ativos em Alta
+                </h2>
+                <div class="flex flex-col gap-2">
+                    <div
+                        class="flex items-center justify-between p-3 rounded-xl bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <div class="flex flex-col">
+                            <span class="text-white font-bold group-hover:text-primary transition-colors">$NVDA</span>
+                            <span class="text-slate-500 text-xs">Nvidia Corp</span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[#11d473] font-mono font-medium text-sm">+2.4%</span>
+                            <span class="text-slate-500 text-xs">12.5k posts</span>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center justify-between p-3 rounded-xl bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <div class="flex flex-col">
+                            <span class="text-white font-bold group-hover:text-primary transition-colors">$BTC</span>
+                            <span class="text-slate-500 text-xs">Bitcoin</span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[#ef4444] font-mono font-medium text-sm">-1.1%</span>
+                            <span class="text-slate-500 text-xs">45k posts</span>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center justify-between p-3 rounded-xl bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary/50 transition-colors cursor-pointer group">
+                        <div class="flex flex-col">
+                            <span class="text-white font-bold group-hover:text-primary transition-colors">$PETR4</span>
+                            <span class="text-slate-500 text-xs">Petrobras</span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[#11d473] font-mono font-medium text-sm">+0.8%</span>
+                            <span class="text-slate-500 text-xs">3.2k posts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <h2 class="text-white font-bold text-lg flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">emoji_events</span>
+                    Principais Contribuidores
+                </h2>
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-primary font-bold w-4 text-center">1</span>
+                        <div class="h-10 w-10 rounded-full bg-cover bg-center border-2 border-primary"
+                            data-alt="Perfil do principal contribuidor"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC5CQd4spJ2ZWMVBTjoEhY2YAjRmD_dxF96LI5HjjwOd62x_ALhAq3FdhVrsVucK8PKOjgiPvy1hzjmZgx4AMpj7lvA5J5O835WzlKIRGlx2Hc0udE9B7S5tM-NDSx_Gu43qultQIjnVG8avYh0plmQgMMUePEMXUaNnKQyurTOIlwD2bTJujGIVpmsE18FjJYSqvdPGsmjLMtZLMS6OBEk6PcDQ_e6kYWeMbs03v30dGFkvLkMjgfBhSvBsvfHfS9cc3sXDJTFe08');">
+                        </div>
+                        <div class="flex flex-col flex-1">
+                            <span class="text-white font-bold text-sm">Marcus Thorne</span>
+                            <span class="text-primary text-xs">98% de Precisão</span>
+                        </div>
+                        <button
+                            class="text-slate-400 hover:text-white transition-colors bg-neutral-dark-surface p-1.5 rounded-lg border border-neutral-dark-border"><span
+                                class="material-symbols-outlined !text-[18px]">person_add</span></button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-white font-bold w-4 text-center">2</span>
+                        <div class="h-10 w-10 rounded-full bg-cover bg-center border border-neutral-dark-border"
+                            data-alt="Contribuidor Rank 2"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDAXt2q1I_WQfgtaNG7QA4OMjuRj5850M9AA_QP1bCQqmCR-I38eU2HgIZrcsiyZz5spfAWXmNDgvvWTj6Ac7d9zE7LEE78CAEJHj3RH9tzAMzDaZPH5gQpcrq8LncCtFFnq31vMHFQtWH_0h7inCXxzeSg2W_XkepV73axBsMIV1HVBy11GimtBz-H4u06fCFM7093cmX_uv8azWOILrAlYiJYnXwJniVP3EvKHHdJ4-P44e7YWynSCWBuP9zJirBYsrKkyWXk8Nw');">
+                        </div>
+                        <div class="flex flex-col flex-1">
+                            <span class="text-white font-bold text-sm">Elena Rodriguez</span>
+                            <span class="text-slate-400 text-xs">94% de Precisão</span>
+                        </div>
+                        <button
+                            class="text-slate-400 hover:text-white transition-colors bg-neutral-dark-surface p-1.5 rounded-lg border border-neutral-dark-border"><span
+                                class="material-symbols-outlined !text-[18px]">person_add</span></button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-white font-bold w-4 text-center">3</span>
+                        <div class="h-10 w-10 rounded-full bg-cover bg-center border border-neutral-dark-border"
+                            data-alt="Contribuidor Rank 3"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCnBNxPoIr9xMxa2npoV2tdzuTFRhmI1z-zORklVeYOn8ZWlJ3JZUrMTAtIHFSuSVaYbg2WidfoaXtWIv0plAgD--Hzj949TDpxuxzJj5NYTjms5Wf8P60YW5tXK0bU8MEGWKsttAJIj_UF5sobox9vvALZSqzLT3bm8jMEt3WtWmyOcrcyl-mhmQ6-ADck3Ji0yN-ph9KNwTkbKoVa3VufrYYHWlbrs8UqDyykq_w3XwiJcfp7XMbQl6Jnj8twLuYr76W7khBwYLQ');">
+                        </div>
+                        <div class="flex flex-col flex-1">
+                            <span class="text-white font-bold text-sm">James Wilson</span>
+                            <span class="text-slate-400 text-xs">91% de Precisão</span>
+                        </div>
+                        <button
+                            class="text-slate-400 hover:text-white transition-colors bg-neutral-dark-surface p-1.5 rounded-lg border border-neutral-dark-border"><span
+                                class="material-symbols-outlined !text-[18px]">person_add</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="mt-auto pt-6 text-xs text-slate-500 flex flex-wrap gap-x-4 gap-y-2 border-t border-neutral-dark-border">
+                <a class="hover:text-primary transition-colors" href="#">Termos de Serviço</a>
+                <a class="hover:text-primary transition-colors" href="#">Política de Privacidade</a>
+                <a class="hover:text-primary transition-colors" href="#">Política de Cookies</a>
+                <a class="hover:text-primary transition-colors" href="#">Informações de Anúncios</a>
+                <span>© 2026 RASTRO.</span>
+            </div>
+        </aside>
+    </main>
+</body>
+
+</html>

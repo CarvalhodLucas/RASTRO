@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise Estratégica Petrobras (PETR4) - 2026</title>
+    <style>
+        :root {
+            --petro-green: #008542;
+            --petro-yellow: #FFD100;
+            --petro-dark: #004B23;
+            --text-color: #333;
+            --bg-color: #f0f2f5;
+            --white: #ffffff;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: var(--white);
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-radius: 4px;
+        }
+        header {
+            border-bottom: 4px solid var(--petro-green);
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo-area h1 {
+            color: var(--petro-green);
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 800;
+        }
+        .report-info {
+            text-align: right;
+            color: #666;
+        }
+        h2 {
+            color: var(--petro-dark);
+            border-left: 6px solid var(--petro-yellow);
+            padding-left: 15px;
+            margin-top: 40px;
+            font-size: 1.8em;
+        }
+        h3 {
+            color: var(--petro-green);
+            margin-top: 25px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        .highlight-card {
+            background: #e8f5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #c8e6c9;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin: 25px 0;
+        }
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border-top: 3px solid var(--petro-green);
+        }
+        .stat-box span {
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--petro-dark);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+        th {
+            background-color: var(--petro-green);
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .risk-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+        .risk-high { background: #ffebee; color: #c62828; }
+        .risk-med { background: #fff3e0; color: #ef6c00; }
+        .risk-low { background: #e8f5e9; color: #2e7d32; }
+        
+        .recommendation-banner {
+            background: var(--petro-dark);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 40px;
+        }
+        .recommendation-banner h2 {
+            color: var(--petro-yellow);
+            border: none;
+            margin: 0;
+            padding: 0;
+        }
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 0.8em;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <h1>PETROBRAS</h1>
+            </div>
+            <div class="report-info">
+                <strong>Análise Estratégica e Técnica</strong><br>
+                Horizonte 2026-2030
+            </div>
+        </header>
+
+        <section>
+            <p>A Petrobras (PETR4) permanece como um dos ativos mais complexos do mercado global. Esta análise foca na dissociação entre o ruído político e os fundamentos de engenharia que sustentam sua geração de caixa no Pré-sal.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-label">Lifting Cost (Pré-sal)</span>
+                    <span class="stat-value">US$ 6/barril</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Dividend Yield (TTM)</span>
+                    <span class="stat-value">12,9%</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Dívida Líquida/EBITDA</span>
+                    <span class="stat-value">1,49x</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">P/L Atual</span>
+                    <span class="stat-value">6,5x</span>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>1. Desempenho Financeiro (2020-2024)</h2>
+            <p>A trajetória recente da Petrobras é marcada por uma desalavancagem agressiva e melhoria na eficiência operacional.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indicador (R$ Bilhões)</th>
+                        <th>2021</th>
+                        <th>2022</th>
+                        <th>2023</th>
+                        <th>2024</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Receita de Vendas</td>
+                        <td>452,7</td>
+                        <td>641,3</td>
+                        <td>511,9</td>
+                        <td>491,4</td>
+                    </tr>
+                    <tr>
+                        <td>EBITDA Ajustado</td>
+                        <td>234,6</td>
+                        <td>340,5</td>
+                        <td>262,2</td>
+                        <td>218,9</td>
+                    </tr>
+                    <tr>
+                        <td>Lucro Líquido</td>
+                        <td>106,7</td>
+                        <td>188,3</td>
+                        <td>124,6</td>
+                        <td>36,6*</td>
+                    </tr>
+                    <tr>
+                        <td>Fluxo de Caixa Operacional</td>
+                        <td>203,1</td>
+                        <td>249,1</td>
+                        <td>215,7</td>
+                        <td>204,0</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><small>*O lucro de 2024 foi impactado por itens não recorrentes e contábeis (variação cambial). O lucro recorrente situou-se em R$ 103 bilhões.</small></p>
+        </section>
+
+        <section>
+            <h2>2. Análise de Riscos</h2>
+            <div class="highlight-card">
+                <h3><span class="risk-tag risk-high">ALTO</span> Risco Político e Interferência</h3>
+                <p>O principal risco reside na política de preços de combustíveis e na alocação de capital em projetos de menor retorno (refinarias/fertilizantes) por pressão governamental.</p>
+            </div>
+            <div class="highlight-card">
+                <h3><span class="risk-tag risk-med">MÉDIO</span> Risco de Commodity</h3>
+                <p>Alta sensibilidade ao Brent. Cada variação de US$ 10 no barril impacta o EBITDA em US$ 3-4 bilhões anuais. No entanto, o break-even de US$ 25 no Pré-sal oferece resiliência.</p>
+            </div>
+            <div class="highlight-card">
+                <h3><span class="risk-tag risk-low">BAIXO</span> Risco Financeiro</h3>
+                <p>Dívida bruta controlada em US$ 60,3 bilhões, bem abaixo do teto prudencial de US$ 65 bilhões. Prazo médio de vencimento alongado para 12,5 anos.</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>3. Valuation Comparativo</h2>
+            <p>A Petrobras negocia com um desconto estrutural significativo em relação às "supermajors" globais.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Múltiplo (Fev/2026)</th>
+                        <th>Petrobras</th>
+                        <th>ExxonMobil</th>
+                        <th>Shell</th>
+                        <th>Chevron</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>P/L Atual</td>
+                        <td>6,5x</td>
+                        <td>21,8x</td>
+                        <td>13,3x</td>
+                        <td>29,9x</td>
+                    </tr>
+                    <tr>
+                        <td>EV/EBITDA (FWD)</td>
+                        <td>3,5x</td>
+                        <td>10,1x</td>
+                        <td>4,5x</td>
+                        <td>10,7x</td>
+                    </tr>
+                    <tr>
+                        <td>Dividend Yield</td>
+                        <td>12,9%</td>
+                        <td>3,4%</td>
+                        <td>3,3%</td>
+                        <td>4,1%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4. Projeções e Cenários (2026)</h2>
+            <ul>
+                <li><strong>Cenário Otimista:</strong> Brent > US$ 80 e licenciamento da Margem Equatorial. Preço alvo: R$ 55,00 - 60,00.</li>
+                <li><strong>Cenário Base:</strong> Brent US$ 65-75 e produção crescendo 11%. Preço alvo: R$ 43,00 - 47,00.</li>
+                <li><strong>Cenário Pessimista:</strong> Brent < US$ 50 e intervenção agressiva em preços. Preço alvo: R$ 25,00 - 28,00.</li>
+            </ul>
+        </section>
+
+        <div class="recommendation-banner">
+            <p>POSICIONAMENTO TÉCNICO</p>
+            <h2>MANTER / COMPRA OPORTUNÍSTICA</h2>
+            <p>Ativo de "Deep Value" com yield imbatível em janelas de pessimismo político.</p>
+        </div>
+
+        <footer>
+            <p>Relatório gerado para fins de análise técnica e fundamentalista. Dados baseados no Plano de Negócios 2026-2030 e resultados oficiais.</p>
+            <p>&copy; 2026 Petrobras - Inteligência de Mercado</p>
+        </footer>
+    </div>
+</body>
+</html>

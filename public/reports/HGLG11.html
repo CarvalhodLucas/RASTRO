@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório 360: CSHG Logística (HGLG11)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.95;
+            margin-bottom: 20px;
+        }
+        
+        header .meta {
+            font-size: 0.95em;
+            opacity: 0.85;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            padding-top: 15px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        section {
+            margin-bottom: 45px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            font-size: 1.9em;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h3 {
+            color: #3498db;
+            font-size: 1.3em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+            color: #555;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #f9f9f9;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        table th {
+            background: #3498db;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        table tr:hover {
+            background: #f0f0f0;
+        }
+        
+        .highlight-box {
+            background: #ecf0f1;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .highlight-box strong {
+            color: #2c3e50;
+        }
+        
+        .bull-case {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .bear-case {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .risk-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .metric-badge {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px 5px 5px 0;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .conclusion-box {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        
+        .conclusion-box h3 {
+            color: white;
+            margin-top: 0;
+        }
+        
+        .conclusion-box p {
+            color: rgba(255, 255, 255, 0.95);
+        }
+        
+        .conclusion-box ul {
+            margin-left: 20px;
+            margin-top: 15px;
+        }
+        
+        .conclusion-box li {
+            margin-bottom: 10px;
+            color: rgba(255, 255, 255, 0.95);
+        }
+        
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        footer {
+            background: #f5f5f5;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .date {
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        .disclaimer {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 20px;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+            
+            table th, table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CSHG Logística (HGLG11)</h1>
+            <p class="subtitle">Análise de Fundamentos - Relatório 360</p>
+            <div class="meta">
+                <p><strong>Data da Análise:</strong> 14 de Março de 2026</p>
+                <p><strong>Ativo Alvo:</strong> HGLG11 (Pátria Log)</p>
+            </div>
+        </header>
+        
+        <div class="content">
+            <!-- Tese de Investimento -->
+            <section>
+                <h2>1. Tese de Investimento e Moat (Fosso Econômico)</h2>
+                <p>O HGLG11 consolidou-se como o maior fundo imobiliário de logística do Brasil, com um patrimônio líquido projetado de aproximadamente R$ 10 bilhões após a incorporação estratégica dos ativos do LVBI11, PATL11 e outros fundos menores. Seu real diferencial competitivo reside na dominância geográfica e na qualidade técnica (A+) de seu portfólio, concentrado no "Raio 30km" de São Paulo, região com a menor vacância e maior barreira de entrada do país.</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Diferencial</th>
+                            <th>Descrição</th>
+                            <th>Impacto no Moat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Escala Imbatível</strong></td>
+                            <td>PL de R$ 10 bi e 54 imóveis pós-consolidação</td>
+                            <td>Maior poder de negociação com fornecedores e locatários</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pricing Power</strong></td>
+                            <td>Vacância física de apenas 2,2% (Dez/25)</td>
+                            <td>Capacidade de repassar inflação e obter ganhos reais em revisionais de aluguel</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Efeito de Rede</strong></td>
+                            <td>Base de 525 mil cotistas e alta liquidez (ADTV > R$ 16 mi)</td>
+                            <td>Facilidade de captação de recursos e menor custo de capital relativo</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="highlight-box">
+                    <strong>Custo de Troca Elevado:</strong> O fundo possui um custo de troca elevado para locatários de e-commerce e logística "last mile", que dependem da localização estratégica dos galpões do HGLG para manter a eficiência operacional.
+                </div>
+            </section>
+            
+            <!-- Governança -->
+            <section>
+                <h2>2. Governança e Alocação de Capital</h2>
+                <p>A gestão do HGLG11 passou por uma transição histórica do Credit Suisse para o Patria Investments, concluída recentemente. Historicamente, a gestão tem utilizado o fluxo de caixa para um mix de reinvestimento em expansões e M&A agressivo para consolidação do setor.</p>
+                
+                <h3>Histórico de Alocação</h3>
+                <p>O fundo mantém uma distribuição estável de R$ 1,10 por cota, utilizando reservas acumuladas (atualmente em R$ 0,44/cota) para suavizar oscilações. Isso demonstra uma abordagem prudente na gestão de caixa e na manutenção de dividendos consistentes.</p>
+                
+                <h3>Conflitos e Governança</h3>
+                <div class="info-box">
+                    <p>A recente alocação de 4,6% do PL no fundo GARE11 e as taxas da 11ª emissão (destinada a profissionais) geraram questionamentos pontuais sobre o alinhamento com o cotista minoritário. No entanto, a transparência nos relatórios gerenciais e a alta adesão em assembleias (33% de quórum na AGE de fusão) reforçam uma governança acima da média do mercado brasileiro.</p>
+                </div>
+            </section>
+            
+            <!-- Riscos -->
+            <section>
+                <h2>3. Riscos de Ruptura e Ciclo Econômico</h2>
+                
+                <h3>Maiores Riscos Não-Financeiros</h3>
+                <ol>
+                    <li>
+                        <strong>Diluição Operacional:</strong> O desafio de gerir um portfólio de 54 imóveis e R$ 10 bi de PL sem perder a agilidade na manutenção e no relacionamento com os 178 locatários.
+                    </li>
+                    <li>
+                        <strong>Risco Regulatório:</strong> Mudanças na tributação de dividendos de FIIs e novas exigências da Resolução CVM 175 podem impactar o fluxo de caixa líquido para o investidor.
+                    </li>
+                    <li>
+                        <strong>Risco Climático:</strong> Aumento de eventos extremos (enchentes e tempestades) que podem danificar coberturas de galpões e interromper fluxos logísticos, elevando prêmios de seguro.
+                    </li>
+                </ol>
+                
+                <h3>Ciclo Econômico</h3>
+                <div class="highlight-box">
+                    <p>O setor logístico encontra-se em fase de maturidade com escassez de oferta em regiões premium. Em cenários de recessão, o HGLG11 apresenta alta resiliência devido à exposição a setores defensivos (alimentos e fármacos) e contratos atípicos de longo prazo (WALE de 4,0 anos).</p>
+                </div>
+            </section>
+            
+            <!-- Saúde Financeira -->
+            <section>
+                <h2>4. Saúde Financeira Qualitativa</h2>
+                <p>A qualidade do lucro do HGLG11 é considerada robusta, sendo majoritariamente composta por receitas de aluguel (caixa operacional). Em Dezembro de 2025, o resultado distribuível foi de R$ 1,38/cota, superando a distribuição de R$ 1,10, o que permitiu o fortalecimento da reserva.</p>
+                
+                <h3>Qualidade do Lucro</h3>
+                <div class="highlight-box">
+                    <p><strong>Baixa dependência de manobras contábeis:</strong> Os ganhos não recorrentes (venda de ativos e indenizações) representaram apenas ~R$ 0,13/cota no último resultado, sendo usados para compor reserva e não para inflar artificialmente o yield.</p>
+                </div>
+                
+                <h3>Estrutura de Dívida</h3>
+                <p>Alavancagem controlada em 11,3% (LTV com SPE). A dívida está estruturada com cronograma de amortização alongado, com projeção de redução para 9,5% em 2026 e 3,0% até 2035, garantindo previsibilidade de caixa.</p>
+                
+                <div class="metric-badge">Distribuição Estável: R$ 1,10/cota</div>
+                <div class="metric-badge">Resultado Distribuível: R$ 1,38/cota (Dez/25)</div>
+                <div class="metric-badge">Reserva Acumulada: R$ 0,44/cota</div>
+                <div class="metric-badge">LTV: 11,3%</div>
+            </section>
+            
+            <!-- Catalisadores -->
+            <section>
+                <h2>5. Catalisadores e Ventos Contrários</h2>
+                
+                <h3>Gatilhos de Valor (Bull Case)</h3>
+                <div class="bull-case">
+                    <p><strong>Elevação de Dividendos:</strong> Projeção da gestão de aumento da distribuição para R$ 1,17/cota no segundo semestre de 2026.</p>
+                </div>
+                
+                <div class="bull-case">
+                    <p><strong>Revisionais Positivas:</strong> Renovação de contratos em galpões com aluguéis defasados em relação ao preço de mercado atual (mark-to-market positivo).</p>
+                </div>
+                
+                <div class="bull-case">
+                    <p><strong>Consolidação do Setor:</strong> A posição de "consolidador" permite ao HGLG adquirir ativos de fundos menores com desconto patrimonial.</p>
+                </div>
+                
+                <h3>Riscos da Tese (Bear Case)</h3>
+                <div class="bear-case">
+                    <p><strong>Diluição em Emissões:</strong> Novas emissões abaixo do valor patrimonial ou com taxas elevadas podem destruir valor para o cotista antigo.</p>
+                </div>
+                
+                <div class="bear-case">
+                    <p><strong>Aumento da Vacância:</strong> A projeção de subida da vacância para 3,3% em Fevereiro de 2026 deve ser monitorada para evitar deterioração das margens.</p>
+                </div>
+            </section>
+            
+            <!-- Conclusão -->
+            <section>
+                <div class="conclusion-box">
+                    <h2 style="color: white; border-bottom-color: rgba(255, 255, 255, 0.3);">6. Conclusão do Momento Atual</h2>
+                    <p>O HGLG11 vive um momento de transformação estrutural, deixando de ser apenas um fundo de galpões para se tornar uma plataforma logística de escala institucional. O atual momento é marcado pela digestão das fusões e pela execução da 11ª emissão de cotas.</p>
+                    
+                    <p style="margin-top: 20px;">A tese de investimento permanece sólida, ancorada na qualidade dos ativos e na resiliência operacional. O investidor deve focar na capacidade da nova gestão (Patria) em extrair sinergias da megafusão e na manutenção da distribuição prometida de R$ 1,17 para o final de 2026.</p>
+                    
+                    <p style="margin-top: 20px;"><strong>Veredito:</strong> O fundo negocia próximo ao seu valor justo, refletindo sua posição de liderança e o prêmio de qualidade de seu portfólio.</p>
+                </div>
+            </section>
+            
+            <!-- Nota de Transparência -->
+            <section>
+                <div class="disclaimer">
+                    <h3 style="color: #2c3e50; margin-bottom: 10px;">Nota de Transparência (Anti-Alucinação)</h3>
+                    <p>Esta análise baseia-se no Relatório Gerencial de Dezembro de 2025 (divulgado em 30/01/2026) e em fatos relevantes de Fevereiro de 2026. Dados de mercado e projeções de vacância para 2026 foram extraídos de fontes setoriais e comunicados oficiais da gestão.</p>
+                </div>
+            </section>
+        </div>
+        
+        <footer>
+            <p><strong>Relatório 360: CSHG Logística (HGLG11)</strong></p>
+            <p class="date">Gerado em: Março de 2026</p>
+            <p style="font-size: 0.85em; margin-top: 15px; color: #999;">
+                <em>Aviso Legal: Este relatório é fornecido apenas para fins informativos e educacionais. Não constitui recomendação de investimento. Consulte um consultor financeiro qualificado antes de tomar decisões de investimento.</em>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

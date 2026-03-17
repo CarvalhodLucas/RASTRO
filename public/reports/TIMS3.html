@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Equity Research: TIM S.A. (TIMS3)</title>
+    <style>
+        :root {
+            --tim-blue: #003399;
+            --tim-red: #E4002B;
+            --tim-light-blue: #0056B3;
+            --text-color: #333;
+            --bg-color: #f4f7f9;
+            --white: #ffffff;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            background: var(--white);
+            padding: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        header {
+            border-bottom: 4px solid var(--tim-blue);
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo-area h1 {
+            color: var(--tim-blue);
+            margin: 0;
+            font-size: 2.8em;
+            font-weight: 900;
+        }
+        .logo-area span {
+            color: var(--tim-red);
+        }
+        .report-tag {
+            background: var(--tim-blue);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        h2 {
+            color: var(--tim-blue);
+            border-left: 5px solid var(--tim-red);
+            padding-left: 15px;
+            margin-top: 40px;
+            font-size: 1.8em;
+        }
+        h3 {
+            color: var(--tim-light-blue);
+            margin-top: 25px;
+        }
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        .highlight-box {
+            background: #eef2ff;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            border: 1px solid #d1d5db;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 4px solid var(--tim-blue);
+        }
+        .stat-value {
+            display: block;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--tim-blue);
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+        }
+        th {
+            background-color: var(--tim-blue);
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .recommendation-banner {
+            background: linear-gradient(135deg, var(--tim-blue) 0%, #001a4d 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            border-radius: 12px;
+            margin-top: 50px;
+        }
+        .recommendation-banner h2 {
+            color: #fff;
+            border: none;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .recommendation-banner p {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+        footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 0.85em;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <h1>TIM<span>3</span></h1>
+            </div>
+            <div class="report-tag">EQUITY RESEARCH 2025/2026</div>
+        </header>
+
+        <section>
+            <h2>Resumo Executivo</h2>
+            <p>A TIM S.A. apresenta um perfil de investimento sólido, fundamentado na liderança da infraestrutura 5G, eficiência operacional superior e uma política de dividendos agressiva. A consolidação do mercado móvel brasileiro e a migração para planos de maior valor (pós-pago) sustentam o crescimento do lucro e das margens.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value">R$ 28,50</span>
+                    <span class="stat-label">Preço Alvo 2026</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">~10%</span>
+                    <span class="stat-label">Dividend Yield Proj.</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">21,1%</span>
+                    <span class="stat-label">ROIC (2025E)</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">0,70x</span>
+                    <span class="stat-label">Dív. Líq / EBITDA</span>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Fundamentos Financeiros</h2>
+            <p>A evolução dos indicadores nos últimos cinco anos demonstra uma clara tendência de expansão de rentabilidade e eficiência na alocação de capital pós-integração da Oi Móvel.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indicador (R$ Mi)</th>
+                        <th>2022</th>
+                        <th>2023</th>
+                        <th>2024</th>
+                        <th>2025E</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Receita Líquida</td>
+                        <td>21.526</td>
+                        <td>23.843</td>
+                        <td>25.771</td>
+                        <td>26.618</td>
+                    </tr>
+                    <tr>
+                        <td>EBITDA Normalizado</td>
+                        <td>10.200</td>
+                        <td>11.800</td>
+                        <td>12.800</td>
+                        <td>13.477</td>
+                    </tr>
+                    <tr>
+                        <td>Lucro Líquido</td>
+                        <td>1.500</td>
+                        <td>2.688</td>
+                        <td>3.500</td>
+                        <td>4.105</td>
+                    </tr>
+                    <tr>
+                        <td>Margem EBITDA</td>
+                        <td>46,4%</td>
+                        <td>49,6%</td>
+                        <td>49,3%</td>
+                        <td>50,6%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Vantagens Competitivas</h2>
+            <div class="highlight-box">
+                <h3>Liderança em 5G</h3>
+                <p>A TIM foi a primeira a conectar 1.000 cidades com 5G, cobrindo 70% da população urbana. Em capitais como São Paulo, o 5G já responde por 36% do tráfego total, desonerando as redes 4G e atraindo clientes premium.</p>
+            </div>
+            <h3>Modelo Asset Light</h3>
+            <p>A segregação de infraestrutura passiva (I-SYSTEMS) permitiu transformar custos fixos em variáveis, liberando o balanço para investimentos em inteligência de rede e serviços digitais B2B.</p>
+        </section>
+
+        <section>
+            <h2>Valuation Comparativo</h2>
+            <p>A TIM negocia a múltiplos que sugerem eficiência de capital superior aos seus pares, com um ROE de 16,0% que supera amplamente a média do setor.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Múltiplo</th>
+                        <th>TIM (TIMS3)</th>
+                        <th>Média Setor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>P/L (Preço/Lucro)</td>
+                        <td>15,76x</td>
+                        <td>11,47x</td>
+                    </tr>
+                    <tr>
+                        <td>EV/EBITDA</td>
+                        <td>4,55x</td>
+                        <td>4,03x</td>
+                    </tr>
+                    <tr>
+                        <td>P/VP</td>
+                        <td>2,52x</td>
+                        <td>1,59x</td>
+                    </tr>
+                    <tr>
+                        <td>Dividend Yield</td>
+                        <td>9,61%</td>
+                        <td>2,13%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Riscos e Red Flags</h2>
+            <ul>
+                <li><strong>Regulatório:</strong> Spectrum caps e revisão do Plano Geral de Metas de Competição (PGMC) em 2025.</li>
+                <li><strong>Competição:</strong> Ascensão de serviços via satélite (Starlink) em áreas rurais e guerra de preços em fibra óptica.</li>
+                <li><strong>Governança:</strong> Reestruturação da controladora Telecom Italia pode influenciar a política de dividendos.</li>
+            </ul>
+        </section>
+
+        <div class="recommendation-banner">
+            <p>RECOMENDAÇÃO FINAL</p>
+            <h2>COMPRAR</h2>
+            <p>Potencial de valorização de ~9% + Dividend Yield de dois dígitos.</p>
+        </div>
+
+        <footer>
+            <p>Relatório gerado para fins de análise de Equity Research. Dados baseados em resultados oficiais e projeções de mercado para 2025/2026.</p>
+            <p>&copy; 2026 TIM S.A. - Inteligência de Mercado</p>
+        </footer>
+    </div>
+</body>
+</html>

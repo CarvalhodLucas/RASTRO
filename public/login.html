@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Market Pulse - Entrar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FFBF00", "primary-hover": "#E6AC00",
+                        "background-light": "#000000", "background-dark": "#000000", "neutral-dark-surface": "#121212", "neutral-dark-border": "#333333",
+                        "accent-blue": "#3b82f6", "market-up": "#11d473",
+                        "market-down": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            }
+            .bg-grid-pattern {
+                background-image: linear-gradient(to right, #333 1px, transparent 1px),
+                linear-gradient(to bottom, #333 1px, transparent 1px);
+                background-size: 40px 40px;
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-black font-display text-slate-100 min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black">
+    <header
+        class="flex items-center justify-between whitespace-nowrap border-b border-solid border-neutral-dark-border px-6 md:px-10 py-3 bg-black sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-white">
+            <a class="flex items-center gap-4" href="#">
+                <div class="size-8 flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined !text-[32px]">candlestick_chart</span>
+                </div>
+                <h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+            </a>
+        </div>
+        <div class="flex flex-1 justify-end gap-8">
+            <nav class="hidden md:flex items-center gap-9">
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Início</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Mercados</a>
+            </nav>
+            <div class="flex gap-2">
+                <button
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary hover:bg-primary-hover transition-colors text-black text-sm font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/20">
+                    <span class="truncate">Seja Pro</span>
+                </button>
+            </div>
+        </div>
+    </header>
+    <main class="flex-1 flex flex-col items-center justify-center px-4 py-8 relative w-full bg-black overflow-hidden">
+        <div class="absolute inset-0 z-0 pointer-events-none opacity-20">
+            <svg class="absolute top-1/2 left-0 w-full h-64 -translate-y-1/2 text-primary" fill="none"
+                preserveAspectRatio="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 1200 300"
+                xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 250 C 200 250, 200 150, 400 150 C 600 150, 600 200, 800 100 C 1000 0, 1000 50, 1200 50">
+                </path>
+            </svg>
+            <div
+                class="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2">
+            </div>
+            <div
+                class="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2">
+            </div>
+        </div>
+        <div class="w-full max-w-md z-10">
+            <div
+                class="bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl shadow-2xl shadow-black overflow-hidden relative">
+                <div
+                    class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50">
+                </div>
+                <div class="flex border-b border-neutral-dark-border">
+                    <button
+                        class="flex-1 py-4 text-sm font-bold text-primary border-b-2 border-primary bg-neutral-dark-surface hover:bg-white/5 transition-colors">
+                        Entrar
+                    </button>
+                    <button
+                        class="flex-1 py-4 text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors">
+                        Criar Conta
+                    </button>
+                </div>
+                <div class="p-8 flex flex-col gap-6">
+                    <div class="text-center">
+                        <h1 class="text-2xl font-bold text-white mb-2">Bem-vindo de volta</h1>
+                        <p class="text-slate-400 text-sm">Acesse seu painel personalizado de inteligência de mercado.
+                        </p>
+                    </div>
+                    <div class="flex flex-col gap-3">
+                        <button
+                            class="flex items-center justify-center gap-3 w-full h-11 bg-black border border-neutral-dark-border hover:border-slate-500 rounded-lg text-white text-sm font-medium transition-colors">
+                            <img alt="Google" class="w-5 h-5"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrtPYcdpuJB3NQwA3F51BGuFRT3bybXkAEsJUkM2n6XgFdlBMKxjcghjmtZSEhHuP028HE9D9vsm-XPMp_o4htvxO0GQCM-3feW0tum4uAUhKmNgZBTX8Ji5rEcXeCIa52qZDVWEap0L4_PJIV3y3frccnrua188MDG6cifw3mT5HD3n-fGg12DdyjXP3C7l52DB3RsZEGJrCxpt8Yn8e4syLeScwDpzUier0wqYbTlz-JVB9p_0GnsECnW1njO_zX2oZqvMNt8v4" />
+                            Continuar com Google
+                        </button>
+                        <div class="flex gap-3">
+                            <button
+                                class="flex-1 flex items-center justify-center gap-2 h-11 bg-black border border-neutral-dark-border hover:border-slate-500 rounded-lg text-white text-sm font-medium transition-colors">
+                                <img alt="Apple" class="w-5 h-5 invert"
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4PFHxe7SnyBkYrrh0vTfpRpoemdiL_gNy_J34HfVbgnBa7C7FTetk4Trrzq3SGnGYC3r0OiSahmVh9NZyz8iJ4eaFy04xVdMFnix6YUsjomLRq7n44fHaertU5VemwHJvspJ7iAFgIXklikZ6q4yTJFTQKHR-_hbZwenrzvj6JgP9CDEfkNDroyb2qOITpD2OFtqoXhtq8ZIqFPWE2irovTBWu2gTI2iPCtkABhE-FVtDAcL9ZXyRHPYiy-yFQCzwuVgTYzEC2QU" />
+                                <span class="hidden sm:inline">Apple</span>
+                            </button>
+                            <button
+                                class="flex-1 flex items-center justify-center gap-2 h-11 bg-black border border-neutral-dark-border hover:border-slate-500 rounded-lg text-white text-sm font-medium transition-colors">
+                                <img alt="Microsoft" class="w-5 h-5"
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHzZ76FbUYTZg3OL6NKYE-AJkIMBfl9UgDkdmL-duI4SOqpQGRDAdHRZB5GiD82PwdwMOOI3eO6jmlPhbArsPFHBgp5rV4uAZzoQjZcUxlr4L9XJL1rvzEjfFzVPjjAfpavCmRaZT5_MarBOXJ4Atdutvzrmp0d1gAAobNj9bO9zayWcDZ7qdxVSpHgMx97__FaJGoNxMopLdMzz6SXs-n5EIR23azWyUNjccgGiNWaht91DRROkbyYeTfBPYJ8-fwIHNzeU-A2gM" />
+                                <span class="hidden sm:inline">Microsoft</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative flex py-1 items-center">
+                        <div class="flex-grow border-t border-neutral-dark-border"></div>
+                        <span class="flex-shrink-0 mx-4 text-xs text-slate-500 font-medium uppercase tracking-wider">ou
+                            entre com e-mail</span>
+                        <div class="flex-grow border-t border-neutral-dark-border"></div>
+                    </div>
+                    <form class="flex flex-col gap-4" onsubmit="event.preventDefault();">
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wide"
+                                for="email">Endereço de E-mail</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                                    <span class="material-symbols-outlined !text-[20px]">mail</span>
+                                </span>
+                                <input
+                                    class="block w-full h-11 pl-10 pr-3 rounded-lg bg-black border border-neutral-dark-border text-white placeholder-slate-600 focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm"
+                                    id="email" placeholder="nome@exemplo.com" type="email" />
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wide"
+                                    for="password">Senha</label>
+                                <a class="text-xs text-slate-400 hover:text-primary transition-colors" href="#">Esqueceu
+                                    a senha?</a>
+                            </div>
+                            <div class="relative">
+                                <span
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                                    <span class="material-symbols-outlined !text-[20px]">lock</span>
+                                </span>
+                                <input
+                                    class="block w-full h-11 pl-10 pr-10 rounded-lg bg-black border border-neutral-dark-border text-white placeholder-slate-600 focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm"
+                                    id="password" placeholder="••••••••" type="password" />
+                                <button
+                                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                                    type="button">
+                                    <span class="material-symbols-outlined !text-[20px]">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <button
+                            class="w-full h-11 bg-primary hover:bg-primary-hover text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-2">
+                            <span>Entrar</span>
+                            <span class="material-symbols-outlined !text-[20px]">arrow_forward</span>
+                        </button>
+                    </form>
+                    <p class="text-center text-xs text-slate-500">
+                        Ao entrar, você concorda com nossos <a
+                            class="text-slate-400 hover:text-primary underline decoration-slate-600 hover:decoration-primary underline-offset-2 transition-all"
+                            href="#">Termos de Serviço</a> e <a
+                            class="text-slate-400 hover:text-primary underline decoration-slate-600 hover:decoration-primary underline-offset-2 transition-all"
+                            href="#">Política de Privacidade</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+</html>

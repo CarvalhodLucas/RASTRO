@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Rastreador de Inteligência de Mercado</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FFBF00",
+                        "primary-hover": "#E6AC00",
+                        "primary-dim": "#4D3900",
+                        "background-light": "#000000",
+                        "background-dark": "#000000",
+                        "neutral-dark-surface": "#121212",
+                        "neutral-dark-border": "#333333",
+                        "neutral-dark-border-hover": "#444444",
+                        "accent-blue": "#3b82f6",
+                        "market-up": "#11d473",
+                        "market-down": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .table-row-hover:hover td {
+                @apply bg-neutral-dark-surface;
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-black font-display text-slate-100 min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black">
+    <header
+        class="flex items-center justify-between whitespace-nowrap border-b border-solid border-neutral-dark-border px-6 py-3 bg-black sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-white">
+            <div class="size-8 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined !text-[32px]">candlestick_chart</span>
+            </div>
+            <h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">Market Pulse</h2>
+        </div>
+        <div class="flex flex-1 justify-end gap-8">
+            <nav class="hidden md:flex items-center gap-8">
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Inicio</a>
+                <a class="text-primary transition-colors text-sm font-bold leading-normal relative after:content-[''] after:absolute after:bottom-[-20px] after:left-0 after:w-full after:h-[2px] after:bg-primary"
+                    href="#">Rastreador</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Notícias</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Square</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="#">Portfólio</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal flex items-center gap-1"
+                    href="#">
+                    <span class="material-symbols-outlined !text-lg text-primary">auto_awesome</span>
+                    Ferramentas de IA
+                </a>
+            </nav>
+            <div class="flex gap-2">
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-neutral-dark-border text-white hover:bg-neutral-dark-surface hover:border-primary/50 transition-colors text-sm font-bold leading-normal tracking-[0.015em]">
+                    <span class="truncate">Entrar</span>
+                </a>
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary hover:bg-primary-hover transition-colors text-black text-sm font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/20">
+                    <span class="truncate">Obter Pro</span>
+                </a>>
+            </div>
+        </div>
+    </header>
+    <main class="flex-1 flex flex-col px-4 py-6 md:px-8 lg:px-10 bg-black gap-6 h-[calc(100vh-65px)] overflow-hidden">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+            <div>
+                <h1 class="text-3xl font-bold text-white tracking-tight">Rastreador de <span
+                        class="text-primary">Inteligência de Mercado</span></h1>
+                <p class="text-slate-400 text-sm mt-1">Filtre mais de 10.000 ativos com métricas baseadas em IA e
+                    sentimento social.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button
+                    class="flex items-center gap-2 px-4 py-2 bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary text-white rounded-lg text-sm font-medium transition-all group">
+                    <span
+                        class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-[18px]">bookmark</span>
+                    Salvar Filtro
+                </button>
+                <button
+                    class="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-black rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/10">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    Exportar
+                </button>
+            </div>
+        </div>
+        <div class="flex flex-1 gap-6 overflow-hidden">
+            <aside
+                class="w-64 flex flex-col gap-4 overflow-y-auto pr-2 pb-10 scrollbar-hide shrink-0 border-r border-neutral-dark-border/50">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-bold text-white uppercase tracking-wider">Filtros</span>
+                    <button class="text-xs text-primary hover:text-white underline">Redefinir Tudo</button>
+                </div>
+                <div class="space-y-2">
+                    <button
+                        class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-200 hover:text-primary group">
+                        <span>Setor e Indústria</span>
+                        <span
+                            class="material-symbols-outlined text-slate-500 group-hover:text-primary text-[18px]">expand_less</span>
+                    </button>
+                    <div class="pl-2 space-y-1.5">
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                class="rounded border-neutral-dark-border bg-black text-primary focus:ring-primary focus:ring-offset-black"
+                                type="checkbox" />
+                            <span class="text-sm text-slate-400 group-hover:text-white">Tecnologia</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                class="rounded border-neutral-dark-border bg-black text-primary focus:ring-primary focus:ring-offset-black"
+                                type="checkbox" />
+                            <span class="text-sm text-slate-400 group-hover:text-white">Saúde</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                class="rounded border-neutral-dark-border bg-black text-primary focus:ring-primary focus:ring-offset-black"
+                                type="checkbox" />
+                            <span class="text-sm text-slate-400 group-hover:text-white">Finanças</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input checked=""
+                                class="rounded border-neutral-dark-border bg-black text-primary focus:ring-primary focus:ring-offset-black"
+                                type="checkbox" />
+                            <span class="text-sm text-primary font-medium">Criptoativos</span>
+                        </label>
+                    </div>
+                </div>
+                <hr class="border-neutral-dark-border" />
+                <div class="space-y-2">
+                    <button
+                        class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-200 hover:text-primary group">
+                        <span>Valor de Mercado</span>
+                        <span
+                            class="material-symbols-outlined text-slate-500 group-hover:text-primary text-[18px]">expand_less</span>
+                    </button>
+                    <div class="px-1 py-2">
+                        <div class="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>$0</span>
+                            <span>$2T+</span>
+                        </div>
+                        <div class="relative h-1 bg-neutral-dark-border rounded-full">
+                            <div class="absolute left-1/4 right-1/4 top-0 bottom-0 bg-primary rounded-full"></div>
+                            <div
+                                class="absolute left-1/4 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full cursor-pointer shadow">
+                            </div>
+                            <div
+                                class="absolute right-1/4 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full cursor-pointer shadow">
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-white mt-2 font-medium">
+                            <span>$10B</span>
+                            <span>$200B</span>
+                        </div>
+                    </div>
+                </div>
+                <hr class="border-neutral-dark-border" />
+                <div class="space-y-2">
+                    <button
+                        class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-200 hover:text-primary group">
+                        <span>Avaliação</span>
+                        <span
+                            class="material-symbols-outlined text-slate-500 group-hover:text-primary text-[18px]">expand_more</span>
+                    </button>
+                </div>
+                <hr class="border-neutral-dark-border" />
+                <div class="space-y-2">
+                    <button
+                        class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-200 hover:text-primary group">
+                        <span>Rentabilidade</span>
+                        <span
+                            class="material-symbols-outlined text-slate-500 group-hover:text-primary text-[18px]">expand_more</span>
+                    </button>
+                </div>
+                <hr class="border-neutral-dark-border" />
+                <div class="space-y-3">
+                    <div class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-200">
+                        <span class="flex items-center gap-1">
+                            Sentimento Social
+                            <span class="material-symbols-outlined text-primary text-[14px]"
+                                title="Pontuação derivada por IA">info</span>
+                        </span>
+                        <span class="material-symbols-outlined text-slate-500 text-[18px]">expand_less</span>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label
+                            class="flex items-center justify-between p-2 rounded bg-neutral-dark-surface border border-neutral-dark-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <span class="text-xs text-white">Muito Otimista</span>
+                            <div class="w-2 h-2 rounded-full bg-market-up"></div>
+                        </label>
+                        <label
+                            class="flex items-center justify-between p-2 rounded bg-primary/10 border border-primary cursor-pointer transition-colors">
+                            <span class="text-xs text-primary font-bold">Otimista</span>
+                            <div class="w-2 h-2 rounded-full bg-primary"></div>
+                        </label>
+                        <label
+                            class="flex items-center justify-between p-2 rounded bg-neutral-dark-surface border border-neutral-dark-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <span class="text-xs text-white">Neutro</span>
+                            <div class="w-2 h-2 rounded-full bg-slate-500"></div>
+                        </label>
+                    </div>
+                </div>
+            </aside>
+            <div class="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
+                <div class="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                    <button
+                        class="px-4 py-1.5 rounded-full bg-primary text-black text-sm font-bold border border-primary whitespace-nowrap shadow-lg shadow-primary/20">
+                        Alto Crescimento
+                    </button>
+                    <button
+                        class="px-4 py-1.5 rounded-full bg-neutral-dark-surface text-slate-300 text-sm font-medium border border-neutral-dark-border hover:border-primary hover:text-primary whitespace-nowrap transition-colors">
+                        Ações de Valor
+                    </button>
+                    <button
+                        class="px-4 py-1.5 rounded-full bg-neutral-dark-surface text-slate-300 text-sm font-medium border border-neutral-dark-border hover:border-primary hover:text-primary whitespace-nowrap transition-colors">
+                        Aristocratas de Dividendos
+                    </button>
+                    <button
+                        class="px-4 py-1.5 rounded-full bg-neutral-dark-surface text-slate-300 text-sm font-medium border border-neutral-dark-border hover:border-primary hover:text-primary whitespace-nowrap transition-colors flex items-center gap-2">
+                        Mais Otimistas no Fórum
+                        <span class="material-symbols-outlined text-[14px] text-primary">forum</span>
+                    </button>
+                    <div class="w-px h-6 bg-neutral-dark-border mx-1"></div>
+                    <button
+                        class="px-3 py-1.5 rounded-full bg-neutral-dark-surface text-slate-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                    </button>
+                </div>
+                <div
+                    class="flex-1 bg-neutral-dark-surface rounded-xl border border-neutral-dark-border overflow-hidden flex flex-col shadow-2xl">
+                    <div
+                        class="grid grid-cols-12 gap-4 px-6 py-3 bg-black border-b border-neutral-dark-border items-center sticky top-0 z-10">
+                        <div
+                            class="col-span-3 text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1 cursor-pointer">
+                            Ticker
+                            <span class="material-symbols-outlined text-[14px]">arrow_downward</span>
+                        </div>
+                        <div
+                            class="col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer">
+                            Preço</div>
+                        <div
+                            class="col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer">
+                            Val. Mercado</div>
+                        <div
+                            class="col-span-1 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer">
+                            P/L</div>
+                        <div
+                            class="col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer">
+                            Div Yield</div>
+                        <div
+                            class="col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-center flex justify-center items-center gap-1 cursor-pointer">
+                            Pulso de IA
+                            <span class="material-symbols-outlined text-[14px]"
+                                title="Pontuação composta com base em Análise Técnica, Fundamentos e Sentimento">help</span>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto flex-1">
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black font-bold text-xs">
+                                    NVDA</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">NVIDIA
+                                        Corp</div>
+                                    <div class="text-xs text-slate-500">Semicondutores</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$892.10</div>
+                                <div class="flex justify-end items-center gap-1 text-market-up text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">trending_up</span>
+                                    +2.4%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$2.2T</div>
+                            <div class="col-span-1 text-right text-slate-300 text-sm font-medium">74.2</div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">0.02%</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-primary drop-shadow-[0_0_4px_rgba(255,191,0,0.5)]"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="94, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-primary">94</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-[#F7931A] flex items-center justify-center text-white font-bold text-xs">
+                                    BTC</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">Bitcoin
+                                    </div>
+                                    <div class="text-xs text-slate-500">Criptoativo</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$68,420.00</div>
+                                <div class="flex justify-end items-center gap-1 text-market-up text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">trending_up</span>
+                                    +1.8%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$1.3T</div>
+                            <div class="col-span-1 text-right text-slate-500 text-sm font-medium">--</div>
+                            <div class="col-span-2 text-right text-slate-500 text-sm font-medium">--</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-primary drop-shadow-[0_0_4px_rgba(255,191,0,0.5)]"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="88, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-primary">88</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                                    V</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">Visa
+                                        Inc.</div>
+                                    <div class="text-xs text-slate-500">Finanças</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$278.45</div>
+                                <div class="flex justify-end items-center gap-1 text-slate-400 text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">remove</span>
+                                    0.0%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$560B</div>
+                            <div class="col-span-1 text-right text-slate-300 text-sm font-medium">32.1</div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">0.75%</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-slate-400"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="65, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-slate-300">65</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-black border border-white flex items-center justify-center text-white font-bold text-xs">
+                                    TSLA</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">Tesla
+                                        Inc</div>
+                                    <div class="text-xs text-slate-500">Automotivo</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$172.50</div>
+                                <div class="flex justify-end items-center gap-1 text-market-down text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">trending_down</span>
+                                    -3.2%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$540B</div>
+                            <div class="col-span-1 text-right text-slate-300 text-sm font-medium">45.8</div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">--</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-market-down"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="42, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-market-down">42</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-xs">
+                                    XOM</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">Exxon
+                                        Mobil</div>
+                                    <div class="text-xs text-slate-500">Energia</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$114.30</div>
+                                <div class="flex justify-end items-center gap-1 text-market-up text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">trending_up</span>
+                                    +0.8%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$450B</div>
+                            <div class="col-span-1 text-right text-slate-300 text-sm font-medium">12.5</div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">3.4%</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-primary"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="78, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-primary">78</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group">
+                            <div class="col-span-3 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-xs">
+                                    JPM</div>
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-primary transition-colors">JP
+                                        Morgan</div>
+                                    <div class="text-xs text-slate-500">Finanças</div>
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right">
+                                <div class="text-white font-medium">$198.05</div>
+                                <div class="flex justify-end items-center gap-1 text-market-up text-xs font-medium">
+                                    <span class="material-symbols-outlined text-[12px]">trending_up</span>
+                                    +0.2%
+                                </div>
+                            </div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">$570B</div>
+                            <div class="col-span-1 text-right text-slate-300 text-sm font-medium">11.8</div>
+                            <div class="col-span-2 text-right text-slate-300 text-sm font-medium">2.3%</div>
+                            <div class="col-span-2 flex justify-center">
+                                <div class="relative w-12 h-12 flex items-center justify-center">
+                                    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-neutral-dark-border"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-width="3"></path>
+                                        <path class="text-slate-400"
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none" stroke="currentColor" stroke-dasharray="55, 100"
+                                            stroke-width="3"></path>
+                                    </svg>
+                                    <span class="absolute text-xs font-bold text-slate-300">55</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="p-4 border-t border-neutral-dark-border bg-black/50 flex items-center justify-between text-xs text-slate-500">
+                        <div>Mostrando <span class="text-white">1-6</span> de <span class="text-white">10.482</span>
+                            ativos</div>
+                        <div class="flex gap-2">
+                            <button
+                                class="px-3 py-1.5 rounded bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary/50 text-white disabled:opacity-50 transition-colors">Anterior</button>
+                            <button
+                                class="px-3 py-1.5 rounded bg-neutral-dark-surface border border-neutral-dark-border hover:border-primary/50 text-white transition-colors">Próximo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+</html>

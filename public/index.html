@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Painel Inicial do Market Pulse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FFBF00", "primary-hover": "#E6AC00",
+                        "background-light": "#000000", "background-dark": "#000000", "neutral-dark-surface": "#121212", "neutral-dark-border": "#333333",
+                        "accent-blue": "#3b82f6", "market-up": "#11d473",
+                        "market-down": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-black font-display text-slate-100 min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black">
+    <header
+        class="flex items-center justify-between whitespace-nowrap border-b border-solid border-neutral-dark-border px-10 py-3 bg-black sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-white">
+            <div class="size-8 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined !text-[32px]">candlestick_chart</span>
+            </div>
+            <h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+        </div>
+        <div class="flex flex-1 justify-end gap-8">
+            <nav class="hidden md:flex items-center gap-9">
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/index.html">Inicio</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/mercado.html">Mercados</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/noticias.html">Notícias</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/square.html">Square</a>
+                <a class="text-slate-300 hover:text-primary transition-colors text-sm font-medium leading-normal"
+                    href="/portfolio.html">Portfólio</a>
+                <a class="text-primary text-sm font-medium leading-normal flex items-center gap-1" href="#">
+                    <span class="material-symbols-outlined !text-lg">auto_awesome</span>
+                    Ferramentas de IA
+                </a>
+            </nav>
+            <div class="flex gap-2">
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-neutral-dark-border text-white hover:bg-neutral-dark-surface hover:border-primary/50 transition-colors text-sm font-bold leading-normal tracking-[0.015em]">
+                    <span class="truncate">Entrar</span>
+                </a>
+                <a href="/login.html"
+                    class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary hover:bg-primary-hover transition-colors text-black text-sm font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/20">
+                    <span class="truncate">Obter Pro</span>
+                </a>
+            </div>
+        </div>
+    </header>
+    <main class="flex-1 flex flex-col items-center px-6 py-8 md:px-10 lg:px-40 bg-black">
+        <div class="w-full max-w-[1280px] flex flex-col gap-8">
+            <section class="flex flex-col items-center justify-center py-10 gap-6 w-full max-w-3xl mx-auto">
+                <div class="text-center space-y-2">
+                    <h1 class="text-white tracking-tight text-4xl md:text-[40px] font-bold leading-tight">
+                        Pesquisa de <span class="text-primary">Inteligência de Mercado</span>
+                    </h1>
+                    <p class="text-slate-400 text-lg">Dados em tempo real, análises de IA e insights da comunidade em um
+                        só lugar.
+                    </p>
+                </div>
+                <div class="w-full relative group z-10">
+                    <div
+                        class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary transition-colors">
+                        <span class="material-symbols-outlined">search</span>
+                    </div>
+                    <input
+                        class="block w-full h-14 pl-12 pr-12 rounded-xl bg-neutral-dark-surface border border-neutral-dark-border text-white placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-lg shadow-black/50 text-lg"
+                        placeholder="Pesquisar Tickers (ex. AAPL), FIIs, Cripto, ou perguntar à IA..." type="text" />
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-2">
+                        <button
+                            class="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-neutral-dark-border transition-colors">
+                            <span class="material-symbols-outlined">mic</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 justify-center text-sm">
+                    <span class="text-slate-400">Em alta:</span>
+                    <a class="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm"
+                        href="#">NVDA</a>
+                    <a class="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm"
+                        href="#">Bitcoin</a>
+                    <a class="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm"
+                        href="#">AI Tech</a>
+                    <a class="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm"
+                        href="#">Futuros de Petróleo</a>
+                </div>
+            </section>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+                <div class="lg:col-span-8 flex flex-col gap-4">
+                    <div class="flex items-center justify-between px-1">
+                        <h2 class="text-white text-xl font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">grid_view</span>
+                            Mapa de Calor do Mercado
+                        </h2>
+                        <div class="flex gap-2">
+                            <select
+                                class="bg-neutral-dark-surface border border-neutral-dark-border rounded-lg text-xs font-medium text-slate-400 py-1 px-2 focus:ring-primary focus:border-primary focus:text-primary outline-none">
+                                <option>S&amp;P 500</option>
+                                <option>Nasdaq 100</option>
+                                <option>Cripto</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div
+                        class="w-full aspect-[4/3] md:aspect-[16/9] lg:aspect-[16/10] bg-neutral-dark-surface border border-neutral-dark-border rounded-xl p-1 overflow-hidden shadow-sm flex flex-col md:flex-row gap-1">
+                        <div class="flex-[3] flex flex-col gap-1">
+                            <div class="flex-[2] flex gap-1">
+                                <div
+                                    class="flex-[2] bg-[#0d9451] hover:bg-[#11d473] transition-colors p-3 rounded-lg flex flex-col justify-between cursor-pointer group relative overflow-hidden">
+                                    <div class="flex justify-between items-start z-10">
+                                        <span class="font-bold text-white text-lg text-shadow">MSFT</span>
+                                        <span class="text-white/90 font-medium text-shadow">+2.4%</span>
+                                    </div>
+                                    <span class="text-xs text-white/70 z-10 text-shadow">Tecnologia</span>
+                                    <div
+                                        class="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                    </div>
+                                </div>
+                                <div class="flex-1 flex flex-col gap-1">
+                                    <div
+                                        class="flex-1 bg-[#1e7a4b] hover:bg-[#25965c] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                        <span class="font-bold text-white text-sm text-shadow">AAPL</span>
+                                        <span class="text-white/90 text-xs text-shadow">+1.2%</span>
+                                    </div>
+                                    <div
+                                        class="flex-1 bg-[#d64135] hover:bg-[#f04a3d] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                        <span class="font-bold text-white text-sm text-shadow">NVDA</span>
+                                        <span class="text-white/90 text-xs text-shadow">-0.8%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-1 flex gap-1">
+                                <div
+                                    class="flex-1 bg-[#155e3e] hover:bg-[#1b7a50] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                    <span class="font-bold text-white text-sm text-shadow">GOOGL</span>
+                                    <span class="text-white/90 text-xs text-shadow">+0.5%</span>
+                                </div>
+                                <div
+                                    class="flex-1 bg-[#d64135] hover:bg-[#f04a3d] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                    <span class="font-bold text-white text-sm text-shadow">AMZN</span>
+                                    <span class="text-white/90 text-xs text-shadow">-1.1%</span>
+                                </div>
+                                <div
+                                    class="flex-1 bg-[#234836] hover:bg-[#2d5c45] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                    <span class="font-bold text-white text-sm text-shadow">META</span>
+                                    <span class="text-white/90 text-xs text-shadow">0.0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-[2] flex flex-col gap-1">
+                            <div
+                                class="flex-1 bg-[#d64135] hover:bg-[#f04a3d] transition-colors p-3 rounded-lg flex flex-col justify-between cursor-pointer">
+                                <div class="flex justify-between items-start">
+                                    <span class="font-bold text-white text-shadow">JPM</span>
+                                    <span class="text-white/90 text-sm text-shadow">-1.5%</span>
+                                </div>
+                                <span class="text-xs text-white/70 text-shadow">Finanças</span>
+                            </div>
+                            <div class="flex-[2] flex gap-1">
+                                <div class="flex-1 flex flex-col gap-1">
+                                    <div
+                                        class="flex-1 bg-[#0d9451] hover:bg-[#11d473] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                        <span class="font-bold text-white text-sm text-shadow">V</span>
+                                        <span class="text-white/90 text-xs text-shadow">+1.8%</span>
+                                    </div>
+                                    <div
+                                        class="flex-1 bg-[#1e7a4b] hover:bg-[#25965c] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                        <span class="font-bold text-white text-sm text-shadow">MA</span>
+                                        <span class="text-white/90 text-xs text-shadow">+0.9%</span>
+                                    </div>
+                                </div>
+                                <div
+                                    class="flex-[1.5] bg-[#d64135] hover:bg-[#f04a3d] transition-colors p-2 rounded-lg flex flex-col justify-center items-center cursor-pointer">
+                                    <span class="font-bold text-white text-sm text-shadow">XOM</span>
+                                    <span class="text-white/90 text-xs text-shadow">-2.1%</span>
+                                    <span class="text-[10px] text-white/70 mt-1 text-shadow">Energia</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-4 flex flex-col gap-4">
+                    <div class="flex items-center justify-between px-1">
+                        <h2 class="text-white text-xl font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">forum</span>
+                            Insights do Fórum
+                        </h2>
+                        <a class="text-primary text-sm font-medium hover:text-white transition-colors" href="#">Ver
+                            Todos</a>
+                    </div>
+                    <div class="flex flex-col gap-4">
+                        <div
+                            class="bg-neutral-dark-surface border border-neutral-dark-border rounded-xl p-4 shadow-sm hover:border-primary/50 transition-colors group cursor-pointer">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="size-10 rounded-full bg-slate-800 overflow-hidden relative border border-neutral-dark-border">
+                                        <img class="w-full h-full object-cover"
+                                            data-alt="Foto de perfil de analista financeiro"
+                                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQM-WTsD-orBU-_RiLUJkUJJZbmBYxBbg2jAUzD4JfdaFXYF3mIIN-WmkJEEHM5Y2rmE_aeTsHNpng88DvlWb-_53GoHyu170BHceZ6mVS-6jUDBDeiK8klARpwE7b96WSFRl4B_JEO7bdPNPDLdP0WhTdiZE5hcej41mLUPvOQsq73nAfm2i1-bfqAARDtZ1yZejbV-YXyPsKL2VjupWBBRlbh82IUUBfU0aEE5iTDCQwE_7thMtHaEf5kppy7vDxjSxXn_OtQiA" />
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-1">
+                                            <h4
+                                                class="text-sm font-bold text-white group-hover:text-primary transition-colors">
+                                                Sarah Jenkins</h4>
+                                            <span class="material-symbols-outlined text-primary !text-[14px]"
+                                                title="Analista de Elite">verified</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400">Estrategista Macro</p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="bg-market-up/10 text-market-up text-[10px] font-bold px-2 py-1 rounded-full border border-market-up/20">OTIMISTA</span>
+                            </div>
+                            <p class="text-sm text-slate-300 mb-3 leading-relaxed">
+                                A divergência nos rendimentos dos títulos sugere que a mudança do Fed está mais próxima
+                                do que precificada.
+                                Aumentando exposição a Small Caps <span class="text-primary font-medium">$IWM</span> e
+                                Biotecnologia.
+                            </p>
+                            <div class="flex items-center gap-4 text-slate-500 text-xs">
+                                <div class="flex items-center gap-1 hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined !text-[16px]">thumb_up</span>
+                                    <span>2.4k</span>
+                                </div>
+                                <div class="flex items-center gap-1 hover:text-white transition-colors">
+                                    <span class="material-symbols-outlined !text-[16px]">chat_bubble</span>
+                                    <span>142</span>
+                                </div>
+                                <div class="flex items-center gap-1 ml-auto">
+                                    <span class="material-symbols-outlined !text-[16px]">schedule</span>
+                                    <span>há 2h</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-neutral-dark-surface border border-neutral-dark-border rounded-xl p-4 shadow-sm hover:border-primary/50 transition-colors group cursor-pointer">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="size-10 rounded-full bg-slate-800 overflow-hidden relative border border-neutral-dark-border">
+                                        <img class="w-full h-full object-cover" data-alt="Foto de perfil de trader"
+                                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAS2gckzMgYc8cH4WFMi7N_krqVk45vrMn59vobGSqW-wJQj3pUHqWrCW6Pp5tVvT7HV9ddy73HyTM6ghqpaEUAiMIL4yjp97yqa1QSqi-a5rrqDtvP8HHZRXVJq1d8blAwQ5ZbWKI7CWwNdDhUkraX8HUinQ1_mLgBCjfHeKdTmKwALhF8CISyZu5PzC4WVMeX6lSJgKwJGtOGEArS_DyM1_QToez52zpmBGNnNEduKq2nZGZEfW6zAu63O0E9m-Wgym-CnO09mjo" />
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-1">
+                                            <h4
+                                                class="text-sm font-bold text-white group-hover:text-primary transition-colors">
+                                                David Chen</h4>
+                                            <span class="material-symbols-outlined text-primary !text-[14px]"
+                                                title="Analista de Elite">verified</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400">Trader Quant</p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="bg-market-down/10 text-market-down text-[10px] font-bold px-2 py-1 rounded-full border border-market-down/20">PESSIMISTA</span>
+                            </div>
+                            <p class="text-sm text-slate-300 mb-3 leading-relaxed">
+                                A análise de sentimento de IA na <span class="text-primary font-medium">$TSLA</span>
+                                atinge mínimas
+                                anuais apesar da alta recente. Meus modelos indicam retração para os níveis de 210.
+                            </p>
+                            <div class="flex items-center gap-4 text-slate-500 text-xs">
+                                <div class="flex items-center gap-1 hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined !text-[16px]">thumb_up</span>
+                                    <span>856</span>
+                                </div>
+                                <div class="flex items-center gap-1 hover:text-white transition-colors">
+                                    <span class="material-symbols-outlined !text-[16px]">chat_bubble</span>
+                                    <span>94</span>
+                                </div>
+                                <div class="flex items-center gap-1 ml-auto">
+                                    <span class="material-symbols-outlined !text-[16px]">schedule</span>
+                                    <span>há 4h</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-neutral-dark-surface border border-neutral-dark-border rounded-xl p-4 shadow-sm hover:border-primary/50 transition-colors group cursor-pointer">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="size-10 rounded-full bg-neutral-800 overflow-hidden relative border border-neutral-dark-border">
+                                        <div
+                                            class="flex items-center justify-center w-full h-full bg-primary text-black font-bold">
+                                            IA</div>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-1">
+                                            <h4
+                                                class="text-sm font-bold text-white group-hover:text-primary transition-colors">
+                                                Market Pulse AI</h4>
+                                            <span
+                                                class="material-symbols-outlined text-primary !text-[14px]">smart_toy</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400">Resumo Automatizado</p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="bg-neutral-700/50 text-neutral-300 text-[10px] font-bold px-2 py-1 rounded-full border border-neutral-600/50">NEUTRO</span>
+                            </div>
+                            <p class="text-sm text-slate-300 mb-3 leading-relaxed">
+                                <span class="font-semibold text-primary">Resumo Diário:</span> Mercados mistos enquanto
+                                aguardam dados do IPC.
+                                Setor de tecnologia com leve rotação para utilitários defensivos. Índice de volatilidade
+                                VIX subindo 2%.
+                            </p>
+                            <div class="flex items-center gap-4 text-slate-500 text-xs">
+                                <div class="flex items-center gap-1 hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined !text-[16px]">bolt</span>
+                                    <span>Alto Impacto</span>
+                                </div>
+                                <div class="flex items-center gap-1 ml-auto">
+                                    <span class="material-symbols-outlined !text-[16px]">schedule</span>
+                                    <span>há 15m</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 py-6 border-t border-neutral-dark-border mt-4">
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-500 font-medium uppercase tracking-wider">Principais Índices</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-white font-bold">S&amp;P 500</span>
+                        <span class="text-market-up text-sm font-medium">+0.45%</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-500 font-medium uppercase tracking-wider">Cripto</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-white font-bold">BTC/USD</span>
+                        <span class="text-market-up text-sm font-medium">+1.24%</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-500 font-medium uppercase tracking-wider">Commodities</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-white font-bold">Ouro</span>
+                        <span class="text-market-down text-sm font-medium">-0.12%</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-500 font-medium uppercase tracking-wider">Moedas</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-white font-bold">EUR/USD</span>
+                        <span class="text-slate-400 text-sm font-medium">0.00%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+</html>

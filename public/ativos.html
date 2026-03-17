@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Painel de Pesquisa Profunda de Ativos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#fbbf24", "primary-hover": "#f59e0b", "background-light": "#f6f8f7",
+                        "background-dark": "#050505", "card-dark": "#121212", "border-dark": "#27272a", "accent-orange": "#f97316", "accent-red": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display overflow-x-hidden antialiased">
+    <div class="flex h-screen w-full flex-col">
+        <header
+            class="flex flex-none items-center justify-between border-b border-border-dark bg-background-dark/95 backdrop-blur-md px-6 py-3 sticky top-0 z-50">
+            <div class="flex items-center gap-8">
+                <div class="flex items-center gap-3 text-white">
+                    <div class="flex items-center justify-center rounded bg-primary/20 p-1.5 text-primary">
+                        <span class="material-symbols-outlined text-2xl">ssid_chart</span>
+                    </div>
+                    <h2 class="text-lg font-bold tracking-tight">Pesquisa Profunda</h2>
+                </div>
+                <div class="relative w-96 hidden md:block">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <span class="material-symbols-outlined text-xl">search</span>
+                    </div>
+                    <input
+                        class="block w-full rounded-lg border-none bg-card-dark py-2 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:ring-1 focus:ring-primary"
+                        placeholder="Buscar ticker, empresa ou analista..." type="text" value="AAPL" />
+                </div>
+            </div>
+            <div class="flex items-center gap-6">
+                <nav class="hidden lg:flex items-center gap-6">
+                    <a class="text-slate-300 hover:text-primary text-sm font-medium transition-colors"
+                        href="#">Painel</a>
+                    <a class="text-primary text-sm font-medium border-b-2 border-primary py-1" href="#">Portfólio</a>
+                    <a class="text-slate-300 hover:text-primary text-sm font-medium transition-colors"
+                        href="#">Filtro</a>
+                    <a class="text-slate-300 hover:text-primary text-sm font-medium transition-colors" href="#">Notícias
+                        do Mercado</a>
+                </nav>
+                <div class="flex items-center gap-4 border-l border-border-dark pl-6">
+                    <button class="relative rounded-full p-1 text-slate-300 hover:text-white">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
+                    </button>
+                    <div class="h-8 w-8 rounded-full bg-center bg-cover border border-border-dark"
+                        data-alt="Foto de perfil do usuário"
+                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC0FCqSWD690oRpem9zlys-RoQJ4MMNwKjlov9AEePeQkavOMIiNEyOU9m7jyo7XbbvQIgZ37ikfIPqidmTY6iJtCqtWSA9Gas0L0fm0BlCZ5kqlX3nVFsCgnGOKSpQP4TnIwxb7_bOKXacs68GWQ5TUNr9R7NHGmEIE9GJ2ZNJy4c8PpRJHCFHybc3FBuMPS4Qz1JFRL5oqKdgiuYcibOevtNCdD4W8aFafc3tdj_dFEpaEp7FEc2Uzqtryk3ystw-mGdN8P0l060");'>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div class="flex flex-1 overflow-hidden">
+            <aside
+                class="w-16 flex-none border-r border-border-dark bg-background-dark hidden xl:flex flex-col items-center py-6 gap-6">
+                <button class="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20"><span
+                        class="material-symbols-outlined">analytics</span></button>
+                <button
+                    class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-card-dark transition-colors"><span
+                        class="material-symbols-outlined">account_balance_wallet</span></button>
+                <button
+                    class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-card-dark transition-colors"><span
+                        class="material-symbols-outlined">newspaper</span></button>
+                <button
+                    class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-card-dark transition-colors"><span
+                        class="material-symbols-outlined">smart_toy</span></button>
+                <div class="flex-1"></div>
+                <button
+                    class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-card-dark transition-colors"><span
+                        class="material-symbols-outlined">settings</span></button>
+            </aside>
+            <main class="flex-1 overflow-y-auto custom-scrollbar bg-background-dark p-6">
+                <div class="mx-auto max-w-7xl space-y-6">
+                    <div class="rounded-xl border border-border-dark bg-card-dark p-6 shadow-sm">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div class="flex items-center gap-4">
+                                <div class="h-16 w-16 rounded-xl bg-white p-2 flex items-center justify-center">
+                                    <img alt="Logo da Apple" class="h-10 w-10 object-contain"
+                                        data-alt="Logo da Apple preto"
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPGY67Oc4NVYj-XmfMpEC3oCZ1H-u3FmZngJs4B5_j8vJ08d0eaCV_78Mupmtqkrq9mcgpL7ko9iWoVk7RwRQV-HdXy3VnRYiNh_oAdJatMsyvR7ciXn7Eenp_W_HzS7akQDkZC2ebYWXEQjfvB_SGfjmUn6yAPdsffOJRPcPWRmcrB8VeIhd6p5e3mPgcVUfQMMSeqnVJfxvi_3PhjeewO7bskwO_X701h3KL5jeXriJkXCnhqKhRVXeGRa9xqOt6sJ0zRqUklrA" />
+                                </div>
+                                <div>
+                                    <h1 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Apple Inc.
+                                        <span class="text-slate-400 font-medium text-xl ml-1">(AAPL)</span></h1>
+                                    <p class="text-slate-400 text-sm mt-1 flex items-center gap-2">
+                                        <span
+                                            class="bg-background-dark border border-border-dark px-2 py-0.5 rounded text-xs text-primary font-semibold">Eletrônicos
+                                            de Consumo</span>
+                                        <span>•</span>
+                                        <span>NASDAQ</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-1">
+                                <div class="flex items-baseline gap-3">
+                                    <span class="text-3xl font-bold text-white">$178.35</span>
+                                    <span
+                                        class="flex items-center text-primary font-bold bg-primary/10 px-2 py-0.5 rounded text-sm border border-primary/20">
+                                        <span class="material-symbols-outlined text-sm mr-1">arrow_upward</span> 1.2%
+                                    </span>
+                                </div>
+                                <span class="text-slate-500 text-xs">Última atualização: Hoje, 16:00 EST</span>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-border-dark pt-4">
+                            <button
+                                class="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-black hover:bg-primary-hover transition-colors">
+                                <span class="material-symbols-outlined text-lg">add</span> Adicionar à Lista
+                            </button>
+                            <button
+                                class="flex items-center gap-2 rounded-lg border border-slate-700 bg-transparent px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors">
+                                <span class="material-symbols-outlined text-lg">notifications_active</span> Definir
+                                Alerta
+                            </button>
+                            <button
+                                class="flex items-center gap-2 rounded-lg border border-slate-700 bg-transparent px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors">
+                                <span class="material-symbols-outlined text-lg">compare_arrows</span> Comparar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-12 gap-6">
+                        <div class="col-span-12 lg:col-span-8 space-y-6">
+                            <section class="rounded-xl border border-border-dark bg-card-dark overflow-hidden">
+                                <div
+                                    class="border-b border-border-dark bg-zinc-900/50 px-6 py-4 flex justify-between items-center">
+                                    <h3 class="flex items-center gap-2 text-lg font-bold text-white">
+                                        <span class="material-symbols-outlined text-primary">psychology</span> Resumo
+                                        Executivo de IA
+                                    </h3>
+                                    <span
+                                        class="text-xs bg-primary/20 text-primary border border-primary/20 px-2 py-1 rounded font-medium">Atualizado
+                                        há 2h</span>
+                                </div>
+                                <div class="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border-dark">
+                                    <div class="p-6 space-y-4">
+                                        <h4 class="text-sm font-bold uppercase tracking-wider text-primary mb-4">Por que
+                                            investir? (Cenário Otimista)</h4>
+                                        <div class="flex gap-3">
+                                            <div class="flex-none pt-1">
+                                                <span
+                                                    class="material-symbols-outlined text-primary text-xl">check_circle</span>
+                                            </div>
+                                            <div>
+                                                <h5 class="text-white font-medium text-sm">Forte Fidelidade à Marca</h5>
+                                                <p class="text-slate-400 text-sm leading-relaxed mt-1">Taxas de retenção
+                                                    &gt;90% criam uma barreira de receita recorrente inigualável no
+                                                    setor de hardware.</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <div class="flex-none pt-1">
+                                                <span
+                                                    class="material-symbols-outlined text-primary text-xl">check_circle</span>
+                                            </div>
+                                            <div>
+                                                <h5 class="text-white font-medium text-sm">Crescimento de Serviços</h5>
+                                                <p class="text-slate-400 text-sm leading-relaxed mt-1">O segmento de
+                                                    serviços agora representa 22% da receita com margens brutas de 70%+.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <div class="flex-none pt-1">
+                                                <span
+                                                    class="material-symbols-outlined text-primary text-xl">check_circle</span>
+                                            </div>
+                                            <div>
+                                                <h5 class="text-white font-medium text-sm">Fortaleza de Caixa</h5>
+                                                <p class="text-slate-400 text-sm leading-relaxed mt-1">$162B em reservas
+                                                    de caixa permitem recompras agressivas e M&amp;A estratégicos.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="p-6 space-y-4 bg-zinc-900/30">
+                                        <h4 class="text-sm font-bold uppercase tracking-wider text-accent-orange mb-4">
+                                            Principais Riscos (Cenário Pessimista)</h4>
+                                        <div class="flex gap-3">
+                                            <div class="flex-none pt-1">
+                                                <span
+                                                    class="material-symbols-outlined text-accent-orange text-xl">warning</span>
+                                            </div>
+                                            <div>
+                                                <h5 class="text-white font-medium text-sm">Dependência da China</h5>
+                                                <p class="text-slate-400 text-sm leading-relaxed mt-1">19% da receita e
+                                                    exposição crítica da cadeia de suprimentos a tensões geopolíticas.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <div class="flex-none pt-1">
+                                                <span
+                                                    class="material-symbols-outlined text-accent-orange text-xl">warning</span>
+                                            </div>
+                                            <div>
+                                                <h5 class="text-white font-medium text-sm">Obstáculos Regulatórios</h5>
+                                                <p class="text-slate-400 text-sm leading-relaxed mt-1">A Lei de Mercados
+                                                    Digitais da UE pode forçar a abertura do ecossistema da App Store.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <section class="rounded-xl border border-border-dark bg-card-dark p-6">
+                                    <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-slate-400">fitness_center</span>
+                                        Saúde Fundamental
+                                    </h3>
+                                    <div class="space-y-6">
+                                        <div>
+                                            <div class="flex justify-between items-end mb-2">
+                                                <span class="text-sm font-medium text-slate-300">Retorno sobre
+                                                    Patrimônio (ROE)</span>
+                                                <span class="text-sm font-bold text-primary">156% <span
+                                                        class="text-xs font-normal text-slate-500">/ Pontuação
+                                                        10.0</span></span>
+                                            </div>
+                                            <div class="w-full bg-zinc-800 rounded-full h-2">
+                                                <div class="bg-primary h-2 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.5)]"
+                                                    style="width: 100%"></div>
+                                            </div>
+                                            <p class="text-xs text-slate-500 mt-1">Média do Setor: 24%</p>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between items-end mb-2">
+                                                <span class="text-sm font-medium text-slate-300">Margem de Lucro
+                                                    Líquido</span>
+                                                <span class="text-sm font-bold text-primary">25.3% <span
+                                                        class="text-xs font-normal text-slate-500">/ Pontuação
+                                                        9.2</span></span>
+                                            </div>
+                                            <div class="w-full bg-zinc-800 rounded-full h-2">
+                                                <div class="bg-primary h-2 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.5)]"
+                                                    style="width: 92%"></div>
+                                            </div>
+                                            <p class="text-xs text-slate-500 mt-1">Média do Setor: 12%</p>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between items-end mb-2">
+                                                <span class="text-sm font-medium text-slate-300">Dívida sobre
+                                                    Patrimônio</span>
+                                                <span class="text-sm font-bold text-accent-orange">1.8 <span
+                                                        class="text-xs font-normal text-slate-500">/ Pontuação
+                                                        6.5</span></span>
+                                            </div>
+                                            <div class="w-full bg-zinc-800 rounded-full h-2">
+                                                <div class="bg-accent-orange h-2 rounded-full shadow-[0_0_8px_rgba(249,115,22,0.5)]"
+                                                    style="width: 65%"></div>
+                                            </div>
+                                            <p class="text-xs text-slate-500 mt-1">Alavancagem maior que os pares</p>
+                                        </div>
+                                        <div class="pt-2">
+                                            <div
+                                                class="flex justify-between items-center bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                                                <span class="text-sm text-slate-300">Piotroski F-Score Geral</span>
+                                                <span
+                                                    class="text-base font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded">8/9</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                                <section class="rounded-xl border border-border-dark bg-card-dark p-6 relative">
+                                    <h3 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-slate-400">price_check</span>
+                                        Análise de Valor Justo
+                                    </h3>
+                                    <div class="flex flex-col gap-6 items-center justify-center h-full pb-4">
+                                        <div class="w-full space-y-5">
+                                            <div class="relative pt-6">
+                                                <div
+                                                    class="absolute -top-1 left-[60%] -translate-x-1/2 flex flex-col items-center">
+                                                    <span
+                                                        class="text-xs font-bold text-black bg-primary border border-primary px-2 py-1 rounded mb-1 whitespace-nowrap z-10 shadow-lg shadow-primary/20">$178.35
+                                                        (Atual)</span>
+                                                    <div class="w-0.5 h-4 bg-primary"></div>
+                                                </div>
+                                                <div
+                                                    class="w-full h-4 bg-gradient-to-r from-yellow-500/20 via-zinc-600/20 to-red-500/20 rounded-full relative overflow-hidden ring-1 ring-zinc-800">
+                                                    <div class="absolute top-0 left-0 h-full w-[70%] bg-primary/20 border-r-2 border-primary/50"
+                                                        title="Zona Subavaliada"></div>
+                                                </div>
+                                                <div class="flex justify-between text-xs text-slate-500 mt-2 font-mono">
+                                                    <span>$100</span>
+                                                    <span>$300</span>
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="flex justify-between items-center border-b border-zinc-800 pb-3">
+                                                <span class="text-sm text-slate-300">Valor Justo DCF</span>
+                                                <div class="text-right">
+                                                    <span class="block text-base font-bold text-primary">$192.40</span>
+                                                    <span class="text-xs text-primary">+7.8% Potencial</span>
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="flex justify-between items-center border-b border-zinc-800 pb-3">
+                                                <span class="text-sm text-slate-300">Número de Graham</span>
+                                                <div class="text-right">
+                                                    <span
+                                                        class="block text-base font-bold text-slate-200">$145.20</span>
+                                                    <span class="text-xs text-accent-red">-18.5% Risco de Queda</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="w-full bg-primary/5 rounded-lg p-3 border border-primary/20 flex items-start gap-3">
+                                            <span
+                                                class="material-symbols-outlined text-primary text-xl">verified_user</span>
+                                            <div>
+                                                <h5 class="text-xs font-bold text-primary uppercase">Margem de Segurança
+                                                </h5>
+                                                <p class="text-xs text-slate-300 leading-tight mt-0.5">A ação está sendo
+                                                    negociada ligeiramente abaixo do valor intrínseco baseado em modelos
+                                                    DCF.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                        <div class="col-span-12 lg:col-span-4 space-y-6">
+                            <section class="rounded-xl border border-border-dark bg-card-dark p-6">
+                                <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-slate-400">speed</span> Sentimento do
+                                    Mercado
+                                </h3>
+                                <p class="text-xs text-slate-400 mb-6">Sentimento Social + Volatilidade do Mercado</p>
+                                <div class="relative h-40 w-full flex items-end justify-center overflow-hidden">
+                                    <svg class="w-full h-full max-w-[240px]" viewBox="0 0 200 110">
+                                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#27272a"
+                                            stroke-linecap="round" stroke-width="20"></path>
+                                        <path class="opacity-30" d="M 20 100 A 80 80 0 0 1 70 38" fill="none"
+                                            stroke="#ef4444" stroke-dasharray="2 2" stroke-width="20"></path>
+                                        <path class="opacity-30" d="M 70 38 A 80 80 0 0 1 130 38" fill="none"
+                                            stroke="#fbbf24" stroke-dasharray="2 2" stroke-width="20"></path>
+                                        <path class="opacity-80" d="M 130 38 A 80 80 0 0 1 180 100" fill="none"
+                                            stroke="#fbbf24" stroke-dasharray="2 2" stroke-width="20"></path>
+                                        <g transform="rotate(45, 100, 100)">
+                                            <line stroke="white" stroke-linecap="round" stroke-width="4" x1="100"
+                                                x2="100" y1="100" y2="30"></line>
+                                            <circle cx="100" cy="100" fill="white" r="6"></circle>
+                                        </g>
+                                    </svg>
+                                    <div class="absolute bottom-0 text-center">
+                                        <span class="block text-3xl font-black text-primary">76</span>
+                                        <span
+                                            class="text-xs uppercase tracking-widest font-bold text-primary">Ganância</span>
+                                    </div>
+                                </div>
+                                <div class="mt-6 space-y-3">
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-slate-400">Volume Social</span>
+                                        <span class="text-white font-medium">Alto</span>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-slate-400">Relação Put/Call</span>
+                                        <span class="text-primary font-medium">Otimista (0.65)</span>
+                                    </div>
+                                </div>
+                            </section>
+                            <section class="rounded-xl border border-border-dark bg-card-dark flex flex-col h-[500px]">
+                                <div
+                                    class="p-4 border-b border-border-dark flex justify-between items-center bg-zinc-900/50">
+                                    <div class="flex items-center gap-3">
+                                        <div class="relative">
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-amber-600 flex items-center justify-center text-black font-bold">
+                                                <span class="material-symbols-outlined text-xl">smart_toy</span>
+                                            </div>
+                                            <span
+                                                class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-card-dark rounded-full"></span>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-bold text-white">Pergunte ao Analista IA</h3>
+                                            <p class="text-xs text-primary">Online • GPT-4 Turbo</p>
+                                        </div>
+                                    </div>
+                                    <button class="text-slate-400 hover:text-white"><span
+                                            class="material-symbols-outlined">more_horiz</span></button>
+                                </div>
+                                <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-card-dark">
+                                    <div class="flex gap-3">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-primary/20 flex-none flex items-center justify-center text-primary text-xs font-bold border border-primary/20">
+                                            IA</div>
+                                        <div
+                                            class="bg-zinc-800 rounded-2xl rounded-tl-none p-3 max-w-[85%] border border-zinc-700">
+                                            <p class="text-sm text-slate-200">Analisei o último relatório 10-K da AAPL.
+                                                Apesar da saturação do iPhone, a receita de serviços cresceu 14% em
+                                                relação ao ano anterior. Gostaria de um detalhamento dos riscos
+                                                regulatórios na UE?</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-3 flex-row-reverse">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-slate-700 flex-none flex items-center justify-center text-white text-xs font-bold">
+                                            EU</div>
+                                        <div
+                                            class="bg-primary/20 border border-primary/30 rounded-2xl rounded-tr-none p-3 max-w-[85%]">
+                                            <p class="text-sm text-white">Como o P/E atual se compara à média de 5 anos?
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-3">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-primary/20 flex-none flex items-center justify-center text-primary text-xs font-bold border border-primary/20">
+                                            IA</div>
+                                        <div
+                                            class="bg-zinc-800 rounded-2xl rounded-tl-none p-3 max-w-[85%] border border-zinc-700">
+                                            <p class="text-sm text-slate-200">A AAPL está sendo negociada atualmente a
+                                                um P/E de <strong class="text-white">28.5x</strong>.</p>
+                                            <div
+                                                class="mt-2 text-xs bg-black p-2 rounded border border-zinc-700 text-slate-300">
+                                                <div class="flex justify-between mb-1">
+                                                    <span>P/E Atual:</span>
+                                                    <span class="text-primary font-bold">28.5x</span>
+                                                </div>
+                                                <div class="flex justify-between">
+                                                    <span>Média P/E 5 Anos:</span>
+                                                    <span class="text-slate-400">26.1x</span>
+                                                </div>
+                                            </div>
+                                            <p class="text-sm text-slate-200 mt-2">Está sendo negociada com um leve
+                                                prêmio (~9%) em relação à sua média histórica.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-t border-border-dark bg-card-dark">
+                                    <div class="relative">
+                                        <input
+                                            class="w-full bg-black border border-zinc-700 rounded-full py-2.5 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-slate-500"
+                                            placeholder="Pergunte sobre dividendos, lucros..." type="text" />
+                                        <button
+                                            class="absolute right-2 top-1.5 p-1 text-primary hover:text-white transition-colors">
+                                            <span class="material-symbols-outlined">send</span>
+                                        </button>
+                                    </div>
+                                    <div class="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+                                        <button
+                                            class="whitespace-nowrap px-3 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-xs text-slate-300 border border-zinc-700 transition-colors">Resumir
+                                            Chamada de Resultados</button>
+                                        <button
+                                            class="whitespace-nowrap px-3 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-xs text-slate-300 border border-zinc-700 transition-colors">Análise
+                                            de Concorrentes</button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+
+</html>
