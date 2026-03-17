@@ -33,6 +33,15 @@ export interface Asset {
     tokenInflation?: string;
     networkRevenue?: string;
     onChainScore?: number;
+    description?: string;
+    fundamentalData?: {
+        pl: number;
+        pvp: number;
+        dy: number;
+        roe: number;
+        margemLiquida: number;
+        dividaPatrimonio: number;
+    };
 }
 
 export const b3Assets: Asset[] = [
