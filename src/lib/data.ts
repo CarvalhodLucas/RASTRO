@@ -7500,7 +7500,7 @@ export const b3Assets: Asset[] = [
         peRatio: "--",
         dividendYield: "13.2%",
         lastUpdate: new Date().toLocaleDateString('pt-BR')
-    }
+    },
 ];
 
 export const cryptoAssets: Asset[] = [
@@ -8675,3 +8675,5 @@ export const assetsDatabase: Asset[] = [
     ...cryptoAssets,
     ...sp500Assets
 ];
+
+export const assets = assetsDatabase;
