@@ -519,7 +519,7 @@ const PortfolioPage: React.FC = () => {
         setMessages([WELCOME_MESSAGE]);
 
         const saved = localStorage.getItem('user_watchlist');
-        let initialList = ['BTC', 'ETH', 'SOL', 'PETR4.SA', 'AAPL'];
+        let initialList: string[] = [];
 
         if (saved) {
             try {
@@ -531,7 +531,9 @@ const PortfolioPage: React.FC = () => {
         // Deduplicate and Normalize
         const uniqueNormalized = Array.from(new Set(initialList.map(normalizeTicker)));
         setWatchlist(uniqueNormalized);
-        localStorage.setItem('user_watchlist', JSON.stringify(uniqueNormalized));
+        if (uniqueNormalized.length > 0) {
+            localStorage.setItem('user_watchlist', JSON.stringify(uniqueNormalized));
+        }
     }, []);
 
     useEffect(() => {
@@ -810,92 +812,85 @@ Use obrigatoriamente esta estrutura completa:
                                     ))}
                                 </div>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-black/40 text-slate-500 text-[9px] uppercase font-black tracking-widest border-b border-neutral-dark-border">
-                                        <tr>
-                                            <th className="px-3 md:px-8 py-4">Ativo / Radar</th>
-                                            <th className="px-3 md:px-8 py-4 text-right">Preço</th>
-                                            <th className="px-3 md:px-8 py-4 text-right hidden lg:table-cell">Variação (24h)</th>
-                                            <th className="px-3 md:px-8 py-4 text-center hidden lg:table-cell">Momento Técnico</th>
-                                            <th className="px-3 md:px-8 py-4 text-right hidden lg:table-cell">Performance Relativa</th>
-                                            <th className="px-3 md:px-8 py-4 text-right cursor-default">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    Nota
-                                                    <InfoTooltip text="Estimativa de valor justo para os próximos 12 meses. O cálculo cruza a nota qualitativa da IA com o preço de mercado para identificar ativos descontados (Upside) ou sobrevalorizados (Downside)." />
+                            <div className="flex flex-col">
+                                {/* Header Row (Visible only on Desktop) */}
+                                <div className="hidden lg:flex items-center bg-black/40 text-slate-500 text-[9px] uppercase font-black tracking-widest border-b border-neutral-dark-border px-4 md:px-8 py-4 gap-4">
+                                    <div className="flex-1 min-w-0">Ativo / Radar</div>
+                                    <div className="w-32 text-right">Momento Técnico</div>
+                                    <div className="w-40 text-right">Performance Relativa</div>
+                                    <div className="w-24 text-right">Nota / Upside</div>
+                                    <div className="w-24 text-right hidden xl:block">Mkt Cap</div>
+                                    <div className="w-28 text-right hidden xl:block">Força (7d)</div>
+                                    <div className="min-w-[70px] text-right">Preço / Var</div>
+                                    <div className="w-8"></div>
+                                </div>
+
+                                <div className="divide-y divide-neutral-dark-border/50">
+                                    {loading && assets.length === 0 ? (
+                                        <div className="py-24 text-center">
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="size-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin"></div>
+                                                <p className="text-xs font-black uppercase text-slate-500 tracking-widest">Sincronizando Watchlist...</p>
+                                            </div>
+                                        </div>
+                                    ) : (isExpanded ? assets : assets.slice(0, 8)).map((asset, idx) => (
+                                        <div key={idx} className="flex items-center justify-between gap-4 p-3 md:p-4 md:px-8 hover:bg-primary/[0.04] transition-all group relative">
+                                            {/* LEFT: Logo, Ticker, Name */}
+                                            <Link href={`/asset/${asset.ticker}`} className="flex items-center gap-4 flex-1 min-w-0">
+                                                <div className="size-10 rounded-full bg-zinc-900 border border-neutral-dark-border/50 flex items-center justify-center overflow-hidden shrink-0">
+                                                    <img
+                                                        src={asset.image || `https://ui-avatars.com/api/?name=${asset.symbol}&background=334155&color=fff&bold=true`}
+                                                        className="w-full h-full object-cover"
+                                                        alt={asset.symbol}
+                                                    />
                                                 </div>
-                                            </th>
-                                            <th className="px-3 md:px-8 py-4 text-right hidden sm:table-cell">Mkt Cap</th>
-                                            <th className="px-3 md:px-8 py-4 hidden sm:table-cell">Força (7d)</th>
-                                            <th className="px-3 md:px-8 py-4 text-right"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-neutral-dark-border/50 text-sm">
-                                        {loading && assets.length === 0 ? (
-                                            <tr><td colSpan={6} className="py-24 text-center">
-                                                <div className="flex flex-col items-center gap-4">
-                                                    <div className="size-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin"></div>
-                                                    <p className="text-xs font-black uppercase text-slate-500 tracking-widest">Sincronizando Watchlist...</p>
+                                                <div className="min-w-0 flex flex-col">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-white shrink-0 text-sm group-hover:text-primary transition-colors">{asset.symbol}</p>
+                                                        {asset.isProtection && <span title="Proteção de Portfólio" className="text-[10px] cursor-help" aria-label="Baixa correlação com benchmark">🛡️</span>}
+                                                    </div>
+                                                    <p className="text-sm text-zinc-400 truncate max-w-[120px] uppercase font-bold tracking-tighter">
+                                                        {asset.name}
+                                                    </p>
                                                 </div>
-                                            </td></tr>
-                                        ) : (isExpanded ? assets : assets.slice(0, 8)).map((asset, idx) => (
-                                            <tr key={idx} className="hover:bg-primary/[0.04] transition-all group">
-                                                <td className="px-3 md:px-8 py-4 md:py-6">
-                                                    <Link href={`/asset/${asset.ticker}`} className="flex items-center gap-4">
-                                                        <div className="size-10 rounded-full bg-zinc-900 border border-neutral-dark-border/50 flex items-center justify-center overflow-hidden">
-                                                            <img
-                                                                src={asset.image || `https://ui-avatars.com/api/?name=${asset.symbol}&background=334155&color=fff&bold=true`}
-                                                                className="w-full h-full object-cover"
-                                                                alt={asset.symbol}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-black text-white text-sm group-hover:text-primary transition-colors">{asset.symbol}</p>
-                                                                {asset.isProtection && <span title="Proteção de Portfólio" className="text-[10px] cursor-help" aria-label="Baixa correlação com benchmark">🛡️</span>}
-                                                            </div>
-                                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{asset.name}</p>
-                                                        </div>
-                                                    </Link>
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right font-mono font-bold text-slate-100">{asset.price}</td>
-                                                <td className={`px-3 md:px-8 py-4 md:py-6 text-right font-mono font-bold hidden lg:table-cell ${asset.color === 'success' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                                                    {asset.change}
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-center hidden lg:table-cell">
-                                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase text-white ${asset.momento?.color || 'bg-slate-700'}`}>
+                                            </Link>
+
+                                            {/* MIDDLE: Desktop specific columns */}
+                                            <div className="hidden lg:flex items-center justify-end gap-6 flex-1">
+                                                {/* Momento */}
+                                                <div className="w-32 flex justify-end">
+                                                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase text-white ${asset.momento?.color || 'bg-slate-700'}`}>
                                                         <span className="material-symbols-outlined !text-[12px]">{asset.momento?.icon}</span>
                                                         {asset.momento?.label}
                                                     </div>
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right hidden lg:table-cell">
-                                                    <div className="flex flex-col items-end gap-1.5 group/risco relative">
-                                                        {/* Alpha/Beta Badge */}
-                                                        {asset.alpha && (
-                                                            <div className="group/alpha relative">
-                                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help transition-all hover:scale-105 border ${asset.alpha.color}`}>
-                                                                    {asset.alpha.label}
-                                                                </span>
-                                                                <div className="absolute bottom-full right-0 mb-2 hidden group-hover/alpha:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none">
-                                                                    <p className="text-[10px] text-slate-300 font-medium leading-relaxed italic">
-                                                                        {asset.alpha.tooltip}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                </div>
 
-                                                        {/* Risk/Correlation Badge */}
-                                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help whitespace-nowrap transition-all hover:scale-105 ${asset.risco?.color}`}>
-                                                            {asset.risco?.label}
-                                                        </span>
-                                                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover/risco:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none">
-                                                            <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
-                                                                {asset.risco?.tooltip}
-                                                            </p>
+                                                {/* Performance Relativa */}
+                                                <div className="w-40 flex flex-col items-end gap-1 group/risco relative">
+                                                    {asset.alpha && (
+                                                        <div className="group/alpha relative">
+                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help transition-all hover:scale-105 border ${asset.alpha.color}`}>
+                                                                {asset.alpha.label}
+                                                            </span>
+                                                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover/alpha:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
+                                                                <p className="text-[10px] text-slate-300 font-medium leading-relaxed italic">
+                                                                    {asset.alpha.tooltip}
+                                                                </p>
+                                                            </div>
                                                         </div>
+                                                    )}
+                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help whitespace-nowrap transition-all hover:scale-105 ${asset.risco?.color}`}>
+                                                        {asset.risco?.label}
+                                                    </span>
+                                                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover/risco:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
+                                                        <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
+                                                            {asset.risco?.tooltip}
+                                                        </p>
                                                     </div>
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right">
+                                                </div>
+
+                                                {/* Nota / Upside */}
+                                                <div className="w-24 text-right">
                                                     {asset.upside.isNeutral ? (
                                                         <div className="inline-flex items-center gap-1 text-sm font-black text-slate-600">
                                                             <span className="material-symbols-outlined text-sm">horizontal_rule</span>
@@ -910,24 +905,38 @@ Use obrigatoriamente esta estrutura completa:
                                                             {asset.upside.label}
                                                         </div>
                                                     )}
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right font-mono text-xs text-slate-400 font-semibold hidden sm:table-cell">{asset.mcap}</td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right hidden sm:table-cell">
-                                                    <div className="w-24 h-8 relative">
-                                                        <svg className={`w-full h-full fill-none stroke-2 overflow-visible ${asset.color === 'success' ? 'stroke-[#0ecb81]' : 'stroke-[#f6465d]'} ${Math.abs(parseFloat(asset.change)) > 5 ? 'animate-pulse' : ''}`}>
-                                                            <path d={asset.spark} strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 md:px-8 py-4 md:py-6 text-right">
-                                                    <button onClick={() => removeFromWatchlist(asset.ticker)} className="text-slate-600 hover:text-red-500 transition-colors">
-                                                        <span className="material-symbols-outlined text-sm">close</span>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                </div>
+
+                                                {/* Mkt Cap (Extra wide screens) */}
+                                                <div className="w-24 text-right font-mono text-[10px] text-slate-400 font-semibold hidden xl:block">
+                                                    {asset.mcap}
+                                                </div>
+
+                                                {/* Força (Extra wide screens) */}
+                                                <div className="w-28 h-8 relative hidden xl:block">
+                                                    <svg className={`w-full h-full fill-none stroke-2 overflow-visible ${asset.color === 'success' ? 'stroke-[#0ecb81]' : 'stroke-[#f6465d]'} ${Math.abs(parseFloat(asset.change)) > 5 ? 'animate-pulse' : ''}`}>
+                                                        <path d={asset.spark} strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+
+                                            {/* RIGHT: Price / Variation Badge */}
+                                            <div className="min-w-[70px] text-right shrink-0 flex flex-col gap-0.5">
+                                                <p className="font-bold text-white text-sm tracking-tight">{asset.price}</p>
+                                                <p className={`text-[11px] font-black font-mono ${asset.color === 'success' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                                                    {asset.change}
+                                                </p>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="w-8 flex justify-end">
+                                                <button onClick={() => removeFromWatchlist(asset.ticker)} className="text-slate-600 hover:text-red-500 transition-colors">
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                             {assets.length > 8 && (
                                 <div className="p-6 border-t border-neutral-dark-border flex justify-center bg-black/10">
@@ -947,9 +956,9 @@ Use obrigatoriamente esta estrutura completa:
                         {watchlist.length === 0 && (
                             <div className="text-center py-20 bg-neutral-dark-surface/30 border-2 border-dashed border-neutral-dark-border rounded-3xl">
                                 <span className="material-symbols-outlined text-6xl text-slate-800 mb-4 block">bookmark_add</span>
-                                <h3 className="text-xl font-bold text-white mb-2">Sua lista está vazia</h3>
-                                <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm">Adicione ativos para começar a receber análises em tempo real da nossa IA.</p>
-                                <button onClick={() => setShowSearchModal(true)} className="px-8 py-4 bg-primary text-black font-black rounded-2xl hover:scale-105 transition-all uppercase text-xs tracking-widest shadow-xl shadow-primary/20">Expandir Watchlist</button>
+                                <h3 className="text-xl font-bold text-white mb-2">Seu portfólio está vazio</h3>
+                                <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm">Adicione ativos para começar a monitorar.</p>
+                                <button onClick={() => setShowSearchModal(true)} className="px-8 py-4 bg-primary text-black font-black rounded-2xl hover:scale-105 transition-all uppercase text-xs tracking-widest shadow-xl shadow-primary/20">Adicionar Ativo</button>
                             </div>
                         )}
                     </div>
