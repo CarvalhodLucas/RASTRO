@@ -13,14 +13,10 @@ export async function GET(req: Request) {
         const cgParams = new URLSearchParams(searchParams);
         cgParams.delete("endpoint");
 
-        const apiKey = process.env.NEXT_PUBLIC_COINGECKO_KEY;
+        const envKey = process.env.NEXT_PUBLIC_COINGECKO_KEY || "";
+        const apiKey = envKey.length > 10 ? envKey : "CG-zP8Aj26U7MQeBXvYLryTkaNy";
         const baseUrl = "https://api.coingecko.com/api/v3";
         
-        // Se houver API Key, adiciona aos params
-        if (apiKey) {
-            cgParams.set("x_cg_demo_api_key", apiKey);
-        }
-
         const url = `${baseUrl}/${endpoint}?${cgParams.toString()}`;
         console.log("🌐 Proxying to CoinGecko:", url);
 
