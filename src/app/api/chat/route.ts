@@ -3,8 +3,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 
 export const dynamic = "force-dynamic";
 
-// Inicializa o SDK usando a variável GOOGLE_API_KEY conforme solicitado
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
+// Inicializa o SDK usando a variável GOOGLE_API_KEY ou GEMINI_API_KEY
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: Request) {
     try {
@@ -12,8 +12,10 @@ export async function POST(req: Request) {
 
         console.log(`[RASTRO IA] Iniciando análise Gemini para: ${ticker || name}`);
 
-        if (!process.env.GOOGLE_API_KEY) {
-            console.error("[RASTRO IA] Erro: GOOGLE_API_KEY não encontrada no servidor.");
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+            console.error("[RASTRO IA] Erro: API_KEY não encontrada no servidor.");
             return NextResponse.json({ error: "Chave da API não configurada no servidor." }, { status: 500 });
         }
 

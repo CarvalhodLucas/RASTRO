@@ -5,14 +5,19 @@ export async function POST(req: Request) {
         const { portfolio } = await req.json();
         const userPortfolio = portfolio || "Nenhum ativo selecionado"; 
 
-        const response = await fetch("https://api.x.ai/v1/chat/completions", {
+        const apiKey = process.env.GROQ_API_KEY || process.env.GROK_API_KEY || "";
+        const isGroq = apiKey.startsWith("gsk_");
+        const endpoint = isGroq ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.x.ai/v1/chat/completions";
+        const modelName = isGroq ? "llama-3.3-70b-versatile" : "grok-beta";
+
+        const response = await fetch(endpoint, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${process.env.GROK_API_KEY}`
+                "Authorization": `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "grok-beta", // ou grok-2
+                model: modelName,
                 messages: [
                     {
                         role: "system",
