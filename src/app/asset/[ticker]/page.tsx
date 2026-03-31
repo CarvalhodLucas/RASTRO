@@ -610,7 +610,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
         try {
             console.log(`🚀 Buscando Métricas On-chain para ${asset.ticker} via Grok...`);
             
-            const promptOnChain = `OBRIGATÓRIO: Pesquise os dados MAIS RECENTES na internet para a criptomoeda ${asset.ticker} (${asset.name}). Atue como um analista de dados on-chain. Retorne APENAS um JSON válido. O JSON deve ter EXATAMENTE estas 6 chaves e seus valores em formato de texto curto:
+            const promptOnChain = `OBRIGATÓRIO: Com base em seu amplo conhecimento da criptomoeda ${asset.ticker} (${asset.name}), avalie seus fundamentos on-chain. Atue como um analista de dados on-chain. Retorne APENAS um JSON válido. O JSON deve ter EXATAMENTE estas 6 chaves e seus valores em formato de texto curto:
 "tvl": Total Value Locked atual (ex: "$5.2B" ou "Crescente").
 "wallets": nível de atividade da rede / endereços (ex: "Alta" ou "1.2M").
 "inflation": inflação anual do token estimada (ex: "< 5%" ou "2.5%").

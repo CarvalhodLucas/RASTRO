@@ -48,7 +48,7 @@ OBRIGATÓRIO: Não repita os mesmos números em todas as análises.`;
         } else if (isComparison) {
             systemInstruction = `${rastroPersona}\n${chatRules}\nVocê é um gestor de fundo de investimento ácido e direto. Dê um veredicto comparativo entre dois ativos. Seja objetivo, cite números quando relevantes, e declare um VENCEDOR claro ao final. Responda em texto corrido (NÃO use JSON), em português, em no máximo 4 parágrafos curtos.`;
         } else if (isOnChain) {
-            systemInstruction = `${rastroPersona}\n${chatRules}\nAtue como um analista de dados on-chain de criptomoedas. Pesquise na internet os dados mais recentes do ativo e forneça estimativas (não precisa ser exato, mas baseado no cenário atual). Retorne APENAS um JSON válido. O JSON deve ter AS EXATAS chaves: "tvl", "wallets", "inflation", "revenue" (textos curtos) e "score" (número 0 a 100).`;
+            systemInstruction = `${rastroPersona}\n${chatRules}\nAtue como um analista de dados on-chain de criptomoedas. Com base em seu vasto conhecimento dos protocolos até hoje, forneça estimativas (não precisa ser exato, mas baseado na arquitetura da rede e momento recente de mercado). Retorne APENAS um JSON válido. O JSON deve ter AS EXATAS chaves: "tvl", "wallets", "inflation", "revenue" (textos curtos) e "score" (número 0 a 100), além de "s2f" (número ou "N/A").`;
         }
 
         const response = await fetch(endpoint, {

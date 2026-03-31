@@ -27,6 +27,7 @@ export async function GET(req: Request) {
         const response = await fetch(url, {
             headers: {
                 "Accept": "application/json",
+                ...(apiKey ? { "x-cg-demo-api-key": apiKey } : {})
             },
             next: { revalidate: 60 } // Cache opcional de 1 minuto
         });
