@@ -10,11 +10,13 @@ interface HeaderProps {
 }
 
 export default function Header({ currentPath = "/", hideNav = false }: HeaderProps) {
-    const { user, hasMounted: authMounted, logout } = useAuth();
+    const { user, hasMounted: authMounted, confirmLogout } = useAuth();
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const isAdmin = user?.email === 'carvalhodlucas@hotmail.com';
     const deferredQuery = useDeferredValue(searchQuery);
 
     useEffect(() => {
@@ -46,6 +48,11 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
         { name: "Notícias", href: "/noticias" },
         { name: "Square", href: "/square" },
         { name: "Portifolio", href: "/portfolio" },
+        { name: "Suporte", href: "#suporte" },
+        ...(isAdmin ? [
+            { name: "Admin", href: "/admin/reports" },
+            { name: "Inbox", href: "/admin/inbox" }
+        ] : []),
     ];
 
     return (
@@ -77,11 +84,26 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                                 <Link
                                     key={link.name}
                                     href={link.href}
-                                    className={`${currentPath === link.href
+                                    onClick={(e) => {
+                                        if (link.name === "Suporte") {
+                                            e.preventDefault();
+                                            window.dispatchEvent(new CustomEvent('open-support-chat'));
+                                        }
+                                    }}
+                                    className={`${currentPath === link.href && link.name !== "Suporte"
                                         ? "text-primary font-bold"
                                         : "text-slate-400 hover:text-white"
-                                        } transition-colors text-sm font-medium`}
+                                        } transition-colors text-sm font-medium flex items-center gap-1`}
                                 >
+                                    {link.name === "Admin" && (
+                                        <span className="material-symbols-outlined text-[18px]">security</span>
+                                    )}
+                                    {link.name === "Suporte" && (
+                                        <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                                    )}
+                                    {link.name === "Inbox" && (
+                                        <span className="material-symbols-outlined text-[18px]">inbox</span>
+                                    )}
                                     {link.name}
                                 </Link>
                             ))}
@@ -155,7 +177,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                                     <span className="hidden lg:inline font-bold">{user.name}</span>
                                 </Link>
                                 <button
-                                    onClick={logout}
+                                    onClick={confirmLogout}
                                     className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                                     title="Sair"
                                 >
@@ -163,9 +185,12 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                                 </button>
                             </div>
                         ) : (
-                            <Link href="/login" className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary-hover transition-all">
+                            <button 
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }))}
+                                className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary-hover transition-all"
+                            >
                                 Entrar
-                            </Link>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -190,12 +215,27 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                                 <Link
                                     key={link.name}
                                     href={link.href}
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`px-4 py-3 rounded-xl ${currentPath === link.href
+                                    onClick={(e) => {
+                                        if (link.name === "Suporte") {
+                                            e.preventDefault();
+                                            window.dispatchEvent(new CustomEvent('open-support-chat'));
+                                        }
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className={`px-4 py-3 rounded-xl flex items-center gap-2 ${currentPath === link.href && link.name !== "Suporte"
                                         ? "bg-primary/10 text-primary font-bold border border-primary/20"
                                         : "text-slate-400 border border-transparent"
                                         } transition-all text-sm uppercase tracking-widest font-black`}
                                 >
+                                    {link.name === "Admin" && (
+                                        <span className="material-symbols-outlined text-[18px]">security</span>
+                                    )}
+                                    {link.name === "Suporte" && (
+                                        <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                                    )}
+                                    {link.name === "Inbox" && (
+                                        <span className="material-symbols-outlined text-[18px]">inbox</span>
+                                    )}
                                     {link.name}
                                 </Link>
                             ))}

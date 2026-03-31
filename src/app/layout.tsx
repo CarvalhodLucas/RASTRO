@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import SupportChat from "@/components/SupportChat";
+import AuthModal from "@/components/AuthModal";
+import Providers from "@/components/Providers";
+import LogoutModal from "@/components/LogoutModal";
 
 export const metadata: Metadata = {
     title: "Rastro - Análise de Ativos",
@@ -27,8 +30,12 @@ export default function RootLayout({
                 />
             </head>
             <body suppressHydrationWarning className="antialiased">
-                {children}
-                <SupportChat />
+                <Providers>
+                    {children}
+                    <SupportChat />
+                    <AuthModal />
+                    <LogoutModal />
+                </Providers>
             </body>
         </html>
     );

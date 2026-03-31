@@ -22,12 +22,19 @@
 }
 
 /* Theme Classes */
+.theme-dark,
+.theme-dark body {
+    background-color: #050505 !important;
+    color: white !important;
+}
+
 .theme-amoled,
 .theme-amoled body {
     background-color: #000000 !important;
+    color: white !important;
 }
 
-.theme-amoled .bg-neutral-dark-surface,
+.theme-amoled .bg-neutral-950\/50,
 .theme-amoled .bg-card-dark {
     background-color: #050505 !important;
     border-color: #111111 !important;
@@ -36,9 +43,11 @@
 .theme-market-blue,
 .theme-market-blue body {
     background-color: #0a192f !important;
+    color: white !important;
 }
 
 .theme-market-blue section,
+.theme-market-blue .bg-neutral-950\/50,
 .theme-market-blue .bg-neutral-dark-surface,
 .theme-market-blue .bg-card-dark {
     background-color: #112240 !important;
@@ -55,6 +64,64 @@
 
 .theme-market-blue .border-primary {
     border-color: #64ffda !important;
+}
+
+/* LIGHT MODE OVERRIDES */
+.theme-light,
+.theme-light body {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+.theme-light .bg-neutral-950\/50,
+.theme-light .bg-neutral-dark-surface,
+.theme-light .bg-card-dark,
+.theme-light section {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+
+.theme-light .bg-neutral-950,
+.theme-light .bg-neutral-900,
+.theme-light .bg-black {
+    background-color: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+}
+
+.theme-light footer,
+.theme-light .border-neutral-900,
+.theme-light .border-neutral-800,
+.theme-light aside {
+    border-color: #e2e8f0 !important;
+}
+
+.theme-light .text-white,
+.theme-light .text-slate-100,
+.theme-light h1,
+.theme-light h2,
+.theme-light h3 {
+    color: #0f172a !important;
+}
+
+.theme-light .text-slate-400,
+.theme-light .text-slate-500 {
+    color: #64748b !important;
+}
+
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+
+.theme-light input::placeholder {
+    color: #94a3b8 !important;
+}
+
+.theme-light .hover\:bg-neutral-900:hover {
+    background-color: #f1f5f9 !important;
 }
 
 /* Scrollbar customizada */
@@ -164,6 +231,32 @@
     }
 }
 
-.animate-scan {
-    animation: scan 4s linear infinite;
+
+/* Animação Market Ticker (Marquee) */
+@keyframes marquee {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.animate-marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+    animation-play-state: paused;
+}
+
+/* Utilitário para esconder scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+}
+.no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
 }

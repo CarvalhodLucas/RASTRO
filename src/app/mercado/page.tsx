@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { assetsDatabase, Asset } from "@/lib/data";
 import Header from "@/components/Header";
+import AssetLogo from "@/components/AssetLogo";
+import MarketTicker from "@/components/MarketTicker";
 
 const InfoTooltip = ({ text }: { text: string }) => (
     <div className="relative group inline-block">
@@ -32,7 +34,7 @@ const InfoTooltip = ({ text }: { text: string }) => (
 
 
 
-const AssetRow = ({ asset }: { asset: Asset }) => {
+const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore?: number | null }) => {
     const [imageError, setImageError] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
     const [realData, setRealData] = useState<any>(null);
@@ -42,7 +44,8 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
         setHasMounted(true);
 
         const fetchRealData = async () => {
-            const CACHE_KEY = `api_data_${asset.ticker}`;
+            const baseTicker = asset.ticker.replace('.SA', '');
+            const CACHE_KEY = `api_data_${baseTicker}`;
             const cached = localStorage.getItem(CACHE_KEY);
 
             try {
@@ -96,10 +99,10 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
                     }
                 } else {
                     // 2. Ticker Inteligente: Ajusta sufixo conforme a bolsa
-                    const isB3 = asset.exchange === "B3" || asset.sector !== "Criptomoedas";
+                    const isB3 = asset.exchange === "B3" && asset.sector !== "Criptomoedas";
                     if (isB3 && !tickerQuery.toUpperCase().endsWith('.SA') && !isUS) {
                         tickerQuery = `${tickerQuery}.SA`;
-                    } else if (isUS && tickerQuery.toUpperCase().endsWith('.SA')) {
+                    } else if ((isUS || asset.exchange === "OTC") && tickerQuery.toUpperCase().endsWith('.SA')) {
                         tickerQuery = tickerQuery.replace(/\.SA$/i, '');
                     }
 
@@ -174,7 +177,7 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
 
     const cleanTicker = (asset.ticker || "").toUpperCase().replace('.SA', '').trim();
     const domain = domainMap[cleanTicker] || `${cleanTicker.toLowerCase()}.com.br`;
-    const assetLogo = asset.logo || `https://logo.clearbit.com/${domain}`;
+    const assetLogo = asset.logo || `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
     const fallbackLogo = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
 
     const displayPrice = realData?.price !== undefined ? realData.price : (asset.price !== "N/D" && asset.price !== "0.00" ? asset.price : "N/D");
@@ -199,9 +202,8 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
         
         const cleanKey = getCleanKey(asset.ticker);
         const keysToTry = [
-            `sentiment_cache_${asset.ticker}`, // Exato (BTC-USD)
-            `sentiment_cache_${cleanKey}`,      // Limpo (BTC)
-            `sentiment_cache_${cleanKey}USD`    // Colado (BTCUSD)
+            `sentiment_cache_${cleanKey}`,      // Chave Padronizada (sem .SA)
+            `sentiment_cache_${asset.ticker}`   // Fallback para legado
         ];
 
         for (const key of keysToTry) {
@@ -218,32 +220,8 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
 
     const { value: sentimentValue, isCached } = getSentimentData();
 
-    // Logic to read AI Score from localStorage (Synced with Asset Page)
-    const getAiScore = () => {
-        if (typeof window === 'undefined') return null;
-        
-        const cleanKey = getCleanKey(asset.ticker);
-        const keysToTry = [
-            `ai_rating_${asset.ticker}`, // Exato (BTC-USD)
-            `ai_rating_${cleanKey}`,      // Limpo (BTC)
-            `ai_rating_${cleanKey}USD`    // Colado (BTCUSD)
-        ];
-
-        for (const key of keysToTry) {
-            const cached = localStorage.getItem(key);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    // Lê do formato unificado (score na raiz) ou legado
-                    const score = parsed.score ?? parsed.data?.score;
-                    if (score !== undefined) return parseFloat(score);
-                } catch (e) {}
-            }
-        }
-        return null;
-    };
-
-    const aiScore = getAiScore();
+    // Usa a nota vinda do pai (estado centralizado) se disponível
+    const aiScore = aiScoreFromParent ?? null;
 
     // Determine color based on sentiment (Termômetro)
     let sentimentColor = "text-slate-400";
@@ -267,21 +245,18 @@ const AssetRow = ({ asset }: { asset: Asset }) => {
     return (
         <Link
             href={`/asset/${asset.ticker}`}
-            className="grid grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-4 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group cursor-pointer overflow-visible"
+            className="grid grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-2.5 border-b border-neutral-dark-border/50 hover:bg-neutral-dark-border/30 transition-colors items-center group cursor-pointer overflow-visible"
         >
             {/* Ticker and Name */}
             <div className="col-span-6 md:col-span-2 flex items-center gap-2 md:gap-3">
-                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 font-bold text-white text-[10px] md:text-xs">
+                <div className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center shrink-0">
                     {hasMounted && (
-                        <img
-                            src={asset.logo || `https://ui-avatars.com/api/?name=${asset.ticker}&background=334155&color=fff&bold=true`}
-                            alt={asset.ticker}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                                // Se a logo oficial falhar, troca pelo avatar com as iniciais do Ticker
-                                e.currentTarget.onerror = null; // Previne loop infinito
-                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${asset.ticker}&background=334155&color=fff&bold=true`;
-                            }}
+                        <AssetLogo 
+                            src={asset.logo} 
+                            ticker={asset.ticker} 
+                            name={asset.name} 
+                            size={asset.ticker.length > 5 ? 7 : 8}
+                            className="w-full h-full"
                         />
                     )}
                 </div>
@@ -401,14 +376,16 @@ export default function MercadoPage() {
     const [selectedSentiment, setSelectedSentiment] = useState("Todos");
     const [marketCapRange, setMarketCapRange] = useState<[number, number]>([0, 3000]); // 0 to $3T+
     const [selectedMarket, setSelectedMarket] = useState<string>("Todos");
+    const [aiRatings, setAiRatings] = useState<Record<string, number>>({});
     const [b3Category, setB3Category] = useState<string>("Todos");
     const [currentPage, setCurrentPage] = useState(1);
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
-    const itemsPerPage = 17;
+    const [marketData, setMarketData] = useState<Record<string, number>>({});
+    const itemsPerPage = 8;
 
-    // Estados de Ordenação
-    const [sortBy, setSortBy] = useState("marketCap"); // Padrão: Valor de Mercado
-    const [sortOrder, setSortOrder] = useState("desc"); // Padrão: Maior para menor
+    // Estados de Ordenação (FORÇADOS: Valor de Mercado Descendente)
+    const sortBy = "marketCap";
+    const sortOrder = "desc";
 
     // Função de Auxílio para Tratar Números (converte strings como "R$ 100B" em números)
     const parseValue = (val: any) => {
@@ -429,20 +406,128 @@ export default function MercadoPage() {
 
     // Trigger para re-ordenar a lista quando os filhos buscam novos dados
     const [cacheTrigger, setCacheTrigger] = useState(0);
+    const [pendingUpdate, setPendingUpdate] = useState(false);
+
+    // Debounce: Evita o "Event Storm" (re-filtrar centenas de vezes por segundo)
+    useEffect(() => {
+        if (!pendingUpdate) return;
+        
+        const timer = setTimeout(() => {
+            setCacheTrigger(prev => prev + 1);
+            setPendingUpdate(false);
+            console.log("⚡ [Performance] Re-filtrando mercado após lote de atualizações.");
+        }, 1000); // Espera 1s de silêncio para re-ordenar
+
+        return () => clearTimeout(timer);
+    }, [pendingUpdate]);
+
+    const loadMarketData = () => {
+        const mData: Record<string, number> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith('api_data_')) {
+                try {
+                    const saved = localStorage.getItem(key);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        const ticker = key.replace('api_data_', '').toUpperCase();
+                        const val = parsed.data?.marketCap;
+                        if (val && val !== "--" && val !== "N/D") {
+                            mData[ticker] = parseMarketValue(val);
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+        setMarketData(mData);
+    };
+
+    // Helper para converter "100B" etc em número real para o mapa
+    const parseMarketValue = (val: any) => {
+        if (typeof val === 'number') return val;
+        const clean = String(val).replace(/[R$U$\s]/g, '').replace(',', '.');
+        let factor = 1;
+        if (clean.includes('T')) factor = 1e12;
+        else if (clean.includes('B')) factor = 1e9;
+        else if (clean.includes('M')) factor = 1e6;
+        return (parseFloat(clean) || 0) * factor;
+    };
+
+    const loadRatings = () => {
+        const ratingsMap: Record<string, number> = {};
+        
+        // 1. Coleta todas as chaves de AI Rating do localStorage de uma vez (O(K))
+        const aiKeys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith('ai_rating_')) aiKeys.push(key);
+        }
+
+        // 2. Mapeia chaves para assets (O(N + K))
+        assetsDatabase.forEach(asset => {
+            const cleanT = asset.ticker.replace('.SA', '').replace('-USD', '').toUpperCase();
+            const prefix1 = `ai_rating_${cleanT}`;
+            const prefix2 = `ai_rating_${asset.ticker.toUpperCase()}`;
+            
+            let bestScore: number | null = null;
+            let lastTimestamp = -1;
+
+            // Filtra apenas chaves relevantes para este ticker
+            const relevantKeys = aiKeys.filter(k => k.includes(cleanT) || k.includes(asset.ticker.toUpperCase()));
+
+            relevantKeys.forEach(k => {
+                const saved = localStorage.getItem(k);
+                if (!saved) return;
+
+                try {
+                    const parsed = JSON.parse(saved);
+                    const val = parsed.score ?? parsed.aiScore ?? parsed.rating ?? parsed.data?.score;
+                    const updateTime = parsed.lastUpdate ? new Date(parsed.lastUpdate).getTime() : 0;
+                    
+                    if (val !== undefined && val !== null) {
+                        if (bestScore === null || updateTime > lastTimestamp) {
+                            lastTimestamp = updateTime;
+                            bestScore = parseFloat(String(val));
+                        }
+                    }
+                } catch (e) {
+                    const num = parseFloat(saved);
+                    if (!isNaN(num) && bestScore === null) {
+                        bestScore = num;
+                    }
+                }
+            });
+
+            if (bestScore !== null) {
+                ratingsMap[asset.ticker] = bestScore;
+            }
+        });
+        setAiRatings(ratingsMap);
+    };
 
     useEffect(() => {
         // Força uma re-avaliação do cache na hidratação do cliente
         setCacheTrigger(prev => prev + 1);
+        loadRatings();
+        loadMarketData();
         
-        const handleCacheUpdate = () => setCacheTrigger(prev => prev + 1);
+        const handleCacheUpdate = () => {
+            setPendingUpdate(true);
+            loadRatings();
+            loadMarketData();
+        };
         const handleFocus = () => {
             console.log("🔄 Janela focada: Atualizando dados do cache...");
-            setCacheTrigger(prev => prev + 1);
+            setPendingUpdate(true);
+            loadRatings();
+            loadMarketData();
         };
         const handleStorage = (e: StorageEvent) => {
-            if (e.key?.startsWith('ai_rating_')) {
+            if (e.key?.startsWith('ai_rating_') || e.key === 'user_market_filters' || e.key?.startsWith('api_data_')) {
                 console.log("💾 Storage alterado: Sincronizando notas...");
-                setCacheTrigger(prev => prev + 1);
+                setPendingUpdate(true);
+                loadRatings();
+                loadMarketData();
             }
         };
 
@@ -460,20 +545,57 @@ export default function MercadoPage() {
     // Auto-Load Filters on Mount
     useEffect(() => {
         setIsMounted(true);
-        const saved = localStorage.getItem("user_market_filters");
-        if (saved) {
+        // Tenta ler primeiro do sessionStorage (Navegação temporária Voltar)
+        const sessionState = sessionStorage.getItem("rastro_market_session_state");
+        
+        if (sessionState) {
             try {
-                const parsed = JSON.parse(saved);
+                const parsed = JSON.parse(sessionState);
                 if (parsed.searchTerm !== undefined) setSearchTerm(parsed.searchTerm);
                 if (parsed.selectedSectors !== undefined) setSelectedSectors(parsed.selectedSectors);
                 if (parsed.selectedSentiment !== undefined) setSelectedSentiment(parsed.selectedSentiment);
                 if (parsed.marketCapRange !== undefined) setMarketCapRange(parsed.marketCapRange);
                 if (parsed.selectedMarket !== undefined) setSelectedMarket(parsed.selectedMarket);
+                if (parsed.b3Category !== undefined) setB3Category(parsed.b3Category);
+                if (parsed.activeQuickFilter !== undefined) setActiveQuickFilter(parsed.activeQuickFilter);
+                if (parsed.currentPage !== undefined) setCurrentPage(parsed.currentPage);
             } catch (error) {
-                console.error("Failed to parse saved filters", error);
+                console.error("Failed to parse session filters", error);
+            }
+        } else {
+            // Fallback para filtros estáticos de localStorage se não houver sessão ativa
+            const saved = localStorage.getItem("user_market_filters");
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.searchTerm !== undefined) setSearchTerm(parsed.searchTerm);
+                    if (parsed.selectedSectors !== undefined) setSelectedSectors(parsed.selectedSectors);
+                    if (parsed.selectedSentiment !== undefined) setSelectedSentiment(parsed.selectedSentiment);
+                    if (parsed.marketCapRange !== undefined) setMarketCapRange(parsed.marketCapRange);
+                    if (parsed.selectedMarket !== undefined) setSelectedMarket(parsed.selectedMarket);
+                } catch (error) {
+                    console.error("Failed to parse saved localStorage filters", error);
+                }
             }
         }
     }, []);
+
+    // Sync state changes automatically to sessionStorage
+    useEffect(() => {
+        if (!isMounted) return;
+        
+        const stateSnapshot = {
+            searchTerm,
+            selectedSectors,
+            selectedSentiment,
+            marketCapRange,
+            selectedMarket,
+            b3Category,
+            activeQuickFilter,
+            currentPage
+        };
+        sessionStorage.setItem("rastro_market_session_state", JSON.stringify(stateSnapshot));
+    }, [searchTerm, selectedSectors, selectedSentiment, marketCapRange, selectedMarket, b3Category, activeQuickFilter, currentPage, isMounted]);
 
     const saveFilters = () => {
         setIsSaving(true);
@@ -520,11 +642,11 @@ export default function MercadoPage() {
     };
 
     const filteredAssets = useMemo(() => {
-        // 1. FUNÇÃO DE PARSE UNIFICADA (Para garantir que "R$ 100B" e "$ 3T" virem números comparáveis)
+        // 1. FUNÇÃO DE PARSE UNIFICADA (Interna para garantir consistência)
         const getNumericValue = (val: any) => {
             if (typeof val === 'number') return val;
             if (!val || val === "--" || val === "N/D") return 0;
-            const clean = String(val).replace(/[R$U$\s]/g, '').replace(',', '.'); // Removido o '.' do regex para não quebrar decimais como 1.5T
+            const clean = String(val).replace(/[R$U$\s]/g, '').replace(',', '.');
             let factor = 1;
             if (clean.includes('T')) factor = 1e12;
             else if (clean.includes('B')) factor = 1e9;
@@ -532,16 +654,53 @@ export default function MercadoPage() {
             return (parseFloat(clean) || 0) * factor;
         };
 
-        // 2. FILTRAGEM
+        // 2. PRÉ-PROCESSAMENTO: Resolve todos os market caps uma única vez (O(N)) usando o state otimizado
+        const resolvedMarketCapMap = new Map<string, number>();
+        const fallbackWeights: Record<string, string> = {
+            "PETR4.SA": "500B", "PETR3.SA": "500B",
+            "VALE3.SA": "300B",
+            "ITUB4.SA": "300B", "ITUB3.SA": "300B",
+            "WEGE3.SA": "160B",
+            "BBAS3.SA": "160B",
+            "BBDC4.SA": "140B", "BBDC3.SA": "140B",
+            "ELET3.SA": "100B", "ELET6.SA": "100B",
+            "RENT3.SA": "60B",
+            "BPAC11.SA": "150B",
+            "SUZB3.SA": "70B",
+            "B3SA3.SA": "65B",
+            "RADL3.SA": "45B",
+            "EQTL3.SA": "40B",
+            "VIVT3.SA": "85B",
+            "JBSS3.SA": "60B",
+            "SBSP3.SA": "55B",
+            "GGBR4.SA": "40B",
+            "HAPV3.SA": "35B",
+            "RAIL3.SA": "45B"
+        };
+
+        assetsDatabase.forEach(asset => {
+            const baseT = asset.ticker.replace('.SA', '').toUpperCase();
+            // Tenta primeiro o state marketData (que já é numérico e pré-carregado)
+            let mCap = marketData[baseT] || 0;
+
+            if (mCap === 0) {
+                const fw = fallbackWeights[asset.ticker];
+                if (fw) mCap = getNumericValue(fw);
+                else mCap = getNumericValue(asset.marketCap);
+            }
+            resolvedMarketCapMap.set(asset.ticker, mCap);
+        });
+
+        // 3. FILTRAGEM
         let result = assetsDatabase.filter(asset => {
             const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 asset.ticker.toLowerCase().includes(searchTerm.toLowerCase());
             
             const matchesSector = selectedSectors.length === 0 || selectedSectors.includes(asset.sector);
 
-            // Filtro de Market Cap usando a lógica unificada
-            const mCap = getNumericValue(asset.marketCap);
-            const minCap = marketCapRange[0] * 1e9; // Converte Bilhões da UI para número real
+            // Filtro de Market Cap
+            const mCap = resolvedMarketCapMap.get(asset.ticker) || 0;
+            const minCap = marketCapRange[0] * 1e9; 
             const maxCap = marketCapRange[1] === 3000 ? Infinity : marketCapRange[1] * 1e9;
             const matchesMarketCap = mCap >= minCap && mCap <= maxCap;
 
@@ -554,7 +713,7 @@ export default function MercadoPage() {
             if (selectedMarket === "Criptomoedas") {
                 matchesMarket = !!asset.cgId || asset.sector === "Criptomoedas" || asset.exchange === "Crypto";
             } else if (selectedMarket === "B3") {
-                matchesMarket = asset.exchange === "B3" || (!asset.cgId && asset.exchange !== "NASDAQ" && asset.exchange !== "NYSE");
+                matchesMarket = asset.exchange === "B3" || (!asset.cgId && asset.exchange !== "NASDAQ" && asset.exchange !== "NYSE" && asset.exchange !== "OTC" && asset.exchange !== "Crypto Market");
 
                 if (matchesMarket && b3Category !== "Todos") {
                     const cleanTicker = asset.ticker.replace(".SA", "");
@@ -567,7 +726,7 @@ export default function MercadoPage() {
                     else if (b3Category === "ETFs") matchesMarket = isETF;
                 }
             } else if (selectedMarket === "EUA") {
-                matchesMarket = asset.exchange === "NASDAQ" || asset.exchange === "NYSE";
+                matchesMarket = asset.exchange === "NASDAQ" || asset.exchange === "NYSE" || asset.exchange === "OTC";
             }
 
             let matchesQuickFilter = true;
@@ -598,105 +757,15 @@ export default function MercadoPage() {
             return matchesSearch && matchesSector && matchesMarketCap && matchesSentiment && matchesMarket && matchesQuickFilter;
         });
 
-        // 3. ORDENAÇÃO (O SEGREDO ESTÁ AQUI)
+        // 4. ORDENAÇÃO (ESTABILIZADA: Removemos cacheTrigger das dependências)
         return [...result].sort((a, b) => {
-            // HIERARQUIA 2: Ordenação pelo Critério Selecionado
-            let valA: any, valB: any;
-
-            // Dicionário de peso base para garantir que as gigantes fiquem no topo antes do lazy load da API
-            const fallbackWeights: Record<string, string> = {
-                "PETR4.SA": "500B", "PETR3.SA": "500B",
-                "VALE3.SA": "300B",
-                "ITUB4.SA": "300B", "ITUB3.SA": "300B",
-                "WEGE3.SA": "160B",
-                "BBAS3.SA": "160B",
-                "BBDC4.SA": "140B", "BBDC3.SA": "140B",
-                "ELET3.SA": "100B", "ELET6.SA": "100B",
-                "RENT3.SA": "60B",
-                "BPAC11.SA": "150B",
-                "SUZB3.SA": "70B",
-                "B3SA3.SA": "65B",
-                "RADL3.SA": "45B",
-                "EQTL3.SA": "40B",
-                "VIVT3.SA": "85B",
-                "JBSS3.SA": "60B",
-                "SBSP3.SA": "55B",
-                "GGBR4.SA": "40B",
-                "HAPV3.SA": "35B",
-                "RAIL3.SA": "45B"
-            };
-
-            switch (sortBy) {
-                case 'ticker':
-                    return sortOrder === 'asc' ? a.ticker.localeCompare(b.ticker) : b.ticker.localeCompare(a.ticker);
-                
-                case 'aiScore':
-                    const getScore = (ticker: string) => {
-                        if (typeof window === 'undefined') return 0;
-                        const clean = ticker.replace('-USD', '').replace('.SA', '').toUpperCase();
-                        const keysToTry = [
-                            `ai_rating_${ticker}`,
-                            `ai_rating_${clean}`,
-                            `ai_rating_${clean}USD`
-                        ];
-
-                        for (const key of keysToTry) {
-                            const cache = localStorage.getItem(key);
-                            if (cache) {
-                                try {
-                                    const p = JSON.parse(cache);
-                                    const score = p.score ?? p.data?.score;
-                                    if (score !== undefined) return parseFloat(score);
-                                } catch {}
-                            }
-                        }
-                        return 0;
-                    };
-                    valA = getScore(a.ticker);
-                    valB = getScore(b.ticker);
-                    break;
-
-                case 'sentiment':
-                    valA = a.sentiment || 0;
-                    valB = b.sentiment || 0;
-                    break;
-
-                case 'price':
-                case 'marketCap':
-                case 'pl':
-                default:
-                    // Verifica cache para Preço e Market Cap primeiro
-                    const getCachedVal = (ticker: string, field: string) => {
-                        if (typeof window === 'undefined') return null;
-                        const cached = localStorage.getItem(`api_data_${ticker}`);
-                        if (cached) {
-                            try {
-                                const p = JSON.parse(cached);
-                                return p.data?.[field] || null;
-                            } catch { return null; }
-                        }
-                        return null;
-                    };
-
-                    const field = sortBy === 'pl' ? 'peRatio' : sortBy;
-                    
-                    let aValStr = getCachedVal(a.ticker, field) || (a as any)[field] || (a as any)[sortBy];
-                    let bValStr = getCachedVal(b.ticker, field) || (b as any)[field] || (b as any)[sortBy];
-
-                    // Aplica fallback se for Market Cap e o valor estiver vazio/"--"
-                    if (sortBy === 'marketCap') {
-                        if (!aValStr || aValStr === "--" || aValStr === "N/D") aValStr = fallbackWeights[a.ticker] || aValStr;
-                        if (!bValStr || bValStr === "--" || bValStr === "N/D") bValStr = fallbackWeights[b.ticker] || bValStr;
-                    }
-
-                    valA = getNumericValue(aValStr);
-                    valB = getNumericValue(bValStr);
-            }
+            const valA = resolvedMarketCapMap.get(a.ticker) || 0;
+            const valB = resolvedMarketCapMap.get(b.ticker) || 0;
 
             if (valA === valB) return a.ticker.localeCompare(b.ticker);
-            return sortOrder === 'asc' ? valA - valB : valB - valA;
+            return valB - valA; 
         });
-    }, [searchTerm, selectedSectors, selectedSentiment, marketCapRange, selectedMarket, b3Category, sortBy, sortOrder, activeQuickFilter, cacheTrigger]);
+    }, [searchTerm, selectedSectors, selectedSentiment, marketCapRange, selectedMarket, b3Category, activeQuickFilter]);
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -715,12 +784,14 @@ export default function MercadoPage() {
 
 
 
+
     return (
         <div className="bg-black font-display text-slate-100 min-h-screen flex flex-col selection:bg-primary selection:text-black">
             <Header currentPath="/mercado" />
+            <MarketTicker />
 
             <main className="flex-1 w-full bg-black h-auto lg:h-[calc(100vh-65px)] overflow-hidden">
-                <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-4 lg:py-6 h-full flex flex-col gap-4 lg:gap-6">
+                <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-2 lg:py-3 h-full flex flex-col gap-3 lg:gap-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 mt-0">
                     <div>
                         <h1 className="text-xl md:text-3xl font-bold text-white tracking-tight">Rastreador de <span className="text-primary">IA</span></h1>
@@ -779,32 +850,6 @@ export default function MercadoPage() {
                     {showFilters && (
                         <div className="w-full p-6 bg-zinc-950/50 border border-zinc-900 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="flex flex-col md:flex-row flex-wrap gap-8">
-                                {/* MERCADO FILTER */}
-                                <div className="flex flex-col gap-3 min-w-[200px]">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mercado</span>
-                                        <button onClick={resetFilters} className="text-[10px] text-primary hover:text-white underline uppercase">Limpar</button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {["Todos", "B3", "EUA", "Criptomoedas"].map(market => (
-                                            <label key={market} className={`flex items-center justify-center gap-2 h-9 rounded-lg border text-xs cursor-pointer transition-all ${selectedMarket === market ? 'bg-primary/10 border-primary text-primary font-bold' : 'bg-black/40 border-zinc-800 text-slate-400 hover:border-zinc-700'}`}>
-                                                <input
-                                                    type="radio"
-                                                    name="marketOption"
-                                                    value={market}
-                                                    checked={selectedMarket === market}
-                                                    onChange={(e) => {
-                                                        setSelectedMarket(e.target.value);
-                                                        setB3Category("Todos");
-                                                    }}
-                                                    className="hidden"
-                                                />
-                                                <span>{market}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 {/* SECTOR FILTER */}
                                 <div className="flex flex-col gap-3 min-w-[200px] flex-1">
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Setor e Indústria</span>
@@ -932,6 +977,26 @@ export default function MercadoPage() {
                             </button>
                         </div>
 
+                        {/* Filtros de Mercado */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase ml-2 mr-1">Mercado:</span>
+                            {["Todos", "B3", "EUA", "Criptomoedas"].map(market => (
+                                <button
+                                    key={market}
+                                    onClick={() => {
+                                        setSelectedMarket(market);
+                                        setB3Category("Todos");
+                                    }}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${
+                                        selectedMarket === market 
+                                            ? 'bg-zinc-700 text-white border-zinc-600 shadow-sm' 
+                                            : 'bg-transparent border-zinc-800 text-slate-400 hover:text-white hover:border-zinc-700'
+                                    }`}>
+                                    {market}
+                                </button>
+                            ))}
+                        </div>
+
                         {/* SUB-FILTROS DINÂMICOS PARA B3 (Inserção Automática) */}
                         {selectedMarket === "B3" && (
                             <div className="flex items-center gap-2 mt-1 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -953,63 +1018,27 @@ export default function MercadoPage() {
 
                         <div className="flex-1 bg-neutral-dark-surface rounded-xl border border-neutral-dark-border flex flex-col shadow-2xl overflow-visible">
                             {/* CABEÇALHO TABELA */}
-                            <div className="grid grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-3 bg-black border-b border-neutral-dark-border items-center sticky top-0 z-10 w-full">
-                                <div 
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'ticker' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('ticker');
-                                    }}
-                                    className="col-span-6 md:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1 cursor-pointer hover:text-white transition-colors"
-                                >
-                                    Ticker {sortBy === 'ticker' && (sortOrder === 'asc' ? '↑' : '↓')}
+                            <div className="grid grid-cols-12 gap-2 md:gap-4 px-4 md:px-6 py-2 bg-black border-b border-neutral-dark-border items-center sticky top-0 z-10 w-full">
+                                <div className="col-span-6 md:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1 cursor-default">
+                                    Ticker
                                 </div>
-                                <div 
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'price' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('price');
-                                    }}
-                                    className="col-span-6 md:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer hover:text-white transition-colors"
-                                >
-                                    Preço {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                <div className="col-span-6 md:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-right cursor-default">
+                                    Preço
                                 </div>
-                                <div 
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'marketCap' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('marketCap');
-                                    }}
-                                    className="hidden md:block md:col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer hover:text-white transition-colors"
-                                >
-                                    Val. Mercado {sortBy === 'marketCap' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                <div className="hidden md:block md:col-span-2 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-default">
+                                    Val. Mercado <span className="text-[10px]">↓</span>
                                 </div>
-                                <div 
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'pl' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('pl');
-                                    }}
-                                    className="hidden lg:block lg:col-span-1 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer hover:text-white transition-colors"
-                                >
-                                    P/L {sortBy === 'pl' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                <div className="hidden lg:block lg:col-span-1 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-default">
+                                    P/L
                                 </div>
-                                <div className="hidden lg:block lg:col-span-1 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-pointer">Div Yield</div>
-                                <div 
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'sentiment' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('sentiment');
-                                    }}
-                                    className="hidden sm:flex sm:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-center justify-center items-center gap-1 cursor-pointer overflow-visible hover:text-white transition-colors"
-                                >
-                                    Sentimento {sortBy === 'sentiment' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                <div className="hidden lg:block lg:col-span-1 text-xs font-bold text-primary uppercase tracking-wider text-right cursor-default">Div Yield</div>
+                                <div className="hidden sm:flex sm:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-center justify-center items-center gap-1 cursor-default overflow-visible">
+                                    Sentimento
                                     <InfoTooltip text="Pontuação baseada em notícias, redes sociais e fluxos institucionais de curto prazo." />
                                 </div>
-                                <div 
-                                    className="hidden sm:flex sm:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-center justify-center items-center gap-1 cursor-pointer overflow-visible hover:text-white transition-colors"
-                                    onClick={() => {
-                                        setSortOrder(sortBy === 'aiScore' && sortOrder === 'asc' ? 'desc' : 'asc');
-                                        setSortBy('aiScore');
-                                    }}
-                                >
+                                <div className="hidden sm:flex sm:col-span-2 text-[10px] md:text-xs font-bold text-primary uppercase tracking-wider text-center justify-center items-center gap-1 cursor-default overflow-visible">
                                     <span className="material-symbols-outlined text-primary text-[14px] md:text-[16px]">psychology</span>
-                                    <span className="whitespace-nowrap">Nota {sortBy === 'aiScore' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
+                                    <span className="whitespace-nowrap">Nota</span>
                                     <InfoTooltip text="Nota de 0 a 10 baseada na tese fundamentalista e fluxo institucional." />
                                 </div>
                             </div>
@@ -1020,7 +1049,11 @@ export default function MercadoPage() {
                                     {isMounted ? (
                                         currentAssets.length > 0 ? (
                                             currentAssets.map(asset => (
-                                                <AssetRow key={asset.ticker} asset={asset} />
+                                                <AssetRow 
+                                                    key={asset.ticker} 
+                                                    asset={asset} 
+                                                    aiScore={aiRatings[asset.ticker]} 
+                                                />
                                             ))
                                         ) : (
 

@@ -25,6 +25,7 @@ interface CommentThreadProps {
     setReplyText: (val: string) => void;
     handleReply: (postId: number, parentCommentId: number | null, image?: string | null) => void;
     handleCommentLike: (postId: number, commentId: number) => void;
+    handleDeleteComment?: (postId: number, commentId: number) => void;
 }
 
 const CommentThread: React.FC<CommentThreadProps> = ({
@@ -37,7 +38,8 @@ const CommentThread: React.FC<CommentThreadProps> = ({
     replyText,
     setReplyText,
     handleReply,
-    handleCommentLike
+    handleCommentLike,
+    handleDeleteComment
 }) => {
     const isCurrentReplying = replyingTo?.postId === postId && replyingTo?.commentId === comment.id;
     const [replyImage, setReplyImage] = React.useState<string | null>(null);
@@ -70,6 +72,20 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                         <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-slate-200 text-xs">{comment.author}</span>
                             <span className="text-slate-500 text-[10px]">• {comment.time}</span>
+                            {user?.email === "carvalhodlucas@hotmail.com" && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm("Deseja excluir este comentário?")) {
+                                            handleDeleteComment?.(postId, comment.id);
+                                        }
+                                    }}
+                                    className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-red-500/10 transition-colors"
+                                    title="Excluir Comentário (Admin)"
+                                >
+                                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                                </button>
+                            )}
                         </div>
                         <p className="text-slate-300 text-sm leading-relaxed mb-1 break-words whitespace-pre-wrap overflow-wrap-anywhere w-full">
                             {comment.content}
@@ -95,6 +111,10 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+                                if (!user) {
+                                    window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
+                                    return;
+                                }
                                 setReplyingTo({ postId, commentId: comment.id, author: comment.author });
                             }}
                             className={`flex items-center gap-1.5 transition-colors hover:text-primary hover:scale-105 active:scale-95 ${isCurrentReplying ? 'text-primary' : ''}`}
@@ -102,7 +122,10 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                             <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
                             <span className="text-[10px] font-bold">Responder</span>
                         </button>
-                        <button className="flex items-center gap-1.5 transition-colors hover:text-[#11d473] hover:scale-105">
+                        <button 
+                            className="flex items-center gap-1.5 transition-colors hover:text-[#11d473] hover:scale-105"
+                            onClick={() => { if (!user) window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } })); }}
+                        >
                             <span className="material-symbols-outlined text-[16px]">repeat</span>
                         </button>
                         <button className="flex items-center gap-1.5 transition-colors hover:text-primary hover:scale-105">
@@ -192,6 +215,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                                     setReplyText={setReplyText}
                                     handleReply={handleReply}
                                     handleCommentLike={handleCommentLike}
+                                    handleDeleteComment={handleDeleteComment}
                                 />
                             ))}
                         </div>

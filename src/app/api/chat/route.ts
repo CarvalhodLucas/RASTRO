@@ -1,35 +1,32 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
-import { LUCAS_KNOWLEDGE } from "@/lib/knowledge";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    try {
-        const { prompt, ticker, name, report, indicators, systemInstruction: instructionOverride, systemPrompt, isSummary, isHealth, isSentiment, isRatingRequest } = await req.json();
-        console.log("TEXTO RECEBIDO:", report);
+// Inicializa o SDK usando a variável GOOGLE_API_KEY conforme solicitado
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
-        const isCrypto = ticker?.includes('USD') || ticker?.includes('BTC') || ticker?.includes('ETH') || ticker?.includes('USDT') || indicators?.isCrypto;
-        const marketType = isCrypto ? 'Cripto/DeFi' : 'Ações/Bolsa de Valores';
+export async function POST(req: Request) {
+    try {
+        const { ticker, name, report, indicators, systemInstruction: instructionOverride, systemPrompt, isSummary, isHealth, isSentiment, isRatingRequest, prompt } = await req.json();
+
+        console.log(`[RASTRO IA] Iniciando análise Gemini para: ${ticker || name}`);
+
+        if (!process.env.GOOGLE_API_KEY) {
+            console.error("[RASTRO IA] Erro: GOOGLE_API_KEY não encontrada no servidor.");
+            return NextResponse.json({ error: "Chave da API não configurada no servidor." }, { status: 500 });
+        }
+
+        const rastroPersona = "És o RASTRO, um Analista IA prático e objetivo. Sê extremamente conciso, direto e usa linguagem simples. Evita jargões técnicos a menos que o utilizador os use primeiro.";
 
         let systemInstruction = "";
 
         if (isHealth) {
-            systemInstruction = `Você é um analista fundamentalista sênior. Analise a empresa ${name} (${ticker}) com base no relatório fornecido.
+            systemInstruction = `${rastroPersona}
+            Analise a saúde fundamental de ${name || ticker} (${ticker}).
             
-            ⚠️ INSTRUÇÃO CRÍTICA DE SCORE:
-            O campo "score" (0-100) deve refletir a SOLIDEZ da empresa. 
-            Se algum indicador estiver como "--", "N/D" ou "0" no relatório devido a falha de API, NÃO penalize a empresa zerando o score. 
-            Nesse caso, desconsidere o peso desse indicador ou use uma estimativa conservadora baseada no setor. O score nunca deve ser 0 a menos que a empresa esteja em colapso real.
-
-            MISSÃO DE CÁLCULO:
-            1. Extrair indicadores: Score (0-100), Status, ROE, P/VP, DY e P/L.
-            2. Valor Justo DCF: Projete o fluxo de caixa para 5 anos.
-            3. Número de Graham: raiz(22.5 * VPA * LPA).
-            4. Preço-teto de Bazin: (Dividendos por Ação nos últimos 12 meses) / 0.06.
-            5. Upside: Para cada valor justo, calcule a % em relação ao preço atual.
-
+            NÃO USE MARKDOWN. NÃO ESCREVA \`\`\`json. RETORNE APENAS O TEXTO DO JSON PURO E NADA MAIS.
+            
             RETORNE EXCLUSIVAMENTE ESTE JSON:
             {
               "score": 0, "status": "", "roe": 0, "pvp": 0, "dy": 0, "pl": 0,
@@ -37,176 +34,134 @@ export async function POST(req: Request) {
               "graham": 0, "grahamUpside": 0,
               "bazin": 0, "bazinUpside": 0
             }
-
             Relatório: ${report}`;
         }
         else if (isSentiment) {
-            systemInstruction = `Você é um especialista em análise de sentimento de mercado.
-            Analise o sentimento de CURTO PRAZO para ${name} (${ticker}). 
-            
-            ⚠️ DIRETRIZES DE ANÁLISE:
-            1. Considere volatilidade, medo e tom das notícias recentes.
-            2. Se o fundamento da empresa for bom mas o mercado estiver em queda livre ou em pânico, o "value" DEVE refletir o MEDO (valor baixo), não a nota técnica fundamentalista.
-            3. Identifique se a tendência é de acumulação, distribuição ou pânico.
-
-            Relatório/Notícias:
-            ${report} 
-
+            systemInstruction = `${rastroPersona}
+            Analise o sentimento de mercado para ${name || ticker} (${ticker}).
+            NÃO USE MARKDOWN. NÃO ESCREVA \`\`\`json. RETORNE APENAS O TEXTO DO JSON PURO E NADA MAIS.
             Retorne APENAS um JSON:
-            {
-              "value": (número de 0 a 100 onde 0-40 é Medo, 41-65 Neutro, 66-100 Ganância), 
-              "label": (string: "Medo Extremo", "Medo", "Neutro", "Otimismo" ou "Ganância Extrema"),
-              "trend": (string: "up", "down" ou "side")
-            }
-            Se não houver dados, retorne 50 e "Neutro".`;
+            { "value": 0, "label": "Neutro", "trend": "side" }
+            Dados: ${report}`;
         }
         else if (isSummary) {
-            systemInstruction = `Você é um analista financeiro. Analise ${name} (${ticker}) e retorne um JSON com duas chaves principais:
-            - bullCase: um array de { "title": string, "desc": string } com pontos positivos.
-            - bearCase: um array de { "title": string, "desc": string } com riscos.
+            systemInstruction = `${rastroPersona}
+            Gere Bull Case e Bear Case para ${ticker}.
+            NÃO USE MARKDOWN. NÃO ESCREVA \`\`\`json. RETORNE APENAS O TEXTO DO JSON PURO E NADA MAIS.
+            Retorne JSON: { "bullCase": [], "bearCase": [] }
             Relatório: ${report}`;
         }
         else if (isRatingRequest) {
+            // Lógica de Pilares (FII/ETF/AÇÕES)
             const isFII = (ticker?.endsWith('11') || ticker?.endsWith('11.SA')) && !indicators?.isETF;
             const isETF = indicators?.isETF || (ticker?.endsWith('11') || ticker?.endsWith('11.SA')) && indicators?.sector === 'ETF';
-            
-            const fiiPillars = `[
-                {"label": "Qualidade dos Ativos", "score": 0},
-                {"label": "Vacância / Portfólio", "score": 0},
-                {"label": "Dividend Yield", "score": 0},
-                {"label": "Risco de Crédito/Juros", "score": 0}
-            ]`;
-            const etfPillars = `[
-                {"label": "Eficiência de Replicação", "score": 0},
-                {"label": "Taxa de Administração", "score": 0},
-                {"label": "Liquidez de Mercado", "score": 0},
-                {"label": "Qualidade do Índice", "score": 0}
-            ]`;
-            const stockPillars = `[
-                {"label": "Saúde Financeira", "score": 0},
-                {"label": "Fosso Competitivo", "score": 0},
-                {"label": "Catalisadores", "score": 0},
-                {"label": "Riscos", "score": 7}
-            ]`;
-            
-            const activePillars = isETF ? etfPillars : (isFII ? fiiPillars : stockPillars);
 
-            systemInstruction = (instructionOverride ? instructionOverride + "\n\n" : "") + `
-                Você é um Analista Sênior especializado em ${isETF ? 'ETFs (Fundos de Índice)' : isFII ? 'Fundos Imobiliários (FIIs)' : 'Bolsa de Valores e Cripto'}.
-                Analise o relatório e indicadores de ${ticker}.
+            const pillars = isETF
+                ? `[{"label": "Replicação", "score": 0}, {"label": "Taxa Adm", "score": 0}, {"label": "Liquidez", "score": 0}, {"label": "Índice", "score": 0}]`
+                : (isFII
+                    ? `[{"label": "Qualidade", "score": 0}, {"label": "Vacância", "score": 0}, {"label": "DY", "score": 0}, {"label": "Risco", "score": 0}]`
+                    : `[{"label": "Saúde", "score": 0}, {"label": "Fosso", "score": 0}, {"label": "Catalisadores", "score": 0}, {"label": "Riscos", "score": 0}]`);
+
+            systemInstruction = `${rastroPersona}
+                ${instructionOverride || ""}
+                Analise ${ticker}. Sê extremamente criterioso.
                 
-                Dê uma nota de 0.0 a 10.0 e preencha os 4 pilares técnicos.
+                NÃO USE MARKDOWN. NÃO ESCREVA \`\`\`json. RETORNE APENAS O TEXTO DO JSON PURO E NADA MAIS.
                 
-                ⚠️ FOCO PARA ETFs:
-                Se for ETF, foque em:
-                1. Taxa de Administração frente aos pares.
-                2. Liquidez e Tracking Error (erro de replicação).
-                3. Qualidade e representatividade do Índice de Referência (Benchmark).
-                
-                ⚠️ FOCO PARA FIIs (Fundos Imobiliários):
-                Se for FII, ignore métricas de lucro/ROE e foque em:
-                1. Qualidade e Localização dos Imóveis.
-                2. Histórico e gestão de Vacância.
-                3. Sustentabilidade do Dividend Yield (Proventos).
-                
-                ⚠️ ESTRUTURA DA TESE (campo "summary"):
-                Extraia a tese de investimento (Investment Thesis) a partir de seções como "Resumo Estratégico", "Conclusão", "Perspectivas" ou "Análise do Analista".
-                O campo "summary" deve conter um parágrafo direto de 2 a 3 linhas. NUNCA deixe vazio.
-                
-                ⚠️ MÉTRICAS ESPECÍFICAS (FII/ETF/CRIPTO):
-                É OBRIGATÓRIO preencher os campos reais em "fiiMetrics", "etfMetrics" ou "cryptoMetrics" extraindo os dados exatos do texto.
-                
-                Responda APENAS em JSON:
+                RETORNE EXCLUSIVAMENTE ESTE JSON:
                 {
-                    "score": 8.5,
-                    "verdict": "${isETF ? 'OTIMISMO E DIVERSIFICAÇÃO' : isFII ? 'OTIMISMO E RENDA' : 'COMPRA / OTIMISMO'}",
-                    "summary": "Tese de investimento extraída...",
-                    "pillars": ${activePillars},
-                    ${isETF ? '"etfMetrics": { "taxa": "0.00%", "benchmark": "Índice", "patrimonio": "R$ 0B", "liquidez": "R$ 0M" }' : 
-                      isFII ? '"fiiMetrics": { "pvp": "0.00", "vacancia": "0.0%", "dy": "0.0%", "patrimonio": "R$ 0.0B" }' : 
-                      ticker.includes('USD') || ticker.includes('BTC') ? '"cryptoMetrics": { "tvl": "--", "wallets": "--", "inflation": "--", "revenue": "--" }' : ''}
+                    "score": 0.0,
+                    "verdict": "OTIMISMO / NEUTRO / CAUTELA",
+                    "summary": "Tese direta de 2 linhas.",
+                    "extractedDY": "0.00%",
+                    "extractedPrice": "0.00",
+                    "pillars": ${pillars},
+                    ${isETF ? '"etfMetrics": { "taxa": "0.00%", "benchmark": "Índice", "patrimonio": "R$ 0B" }' :
+                    isFII ? '"fiiMetrics": { "pvp": "0.00", "vacancia": "0.0%", "dy": "0.0%" }' :
+                        ticker?.includes('USD') || ticker?.includes('BTC') ? '"cryptoMetrics": { "tvl": "--", "inflation": "--" }' : ''}
                 }
-                
-                Baseie-se nos dados reais: ${report} e Indicadores: ${JSON.stringify(indicators || {})}.
-                
-                ⚠️ ANÁLISE FORENSE: Se os indicadores numéricos estiverem zerados, use o texto do "Relatório 360" (EBITDA, Backlog, Aluguéis, Ocupação) para compor a nota. A nota deve refletir a qualidade descrita no texto.
-            `;
+                INSTRUÇÃO CRÍTICA DE EXTRAÇÃO: No relatório (texto base abaixo de "RELATÓRIO DE FUNDAMENTOS"), identifique o Dividend Yield (DY) projetado/estimado e o PREÇO ATUAL citado. 
+                ATENÇÃO: Ignore símbolos de "aproximadamente" como "~" ou "cerca de". Se o texto diz "~7,6%", extraia "7.60%".
+                REGRA DE OURO: Ignore COMPLETAMENTE os valores do bloco "DADOS NUMÉRICOS COMPLEMENTARES" para preencher os campos "extractedDY" e "extractedPrice". Busque-os EXCLUSIVAMENTE dentro do texto corrido do relatório.
+                Retorne-os nos campos "extractedDY" (ex: "7.60%") e "extractedPrice" (ex: "12.50"). 
+                Se o texto não mencionar valores específicos, retorne "N/D" para o respectivo campo.
+                Baseie-se nestas dados: ${report}`;
         } else {
-            // If a systemPrompt was sent from the frontend (portfolio chat), use it directly.
-            // This is the fix: the frontend's SENIOR_AGENT_PROMPT with all classification rules
-            // was being ignored because the backend always built its own internal prompt.
-            if (systemPrompt) {
-                systemInstruction = systemPrompt;
-            } else {
-                // BLOCO DO CHATBOX - ANALISTA SÊNIOR COM FOCO EXCLUSIVO E JUSTIFICATIVA
-                const isCrypto = ticker?.toUpperCase().includes('USD') || ticker?.toUpperCase().includes('BTC') || ticker?.toUpperCase().includes('ETH') || ticker?.toUpperCase().includes('USDT') || name?.toLowerCase().includes('token');
-                const assetType = isCrypto ? 'Criptoativo/Token' : 'Ação/Ativo Tradicional';
-                
-                // 1. Tradução do Veredito para Psicologia de Mercado (Sentimento)
-                const rawVerdict = indicators?.verdict?.toUpperCase() || "NEUTRO";
-                let safeVerdict = "NEUTRALIDADE / AGUARDAR DEFINIÇÃO";
+            const chatRules = `
+REGRAS DE COMUNICAÇÃO (OBRIGATÓRIO):
+Seja EXTREMAMENTE conciso e direto. Responda em no máximo 2 a 3 parágrafos curtos.
+Use uma linguagem simples e acessível. Evite jargões complexos de Wall Street (como FCF, Covenants, CAPEX) a menos que o utilizador use esses termos primeiro.
+Vá direto ao ponto. Não faça introduções longas ou floreados.
 
-                if (rawVerdict.includes("COMPRA")) {
-                    safeVerdict = "OTIMISMO E ACUMULAÇÃO (BULLISH)"; 
-                } else if (rawVerdict.includes("VENDA")) {
-                    safeVerdict = "CAUTELA E DISTRIBUIÇÃO (BEARISH)";
-                } else if (rawVerdict !== "NEUTRO") {
-                    safeVerdict = rawVerdict;
-                }
-
-                const realScore = indicators?.score || "N/A";
-
-                systemInstruction = `
-                VOCÊ É O LUCAS, ANALISTA SÊNIOR DA PLATAFORMA RASTRO IA. Responda de forma natural, em parágrafos e vá direto ao ponto.
-                ATIVO EM TELA: ${name} (${ticker}) - TIPO: ${assetType}
-
-                [BASE DE CONHECIMENTO DO ATIVO]
-                ${report || "Use seu conhecimento técnico."}
-
-                [CLASSIFICAÇÃO OFICIAL DO SISTEMA]
-                - NOTA: ${realScore}/10
-                - VEREDITO OFICIAL: ${safeVerdict}
-
-                ⚠️ REGRAS OBRIGATÓRIAS:
-                1. FOCO EXCLUSIVO NO ATIVO ATUAL (${name}).
-                2. NUNCA use "Carteira". Use "Watchlist" ou "Lista de Acompanhamento".
-                3. O DONO DA NOTA: Use APENAS ${realScore}/10. NUNCA invente outra nota.
-                4. PROIBIDO RECOMENDAR COMPRA/VENDA DIRETO.
-                5. Se for Cripto, não use métricas de Ações (LPA, ROE).
-                `;
-            }
+REGRA DE PLATAFORMA: Se o utilizador perguntar sobre a diferença entre os números da "Saúde Fundamental" (ou tela) e o "Relatório", explique de forma simples e prática: os números da Saúde Fundamental vêm de APIs automáticas de mercado (são uma fotografia fria dos últimos 12 meses e podem ter atrasos ou distorções), enquanto o Relatório reflete a análise contextual humana/IA da estratégia real, histórico e futuro da empresa. O Relatório é sempre a fonte da verdade sobre a qualidade da empresa.
+`;
+            systemInstruction = systemPrompt || `${rastroPersona}\n${chatRules}`;
         }
 
-        const chatCompletion = await groq.chat.completions.create({
-            messages: [
-                { role: "system", content: systemInstruction },
-                { role: "user", content: prompt || "Gere a análise técnica agora baseada nos dados fornecidos." }
-            ],
-            // Usamos llama-3.1-8b-instant porque tiene una ventana de contexto de 128k tokens,
-            // lo que permite procesar LUCAS_KNOWLEDGE (30k chars) + reportes largos sin fallar.
-            model: "llama-3.1-8b-instant",
-            response_format: (isSummary || isHealth || isSentiment || isRatingRequest) ? { type: "json_object" } : undefined,
-            temperature: 0.2,
-            max_tokens: 1024,
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: systemInstruction,
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            ]
         });
 
-        const response = chatCompletion.choices[0]?.message?.content || (isSummary || isHealth || isSentiment ? "{}" : "");
+        // Preparar el prompt final enriquecido si es una pregunta del chat
+        let finalPrompt = prompt || "Gere a análise requerida baseada nos dados do relatório.";
+
+        if (prompt && !isSummary && !isHealth && !isSentiment && !isRatingRequest) {
+            finalPrompt = `${rastroPersona}
+REGRAS DE COMUNICAÇÃO E INTELIGÊNCIA (OBRIGATÓRIO):
+
+CONTEXTO É REI: Nunca dês respostas genéricas ou teóricas de dicionário (ex: "Um score reflete a saúde da empresa"). Se o utilizador perguntar sobre uma nota, score ou dados, LÊ O RELATÓRIO DO ATIVO ABAIXO e elenca os motivos REAIS E ESPECÍFICOS desta empresa.
+
+Sê inteligente, analítico e específico, mostrando que leste os fundamentos.
+
+Mantém a resposta concisa e em linguagem simples.
+
+ATIVO EM ANÁLISE: ${name || ticker} (${ticker})
+
+RELATÓRIO COMPLETO DA EMPRESA:
+${report || "Relatório indisponível."}
+
+PERGUNTA DO UTILIZADOR:
+${prompt}`;
+        }
+
+        // Chamada com o contexto e regras completos
+        const result = await model.generateContent(finalPrompt);
+
+        const response = await result.response;
+        const responseText = response.text();
 
         if (isSummary || isHealth || isSentiment || isRatingRequest) {
             try {
-                const parsed = JSON.parse(response);
-                return NextResponse.json(parsed);
+                // Tenta extrair o JSON do texto caso a IA tenha adicionado ruído/markdown
+                const match = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+                const jsonString = match ? match[0] : responseText;
+                return NextResponse.json(JSON.parse(jsonString));
             } catch (e) {
-                console.error("Erro ao parsear JSON da Groq:", response);
-                return NextResponse.json({ error: "Erro no formato da resposta da IA" }, { status: 500 });
+                console.error("[GEMINI PARSE ERROR] Recebido:", responseText);
+                // Retornar um JSON vazio estruturado em vez de erro 500 para não quebrar a tela
+                return NextResponse.json({
+                    score: 5,
+                    verdict: "Erro de Leitura",
+                    summary: "A IA não conseguiu formatar os dados corretamente para este ativo.",
+                    pillars: [],
+                    bullCase: [],
+                    bearCase: [],
+                    error: true
+                });
             }
         }
 
-        // Se for o chat, retornamos no formato esperado pelo componente de mensagens
-        return NextResponse.json({ reply: response });
+        return NextResponse.json({ reply: responseText });
 
     } catch (error: any) {
-        console.error("Erro na Rota API:", error?.response?.data || error.message || error);
+        console.error("[GEMINI API ROUTE ERROR]:", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

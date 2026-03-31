@@ -3,7 +3,26 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/useAuth";
+import MarketTicker from "@/components/MarketTicker";
 import Link from "next/link";
+import { Asset } from "@/lib/data";
+
+interface PortfolioAsset extends Asset {
+    symbol?: string;
+    change?: string;
+    image?: string;
+    color?: string;
+    spark?: string;
+    mcap?: string;
+    momento?: { label: string; color: string; icon: string };
+    alpha?: { label: string; color: string; tooltip: string } | null;
+    rating?: number;
+    upside?: { value: number; label: string; positive: boolean; isNeutral: boolean; aiScore: number };
+    isProtection?: boolean;
+    risco?: { label: string; color: string; tooltip: string };
+    aiScoreReal?: number;
+    status?: string;
+}
 
 const DashboardHelp = () => (
     <div className="relative group inline-block">
@@ -70,7 +89,7 @@ const PortfolioPage: React.FC = () => {
     const [isAIThinking, setIsAIThinking] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [watchlist, setWatchlist] = useState<string[]>([]);
-    const [assets, setAssets] = useState<any[]>([]);
+    const [portfolio, setPortfolio] = useState<PortfolioAsset[]>([]);
     const [globalData, setGlobalData] = useState<any>({ vol: "---", dom: "---" });
     const [benchmarks, setBenchmarks] = useState<any>({ ibov: 0, btc: 0 });
     const [avgSentiment, setAvgSentiment] = useState(50);
@@ -101,21 +120,21 @@ const PortfolioPage: React.FC = () => {
     };
 
     const generateWhaleSignal = useCallback(() => {
-        if (assets.length === 0) return;
+        if (portfolio.length === 0) return;
 
         // Escolha um ativo aleatório da lista atual, mas priorize os que têm mais "ação"
-        const sorted = [...assets].sort((a, b) => {
-            const valA = Math.abs(parseFloat(a.change)) + (a.rating / 10 || 0);
-            const valB = Math.abs(parseFloat(b.change)) + (b.rating / 10 || 0);
+        const sorted = [...portfolio].sort((a, b) => {
+            const valA = Math.abs(parseFloat(a.change || "0")) + ((a.rating || 0) / 10 || 0);
+            const valB = Math.abs(parseFloat(b.change || "0")) + ((b.rating || 0) / 10 || 0);
             return valB - valA;
         });
 
         // Pega um dos top 5 ou um aleatório se a lista for pequena
         const pool = sorted.slice(0, 5);
         const asset = pool[Math.floor(Math.random() * pool.length)];
-        const ticker = asset.symbol;
-        const variation = parseFloat(asset.change) || 0;
-        const aiScore = asset.rating ? asset.rating / 10 : 5;
+        const ticker = asset.symbol || asset.ticker;
+        const variation = parseFloat(asset.change || "0");
+        const aiScore = (asset.rating || 0) / 10 || 5;
         const sector = asset.sector || "Mercado";
 
         let msg = "";
@@ -152,7 +171,7 @@ const PortfolioPage: React.FC = () => {
         };
 
         setWhaleSignals(prev => [newSignal, ...prev].slice(0, 8));
-    }, [assets]);
+    }, [portfolio]);
 
     useEffect(() => {
         if (!hasMounted) return;
@@ -162,34 +181,61 @@ const PortfolioPage: React.FC = () => {
     }, [hasMounted, generateWhaleSignal, whaleSignals.length]);
 
     const fetchGlobalData = async () => {
-        const CACHE_KEY = 'cg_global_data';
+        const CACHE_KEY = 'cg_global_data_v2';
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+
         try {
+            // 1. Tentar carregar do cache
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
-                const { data, timestamp } = JSON.parse(cached);
-                const isOld = Date.now() - timestamp > 24 * 60 * 60 * 1000;
-                if (!isOld) {
-                    setGlobalData(data);
-                    return;
+                try {
+                    const { data, timestamp } = JSON.parse(cached);
+                    const isOld = Date.now() - timestamp > ONE_DAY;
+                    if (!isOld && data?.vol && data?.dom) {
+                        setGlobalData(data);
+                        return;
+                    }
+                } catch (e) {
+                    localStorage.removeItem(CACHE_KEY);
                 }
             }
+
+            // 2. Se não houver cache ou for antigo, buscar real
             const url = `/api/coingecko?endpoint=global`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Global fetch failed');
+            
             const res = await response.json();
             const data = res.data;
-            const formatted = {
-                vol: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' }).format(data.total_volume.usd),
-                dom: data.market_cap_percentage.btc.toFixed(1) + "%"
-            };
-            setGlobalData(formatted);
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: formatted, timestamp: Date.now() }));
+            
+            if (data) {
+                const formatted = {
+                    vol: new Intl.NumberFormat('en-US', { 
+                        style: 'currency', 
+                        currency: 'USD', 
+                        notation: 'compact',
+                        maximumFractionDigits: 1 
+                    }).format(data.total_volume.usd),
+                    dom: data.market_cap_percentage.btc.toFixed(1) + "%"
+                };
+                
+                setGlobalData(formatted);
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ 
+                    data: formatted, 
+                    timestamp: Date.now() 
+                }));
+            }
         } catch (err) {
-            console.error("Global fetch error:", err);
+            console.error("Erro ao buscar dados globais:", err);
+            // Fallback: Tenta usar o cache mesmo se for antigo em caso de erro de rede
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
-                const { data } = JSON.parse(cached);
-                setGlobalData(data);
+                try {
+                    const { data } = JSON.parse(cached);
+                    setGlobalData(data);
+                } catch {
+                    setGlobalData({ vol: "---", dom: "---" });
+                }
             }
         }
     };
@@ -206,7 +252,7 @@ const PortfolioPage: React.FC = () => {
 
     const fetchMarketData = useCallback(async (force = false) => {
         if (watchlist.length === 0) {
-            setAssets([]);
+            setPortfolio([]);
             setLoading(false);
             return;
         }
@@ -369,7 +415,7 @@ const PortfolioPage: React.FC = () => {
 
             // 2. Process Assets with Momentum and Alpha
             const finalAssets = [...cachedAssets, ...freshResults, ...stockResults].map(asset => {
-                const variationNum = parseFloat(asset.change) || 0;
+                const variationNum = parseFloat(asset.change || "0");
                 const tickerUpper = asset.ticker.toUpperCase();
 
                 // --- Find static info again to ensure correct metadata ---
@@ -390,7 +436,7 @@ const PortfolioPage: React.FC = () => {
                 }
 
                 const isCrypto = (
-                    ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOT', 'LINK', 'ONDO', 'AVAX', 'MATIC', 'ARB', 'OP'].includes(asset.symbol?.toUpperCase()) ||
+                    ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOT', 'LINK', 'ONDO', 'AVAX', 'MATIC', 'ARB', 'OP'].includes(asset.symbol?.toUpperCase() || '') ||
                     tickerUpper.endsWith('-USD') ||
                     tickerUpper.endsWith('USD')
                 ) && !tickerUpper.endsWith('.SA');
@@ -491,13 +537,13 @@ const PortfolioPage: React.FC = () => {
             // 4. Generate Live Signals
             const newSignals: any[] = [];
             finalAssets.forEach(a => {
-                const v = parseFloat(a.change) || 0;
+                const v = parseFloat(a.change || "0");
                 if (v > 2) newSignals.push({ type: 'buy', icon: 'local_fire_department', color: 'text-[#0ecb81]', msg: `Fluxo comprador detectado em ${a.symbol}`, sub: `+${v.toFixed(2)}% (24h)`, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
                 if (v < -2) newSignals.push({ type: 'sell', icon: 'trending_down', color: 'text-[#f6465d]', msg: `Pressão vendedora em ${a.symbol}`, sub: `${v.toFixed(2)}% (24h)`, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
                 if ((a.rating || 50) > 80) newSignals.push({ type: 'ai', icon: 'psychology', color: 'text-primary', msg: `IA Lucas: veredito forte em ${a.symbol}`, sub: `Nota ${((a.rating || 50) / 10).toFixed(1)}/10`, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
             });
             setSignals(newSignals.slice(0, 15));
-            setAssets(finalAssets);
+            setPortfolio(finalAssets);
             setError(null);
         } catch (err) {
             console.error("Fetch error:", err);
@@ -513,14 +559,30 @@ const PortfolioPage: React.FC = () => {
 
     useEffect(() => {
         setHasMounted(true);
-        
+
         // Clear chat history on fresh load
         localStorage.removeItem('chat-history');
         setMessages([WELCOME_MESSAGE]);
 
+        // --- LIMPEZA DE CACHE CONFLITANTE ---
+        // Se o usuário tiver dados antigos de versões de teste (Apple/Petrobras), limpamos para começar do zero
         const saved = localStorage.getItem('user_watchlist');
-        let initialList: string[] = [];
+        const legacyStorage = localStorage.getItem('portfolio-storage');
 
+        if (legacyStorage) localStorage.removeItem('portfolio-storage');
+
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && (parsed.includes('AAPL') || parsed.includes('PETR4.SA') || parsed.includes('PETR4'))) {
+                    localStorage.removeItem('user_watchlist');
+                    setWatchlist([]);
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        let initialList: string[] = [];
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
@@ -531,9 +593,7 @@ const PortfolioPage: React.FC = () => {
         // Deduplicate and Normalize
         const uniqueNormalized = Array.from(new Set(initialList.map(normalizeTicker)));
         setWatchlist(uniqueNormalized);
-        if (uniqueNormalized.length > 0) {
-            localStorage.setItem('user_watchlist', JSON.stringify(uniqueNormalized));
-        }
+        localStorage.setItem('user_watchlist', JSON.stringify(uniqueNormalized));
     }, []);
 
     useEffect(() => {
@@ -543,10 +603,11 @@ const PortfolioPage: React.FC = () => {
 
     // Gatilho automático removido - Silenciando a inicialização
     useEffect(() => {
-        // if (assets.length > 0 && messages.length === 1 && !isAIThinking) {
-        //     handleSendMessage("Faça um panorama estratégico da minha lista. Identifique os Motores de Alpha e riscos eminentes.");
+        if (!hasMounted) return;
+        // if (portfolio.length > 0 && messages.length === 1 && !isAIThinking) {
+        //   fetchInitialAiDiagnosis();
         // }
-    }, [assets, messages.length, isAIThinking]);
+    }, [portfolio, messages.length, isAIThinking]);
 
     const addToWatchlist = (ticker: string) => {
         const normalized = normalizeTicker(ticker);
@@ -560,53 +621,34 @@ const PortfolioPage: React.FC = () => {
         setShowSearchModal(false);
     };
 
-    const removeFromWatchlist = (ticker: string) => {
-        const newList = watchlist.filter(t => t !== ticker);
+    const removeFromWatchlist = (tickerToRemove: string) => {
+        const normalizedTarget = normalizeTicker(tickerToRemove);
+        const newList = watchlist.filter(t => normalizeTicker(t) !== normalizedTarget);
         setWatchlist(newList);
         localStorage.setItem('user_watchlist', JSON.stringify(newList));
     };
 
-    const SENIOR_AGENT_PROMPT = `Você é o RASTRO, Consultor Sênior de Inteligência Ativa. Seu papel não é apenas listar dados, mas cruzar fundamentos macro e microeconômicos para explicar o *porquê* das movimentações na Watchlist do usuário. 
-Sua linguagem deve ser de um Terminal Bloomberg operado por um gestor de fundo: seja incisivo, analítico, direto e com visão de "Skin in the Game".
+    const SENIOR_AGENT_PROMPT = `Você é o RASTRO, um Analista IA prático e objetivo. Seu papel é ajudar o investidor de retalho a tomar decisões rápidas e fundamentadas.
+Seja EXTREMAMENTE conciso e direto. Responda em no máximo 2 a 3 parágrafos curtos.
+Use uma linguagem simples e acessível. Evite jargões complexos de Wall Street (como FCF, Covenants, CAPEX) a menos que o utilizador os use primeiro.
+Vá direto ao ponto. Não faça introduções longas ou floreados.
+
+REGRA DE PLATAFORMA: Se o utilizador perguntar sobre a diferença entre os números da "Saúde Fundamental" (ou tela) e o "Relatório", explique de forma simples e prática: os números da Saúde Fundamental vêm de APIs automáticas de mercado (são uma fotografia fria dos últimos 12 meses e podem ter atrasos ou distorções), enquanto o Relatório reflete a análise contextual humana/IA da estratégia real, histórico e futuro da empresa. O Relatório é sempre a fonte da verdade sobre a qualidade da empresa.
 
 REGRAS DE OURO (SISTEMA — INVIOLÁVEIS):
-1. FIDELIDADE AOS DADOS: Use EXCLUSIVAMENTE os dados (Notas, Preços, Vereditos) fornecidos no JSON/Contexto abaixo. NUNCA invente notas (como o padrão 5.0) para preencher lacunas. Se um ativo não tiver nota no sistema, declare-o como "Pendente de Análise Técnica" e analise apenas o fundamento geral.
-2. VOCABULÁRIO PROIBIDO: As palavras "Carteira" e "Carteira de Investimentos" estão BANIDAS. Use sempre "Watchlist", "Lista de Acompanhamento" ou "Exposição Atual".
-3. SEM CLICHÊS: É terminantemente PROIBIDO usar as frases: "importante monitorar", "ajustar conforme necessário" ou "sinal de cautela". Fale como um terminal lógico, não como um conselheiro.
-4. FORMATAÇÃO: PROIBIDO usar itálico ou underlines em tickers (Ex: nunca use _BTC_ ou *AAPL*). Use apenas Negrito simples: **BTC**.
-5. MÉTRICA REAL: Nunca responda com "N/A" para a visão geral. Se precisar de uma avaliação global, calcule a média matemática real dos ativos que possuem nota no contexto.
-6. CENÁRIO A - SE O USUÁRIO PERGUNTAR 'POR QUÊ?' SOBRE UM ATIVO: Responda EXCLUSIVAMENTE lendo o campo 'tese' daquele ativo no JSON. NUNCA cite outros ativos da lista se não foram perguntados. NUNCA invente justificativas. Se a tese disser 'Tese não carregada', diga ao usuário que você só tem a nota no momento. PROIBIDO usar a frase 'importante monitorar'.
+1. FIDELIDADE AOS DADOS: Use EXCLUSIVAMENTE os dados (Notas, Preços, Vereditos) fornecidos no Contexto. NUNCA invente notas.
+2. VOCABULÁRIO: Use "Watchlist" ou "Exposição Atual". Evite "Carteira".
+3. SEM CLICHÊS: PROIBIDO usar "importante monitorar" ou "ajustar conforme necessário". Seja direto.
+4. FORMATAÇÃO: Use apenas Negrito simples: **BTC**. Sem itálicos em tickers.
+5. PROIBIÇÃO DE RECOMENDAÇÃO: O RASTRO é estritamente informativo. NUNCA dê recomendações de compra/venda. Use "O cenário sugere" ou "Os dados indicam".
+6. RODAPÉ OBRIGATÓRIO: Em toda resposta de análise, adicione: "⚠️ Aviso: Este conteúdo tem caráter exclusivamente informativo e não constitui recomendação de investimento."
 
-LÓGICA DE CONSULTORIA DE ELITE (Como avaliar QUALQUER ativo):
-A classificação deve ser feita com base na NOTA REAL fornecida no contexto, cruzada com a classe do ativo:
-
-- NOTA 8.0 a 10.0 (MOTORES DE ALPHA): Trate como "Oportunidade de Elite", "Líder de Categoria" ou "Turnaround de Alta Confiança". Estes são os ativos que puxam o rendimento.
-- NOTA 5.0 a 7.9 (SUSTENTAÇÃO / NEUTRO): Trate como "Porto Seguro" (se for empresa consolidada/Big Tech) ou "Em Observação" (se for volátil/bancário). Não são armadilhas, são ativos de retenção ou defesa.
-- NOTA < 5.0 (RISCO ESTRUTURAL): Trate como "Value Trap", "Risco de Capital" ou "Candidato a Corte". Ativos esticados ou com fundamentos deteriorados.
-
-INTELIGÊNCIA SETORIAL (Cruze os dados ao explicar):
-- Cripto/RWA: Analise sob a ótica de liquidez global, tokenização institucional, juros on-chain e escassez.
-- Bancos/Velha Economia: Analise sob a ótica de ciclos de juros (Fed/Selic), inadimplência, ROE e desconto patrimonial (P/VPA).
-- Tech/Global: Analise sob a ótica de inovação, fluxo de capital e proxy de segurança.
-
-ESTRUTURA DE RESPOSTA (DINÂMICA E INTELIGENTE):
-O formato da sua resposta DEPENDE do que o usuário perguntou.
-
-CENÁRIO A - PERGUNTA ESPECÍFICA (Ex: "Qual a nota do ONDO?", "Por que AAPL é porto seguro?"):
-- Responda APENAS o que foi perguntado, com uma pequena justificativa da resposta.
-
-- PROIBIDO gerar o relatório completo (Diagnóstico, Plano de Voo, etc) neste cenário.
-
-CENÁRIO B - PEDIDO DE ANÁLISE GERAL (Ex: "Faça um panorama", "Analise minha lista", "Como está minha Watchlist?"):
-Use obrigatoriamente esta estrutura completa:
-1. Saudação Sênior.
-2. Diagnóstico Cruzado: Visão geral da estratégia.
-3. Dissecando a Watchlist: Tópicos curtos com as notas reais.
-4. Insight de Ouro Macro (2026).
-5. Plano de Voo: AUMENTAR, RETER, CORTAR.`;
+ESTRUTURA DE RESPOSTA:
+- Se for pergunta específica: Responda apenas o que foi pedido de forma curta (1 parágrafo).
+- Se for análise geral: Diagnóstico rápido -> Dissecando a Watchlist (tópicos curtos) -> Plano de Voo (Comprar, Manter, Cortar).`;
 
     const prepareAgentContext = () => {
-        const dataSnapshot = assets.map(a => {
+        const dataSnapshot = portfolio.map(a => {
             let aiScore = a.aiScoreReal !== null && a.aiScoreReal !== undefined ? parseFloat(String(a.aiScoreReal)) : null;
             let teseIA = "Tese detalhada não carregada.";
 
@@ -664,7 +706,7 @@ Use obrigatoriamente esta estrutura completa:
         setChatInput("");
         setIsAIThinking(true);
         const ctx = prepareAgentContext();
-        const fullPrompt = `${ctx}\n\nAtenção: A nota atual do BBDC3 no banco de dados é 8.5 (Bullish). Ignore qualquer informação anterior que diga o contrário. Responda com base nestes números AGORA.\n\nPERGUNTA DO USUÁRIO: ${userMsg}`;
+        const fullPrompt = `${ctx}\n\nPERGUNTA DO USUÁRIO: ${userMsg}`;
 
         try {
             const res = await fetch("/api/chat", {
@@ -690,7 +732,7 @@ Use obrigatoriamente esta estrutura completa:
 
         return parts.map((part, i) => {
             if (part === "[DISCLAIMER]") return null;
-            if (part.startsWith("⚠️ Nota Legal:")) {
+            if (part.startsWith("⚠️ Aviso:")) {
                 return (
                     <div key={i} className="mt-4 pt-4 border-t border-white/5 text-[9px] text-zinc-500 italic leading-relaxed">
                         {part}
@@ -710,6 +752,7 @@ Use obrigatoriamente esta estrutura completa:
     return (
         <div className="bg-black font-display text-slate-100 min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black">
             <Header currentPath="/portfolio" />
+            <MarketTicker />
 
             <main className="flex-1 w-full bg-black h-auto lg:h-[calc(100vh-65px)] overflow-hidden">
                 <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-4 lg:py-6 h-full grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
@@ -749,68 +792,19 @@ Use obrigatoriamente esta estrutura completa:
                                     ></div>
                                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[9px] font-black text-white uppercase drop-shadow-md">
                                         {avgSentiment < 35 ? 'PÂNICO' : avgSentiment < 65 ? 'NEUTRO' : 'OTIMISMO'} ({avgSentiment.toFixed(0)}%)
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="hidden md:flex gap-4 text-right">
-                                <div className="px-5 py-3 bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl">
-                                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Vol IBOV</p>
-                                    <p className={`text-xl font-black ${benchmarks.ibov >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                                        {benchmarks.ibov > 0 ? '+' : ''}{benchmarks.ibov.toFixed(2)}%
-                                    </p>
-                                </div>
-                                <div className="px-5 py-3 bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl">
-                                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Vol BTC</p>
-                                    <p className={`text-xl font-black ${benchmarks.btc >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                                        {benchmarks.btc > 0 ? '+' : ''}{benchmarks.btc.toFixed(2)}%
-                                    </p>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
-                            <div className="bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl p-6 shadow-xl hover:border-primary/20 transition-all group">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Liquidez Global (24h)</span>
-                                    <span className="material-symbols-outlined text-primary text-xl">payments</span>
-                                </div>
-                                <div className="flex items-end gap-3">
-                                    <span className="text-4xl font-black text-white leading-none tracking-tighter">{globalData.vol}</span>
-                                    <span className="text-xs font-bold text-[#0ecb81] mb-1 flex items-center">
-                                        <span className="material-symbols-outlined text-sm">sensors</span>
-                                        LIVE
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl p-6 shadow-xl hover:border-primary/20 transition-all group">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Índice de Dominância (BTC)</span>
-                                    <span className="material-symbols-outlined text-primary text-xl">monitoring</span>
-                                </div>
-                                <div className="flex items-end gap-3">
-                                    <span className="text-4xl font-black text-white leading-none tracking-tighter">{globalData.dom}</span>
-                                    <span className="text-xs font-bold text-slate-400 mb-1 flex items-center">
-                                        <span className="material-symbols-outlined text-sm">leaderboard</span>
-                                        Market Share
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+
 
                         {/* Assets Table */}
                         <div className="bg-neutral-dark-surface border border-neutral-dark-border rounded-3xl overflow-hidden shadow-2xl mb-8">
                             <div className="px-8 py-5 border-b border-neutral-dark-border flex justify-between items-center bg-black/20">
                                 <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
                                     <span className="size-2 rounded-full bg-primary animate-pulse"></span>
-                                    Sinais Ativos
                                 </h3>
-                                <div className="flex gap-2 p-1 bg-black/40 rounded-xl border border-neutral-dark-border">
-                                    {['7D', '24H', '1H'].map(t => (
-                                        <button key={t} className={`px-4 py-1.5 text-[10px] font-black rounded-lg transition-all ${t === '1H' ? 'bg-primary text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>
-                                    ))}
-                                </div>
                             </div>
                             <div className="flex flex-col">
                                 {/* Header Row (Visible only on Desktop) */}
@@ -820,147 +814,152 @@ Use obrigatoriamente esta estrutura completa:
                                     <div className="w-40 text-right">Performance Relativa</div>
                                     <div className="w-24 text-right">Nota / Upside</div>
                                     <div className="w-24 text-right hidden xl:block">Mkt Cap</div>
-                                    <div className="w-28 text-right hidden xl:block">Força (7d)</div>
                                     <div className="min-w-[70px] text-right">Preço / Var</div>
                                     <div className="w-8"></div>
                                 </div>
 
-                                <div className="divide-y divide-neutral-dark-border/50">
-                                    {loading && assets.length === 0 ? (
-                                        <div className="py-24 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="size-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin"></div>
-                                                <p className="text-xs font-black uppercase text-slate-500 tracking-widest">Sincronizando Watchlist...</p>
-                                            </div>
+                                {/* Asset List or Empty State */}
+                                {loading && portfolio.length === 0 ? (
+                                    <div className="py-24 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="size-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin"></div>
+                                            <p className="text-xs font-black uppercase text-slate-500 tracking-widest">Sincronizando Watchlist...</p>
                                         </div>
-                                    ) : (isExpanded ? assets : assets.slice(0, 8)).map((asset, idx) => (
-                                        <div key={idx} className="flex items-center justify-between gap-4 p-3 md:p-4 md:px-8 hover:bg-primary/[0.04] transition-all group relative">
-                                            {/* LEFT: Logo, Ticker, Name */}
-                                            <Link href={`/asset/${asset.ticker}`} className="flex items-center gap-4 flex-1 min-w-0">
-                                                <div className="size-10 rounded-full bg-zinc-900 border border-neutral-dark-border/50 flex items-center justify-center overflow-hidden shrink-0">
-                                                    <img
-                                                        src={asset.image || `https://ui-avatars.com/api/?name=${asset.symbol}&background=334155&color=fff&bold=true`}
-                                                        className="w-full h-full object-cover"
-                                                        alt={asset.symbol}
-                                                    />
-                                                </div>
-                                                <div className="min-w-0 flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-white shrink-0 text-sm group-hover:text-primary transition-colors">{asset.symbol}</p>
-                                                        {asset.isProtection && <span title="Proteção de Portfólio" className="text-[10px] cursor-help" aria-label="Baixa correlação com benchmark">🛡️</span>}
-                                                    </div>
-                                                    <p className="text-sm text-zinc-400 truncate max-w-[120px] uppercase font-bold tracking-tighter">
-                                                        {asset.name}
-                                                    </p>
-                                                </div>
-                                            </Link>
-
-                                            {/* MIDDLE: Desktop specific columns */}
-                                            <div className="hidden lg:flex items-center justify-end gap-6 flex-1">
-                                                {/* Momento */}
-                                                <div className="w-32 flex justify-end">
-                                                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase text-white ${asset.momento?.color || 'bg-slate-700'}`}>
-                                                        <span className="material-symbols-outlined !text-[12px]">{asset.momento?.icon}</span>
-                                                        {asset.momento?.label}
-                                                    </div>
-                                                </div>
-
-                                                {/* Performance Relativa */}
-                                                <div className="w-40 flex flex-col items-end gap-1 group/risco relative">
-                                                    {asset.alpha && (
-                                                        <div className="group/alpha relative">
-                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help transition-all hover:scale-105 border ${asset.alpha.color}`}>
-                                                                {asset.alpha.label}
-                                                            </span>
-                                                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover/alpha:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
-                                                                <p className="text-[10px] text-slate-300 font-medium leading-relaxed italic">
-                                                                    {asset.alpha.tooltip}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help whitespace-nowrap transition-all hover:scale-105 ${asset.risco?.color}`}>
-                                                        {asset.risco?.label}
-                                                    </span>
-                                                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover/risco:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
-                                                        <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
-                                                            {asset.risco?.tooltip}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Nota / Upside */}
-                                                <div className="w-24 text-right">
-                                                    {asset.upside.isNeutral ? (
-                                                        <div className="inline-flex items-center gap-1 text-sm font-black text-slate-600">
-                                                            <span className="material-symbols-outlined text-sm">horizontal_rule</span>
-                                                            {asset.upside.label}
-                                                        </div>
-                                                    ) : (
-                                                        <div className={`inline-flex items-center gap-1 text-sm font-black ${asset.upside.aiScore >= 8.0 ? 'text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' :
-                                                            asset.upside.aiScore < 5.0 ? 'text-orange-400' :
-                                                                asset.upside.positive ? 'text-emerald-400' : 'text-rose-400'
-                                                            }`}>
-                                                            <span className="material-symbols-outlined text-sm">{asset.upside.positive ? 'trending_up' : 'trending_down'}</span>
-                                                            {asset.upside.label}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Mkt Cap (Extra wide screens) */}
-                                                <div className="w-24 text-right font-mono text-[10px] text-slate-400 font-semibold hidden xl:block">
-                                                    {asset.mcap}
-                                                </div>
-
-                                                {/* Força (Extra wide screens) */}
-                                                <div className="w-28 h-8 relative hidden xl:block">
-                                                    <svg className={`w-full h-full fill-none stroke-2 overflow-visible ${asset.color === 'success' ? 'stroke-[#0ecb81]' : 'stroke-[#f6465d]'} ${Math.abs(parseFloat(asset.change)) > 5 ? 'animate-pulse' : ''}`}>
-                                                        <path d={asset.spark} strokeLinecap="round" strokeLinejoin="round" />
-                                                    </svg>
-                                                </div>
+                                    </div>
+                                ) : portfolio.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center p-12 border border-dashed border-zinc-800 rounded-3xl bg-zinc-950/50">
+                                        <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
+                                            <span className="material-symbols-outlined text-zinc-700 text-3xl">folder_off</span>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-white mb-2">Seu portfólio está vazio</h3>
+                                        <p className="text-zinc-500 mb-8 text-center max-w-sm">
+                                            Adicione ativos para começar a monitorar a saúde fundamental e o sentimento do mercado em tempo real.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowSearchModal(true)}
+                                            className="px-8 py-3 bg-primary text-black font-black uppercase tracking-tighter rounded-xl hover:scale-105 transition-all"
+                                        >
+                                            Adicionar Ativo
+                                        </button>
+                                    </div>
+                                ) : (isExpanded ? portfolio : portfolio.slice(0, 8)).map((asset, idx) => (
+                                    <div key={asset.ticker} className="flex items-center justify-between gap-4 p-3 md:p-4 md:px-8 hover:bg-primary/[0.04] transition-all group relative">
+                                        {/* LEFT: Logo, Ticker, Name */}
+                                        <Link href={`/asset/${asset.ticker}`} className="flex items-center gap-4 flex-1 min-w-0">
+                                            <div className="size-10 rounded-full bg-zinc-900 border border-neutral-dark-border/50 flex items-center justify-center overflow-hidden shrink-0">
+                                                <img
+                                                    src={asset.image || `https://ui-avatars.com/api/?name=${asset.symbol}&background=334155&color=fff&bold=true`}
+                                                    className="w-full h-full object-cover"
+                                                    alt={asset.symbol}
+                                                    onError={(e) => {
+                                                        e.currentTarget.onerror = null;
+                                                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${asset.symbol}&background=334155&color=fff&bold=true`;
+                                                    }}
+                                                />
                                             </div>
-
-                                            {/* RIGHT: Price / Variation Badge */}
-                                            <div className="min-w-[70px] text-right shrink-0 flex flex-col gap-0.5">
-                                                <p className="font-bold text-white text-sm tracking-tight">{asset.price}</p>
-                                                <p className={`text-[11px] font-black font-mono ${asset.color === 'success' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                                                    {asset.change}
+                                            <div className="min-w-0 flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-bold text-white shrink-0 text-sm group-hover:text-primary transition-colors">{asset.symbol}</p>
+                                                    {asset.isProtection && <span title="Proteção de Portfólio" className="text-[10px] cursor-help" aria-label="Baixa correlação com benchmark">🛡️</span>}
+                                                </div>
+                                                <p className="text-sm text-zinc-400 truncate max-w-[120px] uppercase font-bold tracking-tighter">
+                                                    {asset.name}
                                                 </p>
                                             </div>
+                                        </Link>
 
-                                            {/* Actions */}
-                                            <div className="w-8 flex justify-end">
-                                                <button onClick={() => removeFromWatchlist(asset.ticker)} className="text-slate-600 hover:text-red-500 transition-colors">
-                                                    <span className="material-symbols-outlined text-sm">close</span>
-                                                </button>
+                                        {/* MIDDLE: Desktop specific columns */}
+                                        <div className="hidden lg:flex items-center justify-end gap-6 flex-1">
+                                            {/* Momento */}
+                                            <div className="w-32 flex justify-end">
+                                                <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase text-white ${asset.momento?.color || 'bg-slate-700'}`}>
+                                                    <span className="material-symbols-outlined !text-[12px]">{asset.momento?.icon}</span>
+                                                    {asset.momento?.label}
+                                                </div>
                                             </div>
+
+                                            {/* Performance Relativa */}
+                                            <div className="w-40 flex flex-col items-end gap-1 group/risco relative">
+                                                {asset.alpha && (
+                                                    <div className="group/alpha relative">
+                                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help transition-all hover:scale-105 border ${asset.alpha.color}`}>
+                                                            {asset.alpha.label}
+                                                        </span>
+                                                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover/alpha:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
+                                                            <p className="text-[10px] text-slate-300 font-medium leading-relaxed italic">
+                                                                {asset.alpha.tooltip}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter cursor-help whitespace-nowrap transition-all hover:scale-105 ${asset.risco?.color}`}>
+                                                    {asset.risco?.label}
+                                                </span>
+                                                <div className="absolute bottom-full right-0 mb-2 hidden group-hover/risco:block w-48 bg-zinc-950 border border-zinc-800 p-3 rounded-xl shadow-2xl z-[9999] pointer-events-none text-left">
+                                                    <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
+                                                        {asset.risco?.tooltip}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Nota / Upside */}
+                                            <div className="w-24 text-right">
+                                                {asset.upside?.isNeutral ? (
+                                                    <div className="inline-flex items-center gap-1 text-sm font-black text-slate-600">
+                                                        <span className="material-symbols-outlined text-sm">horizontal_rule</span>
+                                                        {asset.upside.label}
+                                                    </div>
+                                                ) : asset.upside ? (
+                                                    <div className={`inline-flex items-center gap-1 text-sm font-black ${asset.upside.aiScore >= 8.0 ? 'text-[#00ff9d] drop-shadow-[0_0_8px_rgba(0,255,157,0.4)]' :
+                                                        asset.upside.aiScore < 5.0 ? 'text-orange-400' :
+                                                            asset.upside.positive ? 'text-emerald-400' : 'text-rose-400'
+                                                        }`}>
+                                                        <span className="material-symbols-outlined text-sm">{asset.upside.positive ? 'trending_up' : 'trending_down'}</span>
+                                                        {asset.upside.label}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+
+                                            {/* Mkt Cap (Extra wide screens) */}
+                                            <div className="w-24 text-right font-mono text-[10px] text-slate-400 font-semibold hidden xl:block">
+                                                {asset.mcap}
+                                            </div>
+
                                         </div>
-                                    ))}
-                                </div>
+
+                                        {/* RIGHT: Price / Variation Badge */}
+                                        <div className="min-w-[70px] text-right shrink-0 flex flex-col gap-0.5">
+                                            <p className="font-bold text-white text-sm tracking-tight">{asset.price}</p>
+                                            <p className={`text-[11px] font-black font-mono ${asset.color === 'success' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                                            {asset.change || "---"}
+                                        </p>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="w-8 flex justify-end">
+                                            <button onClick={() => removeFromWatchlist(asset.ticker)} className="text-slate-600 hover:text-red-500 transition-colors">
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            {assets.length > 8 && (
+                            {portfolio.length > 8 && (
                                 <div className="p-6 border-t border-neutral-dark-border flex justify-center bg-black/10">
-                                    <button 
+                                    <button
                                         onClick={() => setIsExpanded(!isExpanded)}
                                         className="flex items-center gap-2 px-6 py-2 bg-zinc-900 border border-zinc-700 hover:border-primary rounded-xl text-[10px] font-black text-slate-400 hover:text-primary transition-all uppercase tracking-widest"
                                     >
                                         <span className="material-symbols-outlined text-sm">
                                             {isExpanded ? 'keyboard_arrow_up' : 'expand_more'}
                                         </span>
-                                        {isExpanded ? 'Recolher Lista' : `Ver todos os ${assets.length} ativos`}
+                                        {isExpanded ? 'Recolher Lista' : `Ver todos os ${portfolio.length} ativos`}
                                     </button>
                                 </div>
                             )}
                         </div>
 
-                        {watchlist.length === 0 && (
-                            <div className="text-center py-20 bg-neutral-dark-surface/30 border-2 border-dashed border-neutral-dark-border rounded-3xl">
-                                <span className="material-symbols-outlined text-6xl text-slate-800 mb-4 block">bookmark_add</span>
-                                <h3 className="text-xl font-bold text-white mb-2">Seu portfólio está vazio</h3>
-                                <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm">Adicione ativos para começar a monitorar.</p>
-                                <button onClick={() => setShowSearchModal(true)} className="px-8 py-4 bg-primary text-black font-black rounded-2xl hover:scale-105 transition-all uppercase text-xs tracking-widest shadow-xl shadow-primary/20">Adicionar Ativo</button>
-                            </div>
-                        )}
+
                     </div>
 
                     <aside className="lg:col-span-4 xl:col-span-3 border-t lg:border-t-0 lg:border-l border-neutral-dark-border bg-black p-6 sticky top-0 h-auto lg:h-full overflow-y-auto custom-scrollbar">
@@ -1128,7 +1127,7 @@ Use obrigatoriamente esta estrutura completa:
                             className="w-full bg-black border-2 border-neutral-dark-border rounded-2xl py-5 px-6 text-white font-mono text-xl outline-none focus:border-primary transition-all mb-8"
                         />
                         <div className="grid grid-cols-2 gap-3">
-                            {['BTC', 'ETH', 'SOL', 'PETR4.SA', 'VALE3.SA', 'AAPL'].map(t => (
+                            {['BTC', 'ETH', 'SOL', 'VALE3.SA', 'WEGE3.SA', 'BBDC4.SA'].map(t => (
                                 <button key={t} onClick={() => addToWatchlist(t)} className="p-3 bg-neutral-dark-surface border border-neutral-dark-border rounded-xl text-[10px] font-black text-slate-500 hover:border-primary hover:text-primary transition-all uppercase">{t}</button>
                             ))}
                         </div>

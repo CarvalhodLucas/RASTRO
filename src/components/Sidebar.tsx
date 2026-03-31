@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/useAuth";
 
 const Sidebar: React.FC = () => {
     const pathname = usePathname();
-    const { user, logout } = useAuth();
+    const { user, confirmLogout } = useAuth();
 
     const menuItems = [
         { name: "Painel Principal", icon: "dashboard", href: "/" },
@@ -87,7 +87,7 @@ const Sidebar: React.FC = () => {
                         <p className="text-xs font-bold text-white truncate">{user?.name || "Trader Elite"}</p>
                         <p className="text-[10px] text-slate-500 truncate">Sessão Ativa • Pro</p>
                     </div>
-                    <button onClick={logout} className="text-slate-500 hover:text-primary transition-colors ml-auto mr-2">
+                    <button onClick={confirmLogout} className="text-slate-500 hover:text-primary transition-colors ml-auto mr-2">
                         <span className="material-symbols-outlined text-sm">logout</span>
                     </button>
                     <Link href="/perfil" className="text-slate-500 hover:text-primary transition-colors">

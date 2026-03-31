@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1774456018687",
+    "email": "carvalhodlucas@hotmail.com",
+    "subject": "Suporte (Chatbot)",
+    "message": "Usuário: Quero fazer uma reclamação\nBot: Lamentamos o transtorno. Por favor, digite o seu EMAIL e descreva o problema.\nUsuário: hant.lucas@gmail.com, nao gostei do serviço\nBot: Muito obrigado! Registramos o seu e-mail e a sua mensagem. A nossa equipe humana entrará em contato o mais rápido possível para resolver isso.",
+    "createdAt": "2026-03-25T16:26:58.687Z",
+    "status": "unread"
+  },
+  {
+    "id": "1774880695497",
+    "email": "carvalhodlucas@gmail.com",
+    "subject": "Suporte (Chatbot)",
+    "message": "Usuário: Onde encontro os tutoriais de uso do RASTRO?\nBot: Você encontra os tutoriais de uso na seção de Ajuda ou Suporte do nosso site.\nUsuário: quero da um conselho\nBot: Como Assistente de Suporte Técnico da plataforma RASTRO, meu foco é ajudar você a navegar no site, entender as funcionalidades como a Watchlist e os Relatórios, e recolher sugestões ou problemas técnicos.\n\nNão posso dar conselhos de investimento ou fazer análises financeiras. Se tiver alguma dúvida sobre como usar a plataforma, estou aqui para ajudar!\nUsuário: eu quero da um conselho para o dono do site\nBot: Entendido. Pedimos desculpa pelo transtorno.\n\nPara que a sua sugestão chegue ao dono do site, por favor, digite o seu EMAIL e a descrição do conselho ou feedback que gostaria de dar.\nUsuário: carvalho@gmail.com o site esta muito bom\nBot: Muito obrigado! Registramos o seu e-mail e a sua mensagem. A nossa equipe humana entrará em contato o mais rápido possível para resolver isso.",
+    "createdAt": "2026-03-30T14:24:55.497Z",
+    "status": "unread"
+  },
+  {
+    "id": "1774880854631",
+    "email": "usuario@anonimo.com",
+    "subject": "Suporte (Chatbot)",
+    "message": "Usuário: eu quero da um conselho para o dono do site\nBot: Entendido! Ficamos felizes em ouvir sugestões para melhorar o RASTRO.\n\nPara registrar seu conselho e garantir que ele chegue ao dono do site, por favor, me informe:\n1. Seu EMAIL\n2. A DESCRIÇÃO completa do seu conselho\nUsuário: carvalho@gmail.com o site esta muito bom\nBot: Entendido! Ficamos felizes em ouvir sugestões para melhorar o RASTRO. Muito obrigado! Registramos sua mensagem e seu contato. Nossa equipe analisará seu feedback com atenção e entrará em contato se necessário.",
+    "createdAt": "2026-03-30T14:27:34.631Z",
+    "status": "unread"
+  }
+]
