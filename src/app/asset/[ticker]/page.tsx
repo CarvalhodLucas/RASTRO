@@ -1166,15 +1166,19 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
 
         const fetchReport = async () => {
             try {
-                // 💡 Remove o ".SA" se ele existir no ticker e passa para minúsculo para buscar o arquivo correto
-                const tickerLimpo = ticker.toLowerCase().replace('.sa', '');
+                const tickerLimpoLower = ticker.toLowerCase().replace('.sa', '');
+                const tickerLimpoUpper = ticker.toUpperCase().replace('.SA', '');
 
-                // Agora ele vai buscar "/reports/klbn3.html" em vez de "/reports/KLBN3.html"
-                let response = await fetch(`/reports/${tickerLimpo}.html`);
+                let response = await fetch(`/reports/${tickerLimpoLower}.html`);
 
-                // Se não encontrar o .html, tenta o .htm (ex: TSLA.htm)
                 if (!response.ok) {
-                    response = await fetch(`/reports/${tickerLimpo}.htm`);
+                    response = await fetch(`/reports/${tickerLimpoUpper}.html`);
+                }
+                if (!response.ok) {
+                    response = await fetch(`/reports/${tickerLimpoLower}.htm`);
+                }
+                if (!response.ok) {
+                    response = await fetch(`/reports/${tickerLimpoUpper}.htm`);
                 }
 
                 if (response.ok) {
@@ -1197,7 +1201,7 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
 
                     setHtmlReport(cleanHtml);
                 } else {
-                    setHtmlReport(`<p class="text-slate-400 italic">Nenhum relatório especializado encontrado para ${tickerLimpo} no momento.</p>`);
+                    setHtmlReport(`<p class="text-slate-400 italic">Nenhum relatório especializado encontrado para ${tickerLimpoUpper} no momento.</p>`);
                 }
             } catch (error) {
                 console.error("Erro ao carregar o relatório:", error);

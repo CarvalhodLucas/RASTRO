@@ -18,7 +18,7 @@ const handler = NextAuth({
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "uma_string_aleatoria_longa_e_segura",
 });
 
 export { handler as GET, handler as POST };
