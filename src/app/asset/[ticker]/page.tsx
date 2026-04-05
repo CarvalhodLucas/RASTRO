@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
-import { assetsDatabase } from "@/lib/data";
+import { assetsDatabase, normalizeTickerForCache } from "@/lib/data";
 import { LUCAS_KNOWLEDGE } from "@/lib/knowledge";
 import Header from "@/components/Header";
 import AssetLogo from "@/components/AssetLogo";
@@ -129,6 +129,8 @@ const calculateSolidityScore = (assetData: any) => {
     return Math.min(score, 100);
 };
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 export default function AssetPage() {
     const params = useParams();
     const { user, hasMounted } = useAuth();
@@ -137,6 +139,28 @@ export default function AssetPage() {
     const [status, setStatus] = useState<Status>("loading");
     const [asset, setAsset] = useState<any>(null);
     const [marketStatus, setMarketStatus] = useState(getMarketStatus(null));
+
+    // --- NOVO: LOCK GLOBAL DE IA (MULTI-ABA) ---
+    const waitForGlobalAiLock = async (module: string, timeout = 15000) => {
+        const lockKey = "RASTRO_AI_GLOBAL_LOCK";
+        const start = Date.now();
+        
+        while (Date.now() - start < timeout) {
+            const currentLock = localStorage.getItem(lockKey);
+            if (!currentLock || (Date.now() - parseInt(currentLock)) > 10000) {
+                // Lock disponível ou expirado (10s)
+                localStorage.setItem(lockKey, Date.now().toString());
+                return true;
+            }
+            // Espera aleatória (jitter) para evitar colisões
+            await new Promise(r => setTimeout(r, 500 + Math.random() * 1000));
+        }
+        return false; // Timeout
+    };
+
+    const releaseGlobalAiLock = () => {
+        localStorage.removeItem("RASTRO_AI_GLOBAL_LOCK");
+    };
 
     useEffect(() => {
         // Atualiza imediatamente ao trocar de ativo
@@ -172,6 +196,7 @@ export default function AssetPage() {
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const prevMessagesLength = useRef(messages.length);
+    const fetchLocks = useRef<Record<string, boolean>>({});
 
     // Auto-scroll do chat (Ancoragem por Contexto)
     useEffect(() => {
@@ -215,18 +240,53 @@ export default function AssetPage() {
             .trim();
     };
 
-    // --- ESTADOS PARA COMPARAÇÃO ---
     const [compareAiRatingData, setCompareAiRatingData] = useState<any>(null);
     const [compareAiSentiment, setCompareAiSentiment] = useState<any>(null);
+    const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+    const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+    const [aiHealth, setAiHealth] = useState<any>(null);
+    const [isLoadingHealth, setIsLoadingHealth] = useState(false);
+    const [onChainMetrics, setOnChainMetrics] = useState<any>(null);
+    const [isLoadingOnChain, setIsLoadingOnChain] = useState(false);
+    const [aiSentiment, setAiSentiment] = useState<any>({ value: 50, label: "Neutro", trend: "side" });
+    const [aiPulse, setAiPulse] = useState<any>(null);
+    const [compareAiPulse, setCompareAiPulse] = useState<any>(null);
+    const [isLoadingPulse, setIsLoadingPulse] = useState(false);
+    const [solidityEval, setSolidityEval] = useState<{ score: string | number, obs: string } | null>(null);
+    const [fairPriceData, setFairPriceData] = useState<{ fairPrice: number; upside: number } | null>(null);
+    const [isChatLiveOpen, setIsChatLiveOpen] = useState(false);
 
     // Función para buscar a nota baseada no relatório e indicadores
     const fetchFundamentalRating = async (targetAsset = asset, isComparison = false, force = false) => {
         if (!targetAsset?.ticker) return;
+        
+        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO) ---
+        const lockKey = `rating_${isComparison ? 'compare' : 'main'}_${targetAsset.ticker}`;
+        if (fetchLocks.current[lockKey] && !force) return;
+        fetchLocks.current[lockKey] = true;
+
+        // Reset state for the current asset if not a comparison
+        if (!isComparison) {
+            setAiRatingData(null);
+            setInvestorThesis("Analisando relatório...");
+        }
 
         // 1. Obtiene el contenido bruto de donde esté disponible
         let rawReport = isComparison
             ? (targetAsset.fullReport || `Análise de mercado para ${targetAsset.ticker}`)
-            : (htmlReport || targetAsset?.fullReport || (window as any).currentReportText);
+            : (htmlReport || targetAsset?.fullReport);
+
+        // --- SANITY CHECK: Evitar vazamento de relatórios de outros ativos ---
+        const verifyTicker = targetAsset.ticker.replace('.SA', '').toUpperCase();
+        const assetKeywords = [verifyTicker, targetAsset.name.split(' ')[0].toUpperCase()];
+        if (rawReport && !isComparison) {
+            const reportUpper = rawReport.toUpperCase();
+            const isMatch = assetKeywords.some(kw => reportUpper.includes(kw));
+            if (!isMatch && !targetAsset.ticker.includes('-')) { // Ignora check rigoroso para crypto pairs complexos
+                console.warn(`🛑 Bloqueio de Segurança: Relatório detectado como incompatível com ${verifyTicker}. Evitando alucinação.`);
+                rawReport = null;
+            }
+        }
 
         if (isComparison) {
             try {
@@ -243,18 +303,49 @@ export default function AssetPage() {
 
         const isActivoCripto = targetAsset?.isCrypto || targetAsset?.ticker?.toUpperCase().includes('BTC');
 
-        if (!rawReport || rawReport.includes("Nenhum relatório especializado encontrado")) {
-            if (!isComparison && !isActivoCripto) return;
+        if (!rawReport || rawReport.trim() === "" || rawReport.includes("Nenhum relatório especializado encontrado")) {
+            if (!isComparison) {
+                setAiRatingData(null);
+                setInvestorThesis("");
+                console.log("⚠️ Relatório não disponível. Score de IA desativado.");
+                
+                // Limpeza de cache residual para evitar que a nota antiga apareça em listagens (Mercado/Rastreamento)
+                try {
+                    const baseT = targetAsset.ticker.replace('.SA', '').toUpperCase();
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.startsWith(`ai_rating_`) && key.includes(baseT)) {
+                            localStorage.removeItem(key);
+                            console.log(`🧹 Cache antigo removido: ${key}`);
+                        }
+                    });
+                } catch (e) {}
+                
+                return;
+            }
         }
 
-        if (!rawReport && isActivoCripto) {
-            rawReport = `Dados limitados. O ativo ${targetAsset.ticker} é uma criptomoeda e deve ser avaliada majoritariamente pelo seu Sentimento, Força, Utilidade de Rede (Wallets/TVL) e Adoção Institucional, ao invés de lucros trimestrais corporativos. Use todo o seu conhecimento sistêmico para avaliar o projeto e a rede ao invés de buscar números corporativos.`;
+        // --- LIMPEZA DE TEXTO (PRÉ-HASHING) ---
+        let cleanTextForAI = rawReport;
+        if (rawReport && (rawReport.includes("<div") || rawReport.includes("<p>"))) {
+            try {
+                const tmp = document.createElement("div");
+                tmp.innerHTML = rawReport;
+                cleanTextForAI = tmp.innerText || tmp.textContent || "";
+            } catch (e) {
+                console.warn("Erro ao limpar HTML no processamento de cache:", e);
+            }
         }
+        cleanTextForAI = (cleanTextForAI || "").substring(0, 15000).trim();
 
-        // --- LÓGICA DE CACHE BASEADA EM CONTEÚDO (OTIMIZAÇÃO) ---
+        // --- LÓGICA DE CACHE BASEADA EM CONTEÚDO (OTIMIZAÇÃO E HASH) ---
         const baseTicker = targetAsset.ticker.toUpperCase().replace('.SA', '');
-        let reportVersion = rawReport ? rawReport.length : 'empty';
-        let cacheKey = `ai_rating_${baseTicker}_v${reportVersion}`;
+        const hashCode = (s: string) => {
+            let h = 0;
+            for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+            return h;
+        };
+        let reportVersion = cleanTextForAI ? `${cleanTextForAI.length}_${hashCode(cleanTextForAI)}` : 'empty';
+        let cacheKey = `ai_rating_v9_${baseTicker}_v${reportVersion}`;
 
         let cachedDataStr = localStorage.getItem(cacheKey);
 
@@ -263,7 +354,7 @@ export default function AssetPage() {
             const cleanT = targetAsset.ticker.replace(".SA", "");
             for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i);
-                if (k && k.startsWith(`ai_rating_${baseTicker}_v`)) {
+                if (k && k.startsWith(`ai_rating_v9_${baseTicker}_v`)) {
                     const vMatch = k.match(/_v(\d+)/);
                     if (vMatch) {
                         const len = parseInt(vMatch[1]);
@@ -280,27 +371,30 @@ export default function AssetPage() {
         if (cachedDataStr && !force) {
             try {
                 const cachedData = JSON.parse(cachedDataStr);
-                // Lê do formato unificado (score e verdict na raiz)
-                const score = cachedData.score ?? cachedData.data?.score;
+                const now = Date.now();
+                const FOUR_HOURS = 4 * 60 * 60 * 1000;
+                
+                // Extrai o score e dados (suporta formatos antigos e novos)
+                const data = cachedData.data || cachedData;
+                const score = data.score;
+                const timestamp = cachedData.timestamp || data.lastUpdate || 0;
 
-                if (score !== undefined) {
-                    const summary = cachedData.summary ?? cachedData.data?.summary ?? "";
-                    const pillars = cachedData.pillars ?? cachedData.data?.pillars ?? [];
+                if (score !== undefined && (now - timestamp < FOUR_HOURS)) {
+                    console.log(`🟢 [IA] Carregando Rating de ${targetAsset.ticker} do Cache Local`);
+                    const summary = data.summary || "";
+                    const pillars = data.pillars || [];
 
-                    // Se o cache for antigo e não tiver a tese (summary) ou os pilares, precisamos ignorar e buscar de novo
-                    if (!summary || pillars.length === 0) {
-                        console.log(`⚠️ Cache incompleto para ${targetAsset.ticker}. Forçando re-análise...`);
-                    } else {
-                        console.log(`⚡ Carregando análise do cache (v${reportVersion}) para: ${targetAsset.ticker}`);
+                    if (summary && pillars.length > 0) {
                         const standardizedData = {
-                            score: score,
-                            verdict: cachedData.verdict ?? cachedData.data?.verdict ?? "",
+                            score: score > 10 ? score / 10 : score,
+                            verdict: data.verdict || "",
                             summary: summary,
                             pillars: pillars,
-                            lastUpdate: cachedData.lastUpdate ?? Date.now(),
-                            fiiMetrics: cachedData.fiiMetrics || null,
-                            cryptoMetrics: cachedData.cryptoMetrics || null,
-                            extractedDY: cachedData.extractedDY || null
+                            lastUpdate: timestamp,
+                            fiiMetrics: data.fiiMetrics || null,
+                            etfMetrics: data.etfMetrics || null,
+                            cryptoMetrics: data.cryptoMetrics || null,
+                            extractedDY: data.extractedDY || null
                         };
 
                         if (isComparison) {
@@ -310,7 +404,8 @@ export default function AssetPage() {
                             setInvestorThesis(cleanAIText(summary));
                             setLastAnalyzedTicker(targetAsset.ticker);
                         }
-                        return;
+                        fetchLocks.current[lockKey] = false;
+                        return; // <-- CRÍTICO: Impede o fetch!
                     }
                 }
             } catch (e) {
@@ -319,32 +414,22 @@ export default function AssetPage() {
         }
         // ==========================================
 
-        let cleanTextForAI = rawReport;
-        if (rawReport.includes("<div") || rawReport.includes("<p>")) {
-            const tmp = document.createElement("div");
-            tmp.innerHTML = rawReport;
-            cleanTextForAI = tmp.innerText || tmp.textContent || "";
-        }
-
-        cleanTextForAI = cleanTextForAI.substring(0, 15000);
-
-        const safeKnowledge = typeof LUCAS_KNOWLEDGE === 'string'
-            ? LUCAS_KNOWLEDGE.substring(0, 15000)
-            : "";
+        // O texto já foi limpo no início da função (pré-hashing)
+        const currentTextToAnalyze = cleanTextForAI;
 
 
 
-        // --- NOVO: Bloqueio inteligente (só ignora se o relatório for o mesmo ou menor) ---
-        const lastReportLen = parseInt(localStorage.getItem(`last_report_len_${baseTicker}`) || "0");
-        const currentReportLen = rawReport?.length || 0;
+        // --- NOVO: Bloqueio inteligente (só ignora se o relatório for estritamente idêntico) ---
+        const currentReportHash = cleanTextForAI ? hashCode(cleanTextForAI).toString() : "empty";
+        const lastReportHash = localStorage.getItem(`last_report_hash_${baseTicker}`) || "";
 
-        if (!isComparison && lastAnalyzedTicker === targetAsset?.ticker && aiRatingData && currentReportLen <= lastReportLen) {
-            console.log(`⏭️ Ignorando re-análise para ${targetAsset.ticker} (relatório já processado ou menor)`);
+        if (!force && !isComparison && lastAnalyzedTicker === targetAsset?.ticker && aiRatingData && currentReportHash === lastReportHash) {
+            console.log(`⏭️ Ignorando re-análise forçada para ${targetAsset.ticker} (relatório idêntico)`);
             return;
         }
         
-        // Salva o tamanho do relatório atual para o próximo check
-        localStorage.setItem(`last_report_len_${baseTicker}`, currentReportLen.toString());
+        // Salva o hash do relatório atual para o próximo check
+        localStorage.setItem(`last_report_hash_${baseTicker}`, currentReportHash);
 
         // --- NOVO: SINCRONIZAÇÃO COM DADOS NUMÉRICOS ---
         const healthCacheKey = `health_cache_${baseTicker}`;
@@ -372,18 +457,37 @@ export default function AssetPage() {
             return formatAsPercentage ? (num * 100).toFixed(2) : num.toFixed(2);
         };
 
+        const safeType = targetAsset?.type?.toLowerCase() || "";
+        const safeSector = targetAsset?.sector?.toLowerCase() || "";
+        const safeSubcategory = targetAsset?.subcategory?.toLowerCase() || "";
+
+        const isETFLocal = 
+            safeType.includes("etf") || safeSector.includes("etf") || safeSubcategory.includes("etf") ||
+            safeType.includes("fundo de índice") || safeSector.includes("fundo de índice") || safeSubcategory.includes("fundo de índice");
+
+        const isFIILocal = !isETFLocal && (
+            safeType.includes("fii") || safeSector.includes("imobili") || safeSubcategory.includes("fii") ||
+            ((targetAsset?.ticker?.toUpperCase().endsWith("11") || targetAsset?.ticker?.toUpperCase().endsWith("11.SA")) && safeType !== "ações")
+        );
+
+        const extractionInstruction = isETFLocal 
+            ? `\nINSTRUÇÃO DE EXTRAÇÃO ETF: O ativo atual é explicitamente um Fundo de Índice (ETF). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: Taxa de Administração, Índice de Referência (Benchmark), Patrimônio Líquido e Liquidez Diária. Retorne-os no objeto "etfMetrics" (ex: { "taxa": "0.30%", "benchmark": "S&P 500", "patrimonio": "R$ 1.5B", "liquidez": "R$ 5.0M" }). Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
+            : isFIILocal
+            ? `\nINSTRUÇÃO DE EXTRAÇÃO FII: O ativo atual é explicitamente um Fundo Imobiliário (FII). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: P/VP, Vacância Física, Dividend Yield e Patrimônio Líquido. Retorne-os no objeto "fiiMetrics". Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
+            : ``;
+
         const reportWithNumbers = `DADOS NUMÉRICOS COMPLEMENTARES:
-
 ROE: ${safeFormatNumber(indicators.roe, true)}%
-
 P/L: ${safeFormatNumber(indicators.pl)}x
-
 P/VP: ${safeFormatNumber(indicators.pvp)}x
-
 Dividend Yield (DY): ${safeFormatNumber(indicators.dy, true)}%
-
-INSTRUÇÃO CRÍTICA E ABSOLUTA: A sua avaliação, as suas notas de 0 a 10 e o seu Veredito DEVEM basear-se PRIMORDIALMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo. Os dados numéricos acima são APENAS complementares.
-Regra de Ouro: Se houver qualquer divergência entre um número (como um DY baixo) e o que está escrito no relatório (ex: o relatório diz que a empresa é excelente pagadora de dividendos), VOCÊ DEVE CONFIAR NO RELATÓRIO e ignorar o número divergente. O relatório é a verdade absoluta.
+Vacância Física: ${(targetAsset as any)?.vacancia || 'N/A'}
+Patrimônio Líquido: ${targetAsset?.marketCap ? 'R$ ' + targetAsset.marketCap : 'N/A'}
+Liquidez Diária: ${(targetAsset as any)?.averageVolume ? 'R$ ' + (targetAsset as any).averageVolume : 'N/A'}
+Taxa de Adm / Benchmark: ${(targetAsset as any)?.taxaAdm || 'N/A'} / ${(targetAsset as any)?.benchmark || 'N/A'}
+Setor do Ativo: ${targetAsset?.sector || 'N/A'} (IMPORTANTE: Se o setor for Energia/Petróleo, ignore qualquer dado de Saúde ou FII)
+ID de Sincronização: ${force ? Date.now() : 'standard'}
+${extractionInstruction}
 
 RELATÓRIO DE FUNDAMENTOS:
 ${cleanTextForAI || 'Sem relatório detalhado.'}
@@ -391,37 +495,54 @@ ${cleanTextForAI || 'Sem relatório detalhado.'}
 INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIORITARIAMENTE no relatório qualitativo acima. Analise APENAS com base nos dados fornecidos.`;
 
         setIsRatingLoading(true);
-        try {
-            console.log(`🚀 Iniciando Deep Research na API para: ${targetAsset.ticker}`);
-
-            const response = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: targetAsset.ticker,
-                    report: reportWithNumbers,
-                    systemInstruction: safeKnowledge, // Enviamos a base reduzida
-                    isRatingRequest: true
-                }),
-            });
-
-            // Verificar si la ruta /api/chat dio un error (ej: 500 o 413)
-            if (!response.ok) {
-                throw new Error(`Error del servidor: código ${response.status}`);
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("Rating");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                fetchLocks.current[lockKey] = false;
+                return;
             }
 
-            const data = await response.json();
-            console.log("✅ Respuesta de la IA:", data);
+            try {
+                console.log(`🚀 Iniciando Deep Research na API Grok para: ${targetAsset.ticker} (Tentativa ${retryCount + 1})`);
+                const response = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: targetAsset.ticker,
+                        assetName: targetAsset.name,
+                        report: reportWithNumbers,
+                        isRatingRequest: true
+                    }),
+                });
+
+                if (response.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [RATING] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Error del servidor: código ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("✅ Respuesta de la IA:", data);
 
             if (data && data.score !== undefined) {
-                const finalScore = data.score <= 1 && data.score > 0 ? data.score * 10 : data.score;
+                // Normaliza para escala 0-10 (Se vier 0-100, divide por 10)
+                const finalScore = data.score > 10 ? data.score / 10 : data.score;
 
                 // --- LÓGICA ROBUSTA DE EXTRAÇÃO DE TESE (DESTRAVADA) ---
                 let extractedSummary = data.summary || "";
 
                 if (!extractedSummary || extractedSummary.length < 30) {
-                    const markers = [
+                        const markers = [
                         /Tese de Investimento:/i,
+                        /Analista Rastro:/i,
                         /Perspectiva do Analista:/i,
                         /Conclusão:/i,
                         /Análise do Fundo:/i,
@@ -463,6 +584,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                     summary: extractedSummary,
                     pillars: data.pillars || [],
                     fiiMetrics: data.fiiMetrics || null,
+                    etfMetrics: data.etfMetrics || null,
                     cryptoMetrics: data.cryptoMetrics || null,
                     extractedDY: data.extractedDY || null,
                     extractedPrice: data.extractedPrice || null,
@@ -479,12 +601,15 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 }
 
                 // 💾 SALVA O RESULTADO NO CACHE UNIFICADO
-                localStorage.setItem(cacheKey, JSON.stringify({
+                const cleanT = normalizeTickerForCache(targetAsset.ticker);
+                const unifiedKey = `ai_rating_v2_${cleanT}`;
+                localStorage.setItem(unifiedKey, JSON.stringify({
                     score: finalRatingData.score,
                     verdict: finalRatingData.verdict,
                     summary: finalRatingData.summary,
                     pillars: finalRatingData.pillars,
                     fiiMetrics: finalRatingData.fiiMetrics,
+                    etfMetrics: finalRatingData.etfMetrics,
                     cryptoMetrics: finalRatingData.cryptoMetrics,
                     extractedDY: finalRatingData.extractedDY,
                     extractedPrice: finalRatingData.extractedPrice,
@@ -512,9 +637,333 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 setAiRatingData(fallbackRating);
                 setInvestorThesis("Resumo indisponível devido a falha na IA.");
             }
-        } finally {
-            setIsRatingLoading(false);
+            } finally {
+                setIsRatingLoading(false);
+                fetchLocks.current[lockKey] = false;
+            }
+        };
+
+        fetchWithRetry();
+    };
+
+    // 2. FUNÇÃO: GERAR RESUMO (BULL/BEAR CASE) - GROK
+    const fetchAiAnalysis = async (force = false) => {
+        if (!asset || !asset.ticker) return;
+
+        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO) ---
+        const lockKey = `analysis_${asset.ticker}`;
+        if (fetchLocks.current[lockKey] && !force) return;
+        fetchLocks.current[lockKey] = true;
+        const cacheKey = `grok_analysis_v3_${asset.ticker}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        // 1. Verifica se existe cache e se é válido (4 horas)
+        if (cachedData && !force) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                const now = Date.now();
+                const ONE_DAY = 24 * 60 * 60 * 1000;
+
+                if (now - parsed.timestamp < ONE_DAY) {
+                    console.log(`🟢 [IA] Carregando Resumo de ${asset.ticker} do Cache Local (24h)`);
+                    // Validação mínima de sanidade do cache
+                    if (Array.isArray(parsed.data?.bullCase) && Array.isArray(parsed.data?.bearCase)) {
+                        setAiAnalysis(parsed.data);
+                        fetchLocks.current[lockKey] = false;
+                        return; // <-- CRÍTICO: Impede o fetch!
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao ler cache do Grok (Resumo)", e);
+            }
         }
+
+        setIsLoadingAnalysis(true);
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("Analysis");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                setIsLoadingAnalysis(false);
+                fetchLocks.current[lockKey] = false;
+                return;
+            }
+
+            try {
+                let relatorioQualitativo = htmlReport || asset.fullReport;
+            
+            // --- SANITY CHECK: Evitar vazamento de relatórios de outros ativos ---
+            const verifyTicker = asset.ticker.replace('.SA', '').toUpperCase();
+            const assetKeywords = [verifyTicker, asset.name.split(' ')[0].toUpperCase()];
+            if (relatorioQualitativo) {
+                const reportUpper = relatorioQualitativo.toUpperCase();
+                const isMatch = assetKeywords.some(kw => reportUpper.includes(kw));
+                if (!isMatch && !asset.ticker.includes('-')) {
+                    console.warn(`🛑 Bloqueio de Segurança (Resumo): Relatório incompatível com ${verifyTicker}.`);
+                    relatorioQualitativo = `Análise de mercado para ${asset.name}. (Aviso: Relatório detalhado sendo atualizado)`;
+                }
+            } else {
+                relatorioQualitativo = `Análise de mercado para ${asset.name}`;
+            }
+
+            if (relatorioQualitativo && relatorioQualitativo.length > 15000) relatorioQualitativo = relatorioQualitativo.substring(0, 15000);
+
+            const res = await fetch("/api/grok", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ticker: asset.ticker,
+                    assetName: asset.name,
+                    report: relatorioQualitativo,
+                    isSummary: true
+                }),
+            });
+
+            if (res.status === 429 && retryCount < 2) {
+                releaseGlobalAiLock();
+                const currentDelay = 2000 * Math.pow(2, retryCount);
+                console.warn(`⚠️ [RESUMO] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                await sleep(currentDelay);
+                return fetchWithRetry(retryCount + 1);
+            }
+
+            const data = await res.json();
+            
+            let finalData = data;
+            // Robustez: Se o server mandou o fallback de texto (porque falhou no parse do route.ts)
+            // tentamos dar parse aqui ou tratar como texto simples se possível.
+            if (data.reply && !data.bullCase) {
+                try {
+                    const rawStr = data.reply;
+                    const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                    const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
+                    const parsed = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                    if (parsed.bullCase) finalData = parsed;
+                } catch (pe) {
+                    console.error("Falha no parse forçado do Resumo:", pe);
+                    // Não salvamos no cache se for um erro total
+                    finalData = { error: true, message: "Erro de processamento da IA" };
+                }
+            }
+
+            if (!finalData.error) {
+                setAiAnalysis(finalData);
+                // 3. Guarda o resultado no localStorage com o timestamp atual
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    data: finalData,
+                    timestamp: Date.now()
+                }));
+            } else {
+                setAiAnalysis(null);
+            }
+            } catch (e) {
+                console.error("Erro no resumo:", e);
+            } finally {
+                setIsLoadingAnalysis(false);
+                releaseGlobalAiLock();
+                fetchLocks.current[lockKey] = false;
+            }
+        };
+
+        fetchWithRetry();
+    };
+
+    // 3. FUNÇÃO: SENTIMENTO DO MERCADO - GROK + FEAR & GREED INDEX
+    const fetchMarketSentiment = async (targetAsset = asset, isComparison = false, force = false) => {
+        if (!targetAsset || !targetAsset.ticker) return;
+
+        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO LOCAL) ---
+        const lockKey = `sentiment_${isComparison ? 'compare' : 'main'}_${targetAsset.ticker}`;
+        if (fetchLocks.current[lockKey] && !force) return;
+        fetchLocks.current[lockKey] = true;
+        
+        const cleanT = normalizeTickerForCache(targetAsset.ticker);
+        const cacheKey = `grok_sent_v3_${cleanT}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        // 1. Verifica se existe cache e se é válido (24 horas)
+        if (cachedData && !force) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                const now = Date.now();
+                const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+                if (now - parsed.timestamp < TWENTY_FOUR_HOURS) {
+                    console.log(`🟢 [IA] Carregando Sentimento de ${targetAsset.ticker} do Cache Local (24h)`);
+                    if (isComparison) setCompareAiSentiment(parsed.data);
+                    else setAiSentiment(parsed.data);
+                    fetchLocks.current[lockKey] = false;
+                    return;
+                }
+            } catch (e) {
+                console.error("Erro ao ler cache do Grok (Sentimento)", e);
+            }
+        }
+
+        if (!isComparison) setAiSentiment(null); // Reset Loading
+        
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("Sentiment");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                fetchLocks.current[lockKey] = false;
+                return;
+            }
+
+            try {
+                let globalSentiment = 50;
+                try {
+                    console.log("🌐 Buscando Fear & Greed Index global...");
+                    const fngResponse = await fetch('https://api.alternative.me/fng/?limit=1');
+                    const fngData = await fngResponse.json();
+                    globalSentiment = parseInt(fngData.data[0].value) || 50;
+                    console.log(`📊 Fear & Greed Index oficial: ${globalSentiment}`);
+                } catch (fee) {
+                    console.error("Erro ao buscar índice F&G global, usando 50 como base.", fee);
+                }
+
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: targetAsset.ticker,
+                        assetName: targetAsset.name,
+                        variation: targetAsset.variation,
+                        isSentiment: true,
+                        prompt: `O Fear & Greed Index global hoje está em ${globalSentiment}. Baseado nisso e no ativo ${targetAsset.ticker} que variou ${targetAsset.variation}% hoje, qual o sentimento de 0 a 100?`
+                    }),
+                });
+
+                if (res.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [SENTIMENTO] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
+                const data = await res.json();
+                if (isComparison) setCompareAiSentiment(data);
+                else setAiSentiment(data);
+
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    data: data,
+                    timestamp: Date.now()
+                }));
+                window.dispatchEvent(new Event('sentimentUpdated'));
+            } catch (e) {
+                console.error("Erro no sentimento:", e);
+                if (!isComparison) setAiSentiment({ value: 50, label: "Indisponível", trend: "side" });
+            } finally {
+                releaseGlobalAiLock();
+                fetchLocks.current[lockKey] = false;
+            }
+        };
+
+        fetchWithRetry();
+    };
+
+    // 4. FUNÇÃO: SAÚDE FINANCEIRA - GROK
+    const fetchAiHealth = async (force = false) => {
+        if (!asset || !asset.ticker) return;
+
+        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO) ---
+        const lockKey = `health_${asset.ticker}`;
+        if (fetchLocks.current[lockKey] && !force) return;
+        fetchLocks.current[lockKey] = true;
+        const cleanT = normalizeTickerForCache(asset.ticker);
+        const cacheKey = `grok_health_v5_${cleanT}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        // 1. Verifica se existe cache e se é válido (4 horas)
+        if (cachedData && !force) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                const now = Date.now();
+                const FOUR_HOURS = 4 * 60 * 60 * 1000;
+
+                if (now - parsed.timestamp < FOUR_HOURS) {
+                    console.log(`🟢 [IA] Carregando Saúde Financeira de ${asset.ticker} do Cache Local`);
+                    setAiHealth(parsed.data);
+                    fetchLocks.current[lockKey] = false;
+                    return; // <-- CRÍTICO: Impede o fetch!
+                }
+            } catch (e) {
+                console.error("Erro ao ler cache do Grok (Saúde)", e);
+            }
+        }
+
+        setIsLoadingHealth(true);
+        setAiHealth(null); // Só reseta se for buscar de fato
+
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("Health");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                setIsLoadingHealth(false);
+                fetchLocks.current[lockKey] = false;
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: asset.ticker,
+                        assetName: asset.name,
+                        report: asset.fullReport?.substring(0, 15000) || "Sem relatório detalhado.",
+                        isHealth: true
+                    }),
+                });
+
+                if (res.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [SAÚDE] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                
+                let finalData = data;
+                if (data.reply && !data.score) {
+                    try {
+                        const rawStr = data.reply;
+                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
+                        const parsed = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                        if (parsed.score) finalData = parsed;
+                    } catch (pe) {
+                        console.error("Falha no parse forçado de Saúde:", pe);
+                    }
+                }
+
+                setAiHealth(finalData);
+                if (finalData.score) {
+                    // 3. Guarda o resultado no localStorage com o timestamp atual
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        data: finalData,
+                        timestamp: Date.now()
+                    }));
+                }
+            } catch (e) {
+                console.error("Erro na saúde financeira:", e);
+            } finally {
+                setIsLoadingHealth(false);
+                releaseGlobalAiLock();
+                fetchLocks.current[lockKey] = false;
+            }
+        };
+
+        fetchWithRetry();
     };
 
     // --- FUNÇÃO PARA ESTIMAR VALOR JUSTO DCF VIA GROK/LLAMA ---
@@ -545,36 +994,65 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
             }
         }
 
-        try {
-            const prompt = `Atue como um analista de valuation. Com base no preço atual de ${currentPrice} e no relatório da empresa ${asset.ticker}, calcule um Valor Justo (Intrinsic Value) usando uma premissa simplificada de DCF. Retorne APENAS um JSON com a chave "fairPrice" (número) e "upside" (porcentagem).`;
-
-            const res = await fetch("/api/grok", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: asset.ticker,
-                    name: asset.name,
-                    report: asset.fullReport || prompt,
-                    isFairPrice: true
-                }),
-            });
-
-            const data = await res.json();
-            let finalData = data;
-
-            // Desempacota se vier em reply
-            if (data.reply) {
-                finalData = typeof data.reply === "string" ? JSON.parse(data.reply) : data.reply;
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("FairPrice");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                return;
             }
 
-            if (finalData?.fairPrice && typeof finalData.fairPrice === "number" && finalData.fairPrice > 0) {
-                const result = { fairPrice: finalData.fairPrice, upside: finalData.upside ?? 0 };
-                setFairPriceData(result);
-                localStorage.setItem(cacheKey, JSON.stringify({ ...result, timestamp: Date.now() }));
+            try {
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: asset.ticker,
+                        name: asset.name,
+                        report: asset.fullReport || prompt,
+                        isFairPrice: true
+                    }),
+                });
+
+                if (res.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [PREÇO TETO] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                let finalData = data;
+
+                // Robustez: Se o server mandou o fallback de texto (porque falhou no parse do route.ts)
+                if (data.reply && !data.fairPrice) {
+                    try {
+                        const rawStr = data.reply;
+                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
+                        const parsed = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                        if (parsed.fairPrice) finalData = parsed;
+                    } catch (pe) {
+                        console.error("Falha no parse forçado de Preço Justo:", pe);
+                    }
+                }
+
+                if (finalData?.fairPrice && typeof finalData.fairPrice === "number" && finalData.fairPrice > 0) {
+                    const result = { fairPrice: finalData.fairPrice, upside: finalData.upside ?? 0 };
+                    setFairPriceData(result);
+                    localStorage.setItem(cacheKey, JSON.stringify({ ...result, timestamp: Date.now() }));
+                }
+            } catch (e) {
+                console.error("Erro ao estimar Valor Justo DCF:", e);
+            } finally {
+                releaseGlobalAiLock();
             }
-        } catch (e) {
-            console.error("Erro ao estimar Valor Justo DCF:", e);
-        }
+        };
+
+        fetchWithRetry();
     };
 
     // --- FUNÇÃO PARA BUSCAR MÉTRICAS ON-CHAIN (GROK) ---
@@ -607,10 +1085,8 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
         
         // 2. SE NÃO HOUVER CACHE, FAZ O FETCH AO GROK
         setIsLoadingOnChain(true);
-        try {
-            console.log(`🚀 Buscando Métricas On-chain para ${asset.ticker} via Grok...`);
-            
-            const promptOnChain = `OBRIGATÓRIO: Com base em seu amplo conhecimento da criptomoeda ${asset.ticker} (${asset.name}), avalie seus fundamentos on-chain. Atue como um analista de dados on-chain. Retorne APENAS um JSON válido. O JSON deve ter EXATAMENTE estas 6 chaves e seus valores em formato de texto curto:
+
+        const promptOnChain = `OBRIGATÓRIO: Com base em seu amplo conhecimento da criptomoeda ${asset.ticker} (${asset.name}), avalie seus fundamentos on-chain. Atue como um analista de dados on-chain. Retorne APENAS um JSON válido. O JSON deve ter EXATAMENTE estas 6 chaves e seus valores em formato de texto curto:
 "tvl": Total Value Locked atual (ex: "$5.2B" ou "Crescente").
 "wallets": nível de atividade da rede / endereços (ex: "Alta" ou "1.2M").
 "inflation": inflação anual do token estimada (ex: "< 5%" ou "2.5%").
@@ -618,56 +1094,87 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
 "s2f": Ratio do Modelo Stock-to-Flow atual (ex: "59.4" para BTC. Se não for aplicável à moeda, retorne "N/A").
 "score": nota de 0 a 100 avaliando a saúde geral on-chain.`;
 
-            const res = await fetch("/api/grok", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: asset.ticker,
-                    name: asset.name,
-                    report: promptOnChain,
-                    isOnChain: true
-                }),
-            });
-
-            const data = await res.json();
-            
-            // Proteção contra fallback de erro do route.ts
-            if (data.error || data.label === "Erro") {
-                throw new Error("A API retornou o bloco de fallback de erro.");
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("OnChain");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                setIsLoadingOnChain(false);
+                return;
             }
 
-            // Se a API falhou o parse nativo e mandou string no data.reply, fazemos o parse aqui
-            let parsedData = data;
-            if (data.reply) {
-                let rawStr = typeof data.reply === "string" ? data.reply : String(data.reply);
-                const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
-                if (jsonMatch) rawStr = jsonMatch[0];
-                parsedData = JSON.parse(rawStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-            }
+            try {
+                console.log(`🚀 Buscando Métricas On-chain para ${asset.ticker} via Grok... (Tentativa ${retryCount + 1})`);
+                
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: asset.ticker,
+                        name: asset.name,
+                        report: promptOnChain,
+                        isOnChain: true
+                    }),
+                });
 
-            // Mapeia os dados finais (agora parsedData já é o objeto correto)
-            const finalMetrics = {
-                tvl: parsedData.tvl || "--",
-                wallets: parsedData.wallets || "Desconhecida",
-                inflation: parsedData.inflation || "--",
-                revenue: parsedData.revenue || "Desconhecido",
-                s2f: parsedData.s2f || "--", // Nova chave mapeada
-                score: typeof parsedData.score === 'number' ? parsedData.score : 50
-            };
+                if (res.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [ON-CHAIN] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
+                }
 
-            setOnChainMetrics(finalMetrics);
-            
-            // Só salva no cache se não for o fallback cego, para não congelar o erro por 7 dias
-            if (finalMetrics.tvl !== "--" && finalMetrics.wallets !== "Desconhecida" && finalMetrics.wallets !== "Erro na IA") {
-                localStorage.setItem(cacheKey, JSON.stringify({ data: finalMetrics, lastUpdate: now.toISOString() }));
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                
+                // Proteção contra fallback de erro do route.ts
+                if (data.error || data.label === "Erro") {
+                    throw new Error("A API retornou o bloco de fallback de erro.");
+                }
+
+                // Se a API falhou o parse nativo e mandou string no data.reply, fazemos o parse aqui
+                let parsedData = data;
+                if (data.reply && !data.tvl) {
+                    try {
+                        let rawStr = typeof data.reply === "string" ? data.reply : String(data.reply);
+                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) rawStr = jsonMatch[0];
+                        parsedData = JSON.parse(rawStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                    } catch (pe) {
+                        console.error("Falha no parse forçado de On-chain:", pe);
+                    }
+                }
+
+                // Mapeia os dados finais (agora parsedData já é o objeto correto)
+                const finalMetrics = {
+                    tvl: parsedData.tvl || "--",
+                    wallets: parsedData.wallets || "Desconhecida",
+                    inflation: parsedData.inflation || "--",
+                    revenue: parsedData.revenue || "Desconhecido",
+                    s2f: parsedData.s2f || "--", // Nova chave mapeada
+                    score: typeof parsedData.score === 'number' ? parsedData.score : 50
+                };
+
+                setOnChainMetrics(finalMetrics);
+                
+                // Só salva no cache se não for o fallback cego, para não congelar o erro por 7 dias
+                if (finalMetrics.tvl !== "--" && finalMetrics.wallets !== "Desconhecida" && finalMetrics.wallets !== "Erro na IA") {
+                    localStorage.setItem(cacheKey, JSON.stringify({ data: finalMetrics, lastUpdate: now.toISOString() }));
+                }
+            } catch (error) {
+                console.error("❌ Falha nas Métricas On-chain:", error);
+                setOnChainMetrics({ tvl: "--", wallets: "Erro na IA", inflation: "--", revenue: "Erro na IA", score: 0 });
+            } finally {
+                setIsLoadingOnChain(false);
+                releaseGlobalAiLock();
             }
-        } catch (error) {
-            console.error("❌ Falha nas Métricas On-chain:", error);
-            // Fallback em caso de erro
-            setOnChainMetrics({ tvl: "--", wallets: "Erro na IA", inflation: "--", revenue: "Erro na IA", score: 0 });
-        } finally {
-            setIsLoadingOnChain(false);
-        }
+        };
+
+
+
+        fetchWithRetry();
     };
 
     // 4. ÚNICO EFFECT PARA DISPARAR TUDO (STAGGERED PARA EVITAR 429)
@@ -675,21 +1182,21 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
         if (!asset?.ticker) return;
 
         const loadAiData = async () => {
-            console.log("⏱️ Iniciando carga paralela de dados IA (Gemini + Grok)...");
+            console.log("⏱️ Iniciando carga sequencial de dados IA (Evitando 429)...");
 
-            fetchFundamentalRating();
-            fetchAiAnalysis();
-            fetchAiHealth();
-            fetchMarketSentiment();
-            fetchAiPulse();
-            fetchFairPrice();
-            fetchOnChainMetrics();
+            await fetchFundamentalRating(); await sleep(1500);
+            await fetchAiAnalysis(); await sleep(1500);
+            await fetchAiHealth(); await sleep(1500);
+            await fetchMarketSentiment(); await sleep(1500);
+            await fetchAiPulse(); await sleep(1500);
+            await fetchFairPrice(); await sleep(1500);
+            await fetchOnChainMetrics();
 
-            console.log("✅ Carga paralela enviada.");
+            console.log("✅ Carga sequencial concluída.");
         };
 
         loadAiData();
-    }, [asset?.ticker, asset?.fullReport, htmlReport]);
+    }, [asset?.ticker]);
 
 
     // Verifica se já existe um alerta para este ticker ao abrir a página
@@ -710,453 +1217,139 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
         return false;
     };
 
-    // --- ESTADOS DA IA (RESUMO E SAÚDE) ---
-    const [aiAnalysis, setAiAnalysis] = useState<any>(null);
-    const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
-    const [aiHealth, setAiHealth] = useState<any>(null);
-    const [isLoadingHealth, setIsLoadingHealth] = useState(false);
-    const [onChainMetrics, setOnChainMetrics] = useState<any>(null);
-    const [isLoadingOnChain, setIsLoadingOnChain] = useState(false);
-    const [aiSentiment, setAiSentiment] = useState<any>({ value: 50, label: "Neutro", trend: "side" });
-    const [aiPulse, setAiPulse] = useState<any>(null);
-    const [compareAiPulse, setCompareAiPulse] = useState<any>(null);
-    const [isLoadingPulse, setIsLoadingPulse] = useState(false);
-    const [solidityEval, setSolidityEval] = useState<{ score: string | number, obs: string } | null>(null);
-    const [fairPriceData, setFairPriceData] = useState<{ fairPrice: number; upside: number } | null>(null);
+    // --- SINCRONIZAÇÃO COMPONENT STATE ---
 
     const fetchAiPulse = async (targetAsset = asset, isComparison = false) => {
         if (!targetAsset || !targetAsset.ticker) return;
 
-        const baseTicker = targetAsset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `pulse_cache_v2_${baseTicker}`;
-        const cachedStr = localStorage.getItem(cacheKey);
-        const now = new Date();
-        const todayStr = now.toDateString();
+        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO) ---
+        const lockKey = `pulse_${isComparison ? 'compare' : 'main'}_${targetAsset.ticker}`;
+        if (fetchLocks.current[lockKey]) return;
+        fetchLocks.current[lockKey] = true;
 
-        let parsedCache = cachedStr ? JSON.parse(cachedStr) : null;
+        const cacheKey = `grok_pulse_v1_${targetAsset.ticker}`;
+        const cachedData = localStorage.getItem(cacheKey);
 
-        // Limite de 4x ao dia: Se o dia mudou, o contador é resetado mantendo os dados para visualização
-        if (parsedCache && parsedCache.date !== todayStr) {
-            parsedCache = { ...parsedCache, date: todayStr, count: 0 };
-        }
+        // 1. Verifica se existe cache e se é válido (4 horas)
+        if (cachedData) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                const now = Date.now();
+                const EIGHT_HOURS = 8 * 60 * 60 * 1000;
 
-        const market = getMarketStatus(targetAsset);
-        let shouldFetch = false;
-
-        if (!parsedCache) {
-            shouldFetch = true;
-        } else {
-            const fetchCount = parsedCache.count || 0;
-            const lastUpdate = parsedCache.lastUpdate ? new Date(parsedCache.lastUpdate) : new Date(0);
-            const hoursSinceLast = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
-
-            // Atualiza se houver budget diário (< 4) e intervalo mínimo (4h)
-            if (fetchCount < 4 && hoursSinceLast >= 4) {
-                shouldFetch = true;
+                if (now - parsed.timestamp < EIGHT_HOURS) {
+                    console.log(`🟢 [IA] Carregando Pulso de ${targetAsset.ticker} do Cache Local (8h)`);
+                    if (isComparison) setCompareAiPulse(parsed.data);
+                    else setAiPulse(parsed.data);
+                    fetchLocks.current[lockKey] = false;
+                    return; // <-- CRÍTICO: Impede o fetch!
+                }
+            } catch (e) {
+                console.error("Erro ao ler cache do Grok (Pulso)", e);
             }
-        }
-
-        if (!shouldFetch && parsedCache?.data) {
-            console.log(`📡 A usar cache do Pulso de IA para ${targetAsset.ticker} (Budget: ${parsedCache.count}/4 hoje)`);
-            if (isComparison) setCompareAiPulse(parsedCache.data);
-            else setAiPulse(parsedCache.data);
-            return;
         }
 
         if (isComparison) setCompareAiPulse(null);
         else setAiPulse(null);
 
         setIsLoadingPulse(true);
-        try {
-            console.log(`🚀 A buscar novo Pulso de IA para ${targetAsset.ticker}`);
 
-            const res = await fetch("/api/grok", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: targetAsset.ticker,
-                    name: targetAsset.name,
-                    report: targetAsset.fullReport || `Dados para gerar Pulso de IA de ${targetAsset.ticker}`,
-                    isPulse: true
-                }),
-            });
-            const data = await res.json();
-
-            let finalData = data;
-            if (data.reply) {
-                try {
-                    finalData = typeof data.reply === "string" ? JSON.parse(data.reply) : data.reply;
-                } catch (pe) {
-                    console.error("Erro ao dar parse no reply do Pulso:", pe);
-                    finalData = { error: true };
-                }
+        const fetchWithRetry = async (retryCount = 0): Promise<void> => {
+            // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
+            const gotLock = await waitForGlobalAiLock("Pulse");
+            if (!gotLock) {
+                console.warn("⚠️ Timeout aguardando lock global de IA.");
+                setIsLoadingPulse(false);
+                fetchLocks.current[lockKey] = false;
+                return;
             }
 
-            if (isComparison) setCompareAiPulse(finalData);
-            else setAiPulse(finalData);
-
-            const newCount = parsedCache ? (parsedCache.count + 1) : 1;
-            localStorage.setItem(cacheKey, JSON.stringify({
-                data: finalData,
-                date: todayStr,
-                lastUpdate: now.toISOString(),
-                count: newCount
-            }));
-
-        } catch (e) {
-            console.error("Erro no Pulso de IA:", e);
-            const fallback = parsedCache ? parsedCache.data : { error: true };
-            if (isComparison) setCompareAiPulse(fallback);
-            else setAiPulse(fallback);
-        } finally {
-            setIsLoadingPulse(false);
-        }
-    };
-
-    // 1. FUNÇÃO: GERAR RESUMO (BULL/BEAR CASE)
-    const fetchAiAnalysis = async (force = false) => {
-        if (!asset || !asset.ticker) return;
-        setIsLoadingAnalysis(true);
-        try {
-            let relatorioQualitativo = htmlReport || asset.deepResearchText || asset.fullReport || `Modelo de negócio e mercado de ${asset.name}`;
-            
-            // Limpa HTML se necessário
-            if (relatorioQualitativo.includes("<div") || relatorioQualitativo.includes("<p>") || relatorioQualitativo.includes("<table")) {
-                const tmp = document.createElement("div");
-                tmp.innerHTML = relatorioQualitativo;
-                relatorioQualitativo = tmp.innerText || tmp.textContent || relatorioQualitativo;
-            }
-            
-            // Trunca para evitar estouro de tokens/payload
-            relatorioQualitativo = relatorioQualitativo.substring(0, 15000);
-
-            // --- LÓGICA DE CACHE BASEADA EM CONTEÚDO (OTIMIZAÇÃO) ---
-            const baseTicker = asset.ticker.toUpperCase().replace('.SA', '');
-            const reportVersion = relatorioQualitativo ? relatorioQualitativo.length : 'empty';
-            const cacheKey = `analysis_${baseTicker}_v${reportVersion}`;
-
-            const cachedStr = localStorage.getItem(cacheKey);
-            if (cachedStr && !force) {
-                try {
-                    const cachedData = JSON.parse(cachedStr);
-                    
-                    // Reaplica os dados extraídos (DY e Preço) para o estado global se existirem
-                    if (cachedData?.extractedDY && cachedData.extractedDY !== "N/D") {
-                        setAiRatingData((prev: any) => ({ ...(prev || {}), extractedDY: cachedData.extractedDY }));
-                    }
-
-                    // Se o cache for um objeto de erro, forçamos um novo fetch ao invés de usar o cache
-                    if (cachedData?.error || (cachedData?.bullCase?.[0]?.title === "Erro")) {
-                        console.log("⚠️ Cache contém erro. Forçando novo fetch...");
-                        // No return here, let it proceed to fetch
-                    } else {
-                        setAiAnalysis(cachedData);
-                        console.log(`⚡ Carregando Resumo do cache (v${reportVersion}) para: ${asset.ticker}`);
-                        setIsLoadingAnalysis(false);
-                        return;
-                    }
-                } catch (e) {
-                    console.error("Erro ao ler cache de análise:", e);
-                }
-            }
-
-            const res = await fetch("/api/grok", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: asset.ticker,
-                    name: asset.name,
-                    isSummary: true,
-                    report: `${relatorioQualitativo}\n\nREGRAS DE ESTILO E TONE OF VOICE (CRÍTICAS):
-PERSONALIDADE: Aja como um consultor financeiro experiente, amigável e didático. O tone deve ser leve, agradável de ler e desenvolvido.
-
-DESENVOLVIMENTO: O 'title' deve ser claro e impactante (ex: "Eficiência Operacional", "Vantagem Competitiva"). A 'desc' deve ser uma frase completa e bem desenvolvida (entre 20 a 30 palavras), explicando o porquê de forma fluida.
-
-VERACIDADE (CRÍTICO): Baseie-se EXCLUSIVAMENTE no relatório. Não invente dividendos se o relatório não os cita. Se a empresa não paga dividendos (como a PRIO), não use isso como ponto positivo.
-
-PROIBIDO LINGUAGEM ROBÓTICA: Nada de "A empresa tem uma longa história". Fale do negócio real de forma natural.
-
-ZERO NÚMEROS: Continua estritamente proibido usar métricas como P/L, ROE, LPA, DY ou preços. Foco na narrativa do negócio.
-
-EXTRAÇÃO DE DADOS (NOVO): Identifique se o relatório cita um Dividend Yield (DY). Se o valor for aproximado (ex: ~7,6%), extraia apenas o número (7.60%). PRIORIZE o texto sobre indicadores externos. NUNCA invente um DY se não houver no texto (use 0.00% ou N/D).`
-                }),
-            });
-
-            const data = await res.json();
-            
-            // Extração à prova de bala (lida com o JSON direto ou envolto em 'reply')
-            let finalData = data;
-            if (data.reply) {
-                let rawStr = typeof data.reply === "string" ? data.reply : String(data.reply);
-                const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
-                if (jsonMatch) rawStr = jsonMatch[0];
-                try {
-                    finalData = JSON.parse(rawStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-                } catch (err) {
-                    console.error("Erro ao fazer parse da resposta:", err);
-                }
-            }
-
-            if (finalData?.extractedDY && finalData.extractedDY !== "N/D") {
-                setAiRatingData((prev: any) => ({ ...(prev || {}), extractedDY: finalData.extractedDY }));
-            }
-
-            setAiAnalysis(finalData);
-            
-            // Salva no cache com a versão do relatório APENAS se não for erro
-            if (!finalData?.error && finalData?.bullCase?.[0]?.title !== "Erro") {
-                localStorage.setItem(cacheKey, JSON.stringify(finalData));
-            } else {
-                console.warn("❌ Falha na IA: Resposta de erro detectada. Cache ignorado.");
-            }
-        } catch (e) {
-            console.error("Erro no resumo:", e);
-        } finally {
-            setIsLoadingAnalysis(false);
-        }
-    };
-
-    // 2. FUNÇÃO: SENTIMENTO DO MERCADO (MIGRADO PARA GEMINI)
-    const fetchMarketSentiment = async (targetAsset = asset, isComparison = false) => {
-        if (!targetAsset || !targetAsset.ticker) return;
-
-        const baseTicker = targetAsset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `sentiment_cache_${baseTicker}`;
-        const now = new Date();
-        const isMonday = now.getDay() === 1;
-
-        try {
-            const cachedStr = localStorage.getItem(cacheKey);
-            if (cachedStr) {
-                const cachedData = JSON.parse(cachedStr);
-                const lastUpdate = new Date(cachedData.lastUpdate);
-                const diffDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-                const shouldUpdate = (isMonday && lastUpdate.toDateString() !== now.toDateString()) || diffDays >= 7;
-
-                if (!shouldUpdate && cachedData.label !== "Erro" && cachedData.value !== undefined) {
-                    if (isComparison) setCompareAiSentiment(cachedData);
-                    else setAiSentiment(cachedData);
-                    return;
-                }
-            }
-        } catch (e) {
-            console.error("Erro ao ler cache do Grok:", e);
-        }
-
-        try {
-            localStorage.removeItem(cacheKey);
-            console.log(`🚀 Iniciando fetch de Sentimento para ${targetAsset.ticker} via GROK...`);
-
-            // Limpeza e Truncamento CRÍTICO para não exceder limites de tokens (Llama/Grok limitam a ~8k)
-            let safeReport = targetAsset.fullReport || `Análise de contexto geral para ${targetAsset.name}`;
-            if (safeReport.includes("<div") || safeReport.includes("<p>")) {
-                const tmp = document.createElement("div");
-                tmp.innerHTML = safeReport;
-                safeReport = tmp.innerText || tmp.textContent || "";
-            }
-            safeReport = safeReport.substring(0, 2500); // 2500 chars é super seguro para sentimento
-
-            const promptSentimento = `Atue como um analista quantitativo. Você deve avaliar OBRIGATORIAMENTE o sentimento predominante do mercado para os próximos 7 dias para ${targetAsset.ticker} com base neste relatório reduzido:
----
-${safeReport}
----
-Retorne APENAS um objeto JSON válido. Todas as chaves e valores de texto DEVEM estar entre aspas duplas (""). O JSON deve ter EXATAMENTE estas 3 chaves.
-EXEMPLO EXATO DO FORMATO ESPERADO:
-{
-  "value": 85,
-  "label": "Otimismo",
-  "trend": "up"
-}
-
-Para label, escolha: "Otimismo", "Neutro", "Pessimismo" ou "Cautela".
-Para trend, escolha: "up", "down" ou "side".`;
-
-            // CHAMADA PARA O GROK COM O FORMATO CORRETO ('report')
-            const res = await fetch("/api/grok", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    report: promptSentimento,
-                    ticker: targetAsset.ticker,
-                    name: targetAsset.name,
-                    isSentiment: true
-                }),
-            });
-
-            const data = await res.json();
-            console.log("📥 Resposta bruta do GROK para Sentimento:", data);
-
-            let rawReply = data.reply || data.text;
-            let parsedData = data; // Assumimos por padrão que o Grok já enviou JSON válido (padrão)
-
-            if (typeof rawReply === 'string' && rawReply.trim().length > 0) {
-                // EXTRATOR EXTREMO DE JSON: Procura apenas o que está entre { e }
-                const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    rawReply = jsonMatch[0];
-                } else {
-                    rawReply = rawReply.replace(/```json/gi, '').replace(/```/g, '').trim();
-                }
-
-                try {
-                    parsedData = JSON.parse(rawReply);
-                } catch (e) { /* se falhar, fica com o fallback mais abaixo */ }
-            }
-
-            const safeLabel = (!parsedData.label || parsedData.label === "Erro") ? "Neutro" : parsedData.label;
-            const safeTrend = ["up", "down", "side"].includes(parsedData.trend) ? parsedData.trend : "side";
-            const safeValue = typeof parsedData.value === 'number' ? parsedData.value : 50;
-
-            const finalSentiment = {
-                value: safeValue,
-                label: safeLabel,
-                trend: safeTrend,
-                lastUpdate: now.toISOString()
-            };
-
-            localStorage.setItem(cacheKey, JSON.stringify(finalSentiment));
-            if (isComparison) setCompareAiSentiment(finalSentiment);
-            else setAiSentiment(finalSentiment);
-
-        } catch (e) {
-            console.error("❌ Falha fatal no sentimento (Grok), ativando fallback. Erro:", e);
-            const fallback = { value: 50, label: "Neutro", trend: "side", lastUpdate: now.toISOString() };
-            if (isComparison) setCompareAiSentiment(fallback);
-            else setAiSentiment(fallback);
-        }
-    };
-
-
-    // 3. FUNÇÃO: SAÚDE E VALOR JUSTO (COM CACHE SEMANAL)
-    const fetchAiHealth = async () => {
-        if (!asset || !asset.ticker) return;
-
-        const baseTicker = asset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `health_cache_${baseTicker}`;
-        const cachedStr = localStorage.getItem(cacheKey);
-        const now = new Date();
-
-        // Verificação de Cache Semanal
-        if (cachedStr) {
             try {
-                const cachedData = JSON.parse(cachedStr);
-                const lastUpdate = new Date(cachedData.lastUpdate);
-                const diffDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+                console.log(`🚀 A buscar novo Pulso de IA para ${targetAsset.ticker} (Tentativa ${retryCount + 1})`);
 
-                // Se tiver menos de 7 dias, usa a memória do navegador
-                if (diffDays < 7) {
-                    console.log(`📡 A usar cache semanal para Saúde Fundamental de ${asset.ticker}`);
-                    setAiHealth(cachedData.data);
-                    return;
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: targetAsset.ticker,
+                        assetName: targetAsset.name,
+                        variation: targetAsset.variation,
+                        report: targetAsset.fullReport || `Dados para gerar Pulso de IA de ${targetAsset.ticker}`,
+                        isPulse: true
+                    }),
+                });
+
+                if (res.status === 429 && retryCount < 2) {
+                    releaseGlobalAiLock();
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    console.warn(`⚠️ [PULSO] Rate Limit (429). Aguardando ${currentDelay}ms...`);
+                    await sleep(currentDelay);
+                    return fetchWithRetry(retryCount + 1);
                 }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                
+                let finalData = data;
+                if (data.reply) {
+                    try {
+                        const rawStr = typeof data.reply === "string" ? data.reply : JSON.stringify(data.reply);
+                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
+                        finalData = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                    } catch (pe) {
+                        console.error("Erro ao dar parse no reply do Pulso:", pe);
+                        finalData = { insight: data.reply, score: 50, tailRisk: "Médio", volatility: "Moderada" };
+                    }
+                }
+
+                if (isComparison) setCompareAiPulse(finalData);
+                else setAiPulse(finalData);
+                
+                // 3. Guarda o resultado no localStorage com o timestamp atual
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    data: finalData,
+                    timestamp: Date.now()
+                }));
+
             } catch (e) {
-                console.error("Erro ao ler cache de saúde:", e);
+                console.error("Erro no Pulso de IA:", e);
+                const fallback = { error: true };
+                if (isComparison) setCompareAiPulse(fallback);
+                else setAiPulse(fallback);
+            } finally {
+                setIsLoadingPulse(false);
+                releaseGlobalAiLock();
+                fetchLocks.current[lockKey] = false;
             }
-        }
+        };
 
-        setIsLoadingHealth(true);
-        try {
-            console.log(`🚀 A buscar nova Saúde Fundamental para ${asset.ticker}`);
-            const res = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticker: asset.ticker,
-                    name: asset.name,
-                    price: asset.price,
-                    report: asset.fullReport || `Saúde financeira para ${asset.name} (${asset.ticker})`,
-                    isHealth: true
-                }),
-            });
-            const data = await res.json();
-            let finalData = data.reply ? (typeof data.reply === "string" ? JSON.parse(data.reply) : data.reply) : data;
-
-            // MAPEAMENTO DE SEGURANÇA
-            if (finalData && typeof finalData === "object") {
-                finalData.pl = finalData.pl || finalData.p_l || finalData.pe_ratio || 0;
-                finalData.dcf = finalData.dcf || finalData.fair_value || finalData.valor_justo || 0;
-                finalData.graham = finalData.graham || finalData.graham_number || finalData.valor_graham || 0;
-                finalData.bazin = finalData.bazin || finalData.bazin_value || 0;
-            }
-
-            setAiHealth(finalData);
-
-            // Guardar no Cache com a data atual
-            localStorage.setItem(cacheKey, JSON.stringify({
-                data: finalData,
-                lastUpdate: now.toISOString()
-            }));
-
-        } catch (e) {
-            console.error("Erro na saúde financeira:", e);
-        } finally {
-            setIsLoadingHealth(false);
-        }
+        fetchWithRetry();
     };
 
-    const fetchIndependentSolidity = async () => {
-        if (!asset || !asset.ticker || !aiHealth) return;
-
-        const baseTicker = asset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `solidity_eval_${baseTicker}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            setSolidityEval(JSON.parse(cached));
-            return;
-        }
-
-        try {
-            const promptEval = `Atue como um analista quantitativo. Avalie estritamente estes indicadores de ${asset.ticker} (Preço atual: ${asset.price}): 
-
-ROE: ${aiHealth?.roe ? (Number(aiHealth.roe) * 100).toFixed(2) : 'N/A'}%
-
-P/L: ${aiHealth?.pl ? Number(aiHealth.pl).toFixed(2) : 'N/A'}x
-
-P/VP: ${aiHealth?.pvp ? Number(aiHealth.pvp).toFixed(2) : 'N/A'}x
-
-Dividend Yield (DY): ${aiHealth?.dy ? (Number(aiHealth.dy) * 100).toFixed(2) : 'N/A'}%
-
-Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a qualidade destes números) e "obs" (observação curta, MÁXIMO 80 CARACTERES, justificando a nota). Exemplo: {"score": 85, "obs": "Múltiplos atrativos e ROE forte indicam desconto."}. Não inclua markdown, apenas o JSON bruto.`;
-
-            const res = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: promptEval, ticker: asset.ticker, name: asset.name })
-            });
-
-            if (!res.ok) {
-                setSolidityEval({ score: 'N/A', obs: 'Análise indisponível' });
-                return;
-            }
-
-            const data = await res.json();
-            const replyText = data.reply || data.text || "";
-
-            if (!replyText) {
-                setSolidityEval({ score: 'N/A', obs: 'Resposta inválida' });
-                return;
-            }
-
-            let cleanJson = replyText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleanJson);
-
-            setSolidityEval(parsed);
-            localStorage.setItem(cacheKey, JSON.stringify(parsed));
-        } catch (e) {
-            setSolidityEval({ score: 'N/A', obs: 'Erro ao analisar.' });
-        }
-    };
-
-    useEffect(() => {
-        fetchIndependentSolidity();
-    }, [aiHealth]);
-
-
-    // Verifica se o ticker já está na watchlist ao carregar
     useEffect(() => {
         const savedWatchlist = JSON.parse(localStorage.getItem('user_watchlist') || '[]');
         const cleanTicker = ticker.toUpperCase().replace('.SA', '');
         setIsInWatchlist(savedWatchlist.includes(cleanTicker));
+    }, [ticker]);
+
+    // Resetar estados ao trocar de ativo para evitar vazamento de dados antigos (hallucinations)
+    useEffect(() => {
+        if (ticker) {
+            setHtmlReport(null);
+            setAiRatingData(null);
+            setInvestorThesis("");
+            setAiAnalysis(null);
+            setAiHealth(null);
+            setAiSentiment({ value: 50, label: "Neutro", trend: "side" });
+            setAiPulse(null);
+            setOnChainMetrics(null);
+            setFairPriceData(null);
+            setMessages([]);
+            setLastAnalyzedTicker("");
+            console.log(`🧽 Estado limpo para o novo ticker: ${ticker}`);
+        }
     }, [ticker]);
 
     // Automatização da busca de relatórios HTML via Ticker
@@ -1169,19 +1362,27 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
                 const tickerLimpoLower = ticker.toLowerCase().replace('.sa', '');
                 const tickerLimpoUpper = ticker.toUpperCase().replace('.SA', '');
 
-                let response = await fetch(`/reports/${tickerLimpoLower}.html`);
+                // Tentar várias combinações de case e extensões (Robustez para PETR4.HTML etc)
+                const variants = [
+                    `/reports/${tickerLimpoLower}.html`,
+                    `/reports/${tickerLimpoUpper}.html`,
+                    `/reports/${tickerLimpoUpper}.HTML`,
+                    `/reports/${tickerLimpoLower}.HTM`,
+                    `/reports/${tickerLimpoUpper}.HTM`,
+                    `/reports/${tickerLimpoLower}.htm`,
+                    `/reports/${tickerLimpoUpper}.htm`
+                ];
 
-                if (!response.ok) {
-                    response = await fetch(`/reports/${tickerLimpoUpper}.html`);
-                }
-                if (!response.ok) {
-                    response = await fetch(`/reports/${tickerLimpoLower}.htm`);
-                }
-                if (!response.ok) {
-                    response = await fetch(`/reports/${tickerLimpoUpper}.htm`);
+                let response = null;
+                for (const url of variants) {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        response = res;
+                        break;
+                    }
                 }
 
-                if (response.ok) {
+                if (response && response.ok) {
                     const lastModified = response.headers.get('Last-Modified');
                     if (lastModified) {
                         const date = new Date(lastModified);
@@ -1213,7 +1414,7 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
     }, [ticker]);
 
 
-    // 4. FUNÇÃO DO CHAT
+    // 4. FUNÇÃO DO CHAT (GROK)
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isLoadingChat) return;
         const userMsg = chatInput;
@@ -1221,7 +1422,6 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
         setChatInput("");
         setIsLoadingChat(true);
 
-        // 🔥 PEGA O RELATÓRIO COMPLETO (E LIMPA HTML SE NECESSÁRIO)
         const rawReport = htmlReport || asset?.fullReport || "";
         let cleanReport = rawReport;
         if (rawReport.includes("<div") || rawReport.includes("<p>")) {
@@ -1229,39 +1429,37 @@ Retorne APENAS um objeto JSON válido com: "score" (nota de 0 a 100 avaliando a 
             tmp.innerHTML = rawReport;
             cleanReport = tmp.innerText || tmp.textContent || "";
         }
-        // Limite de segurança para Context Window
         cleanReport = cleanReport.substring(0, 5000);
 
         try {
-            const res = await fetch("/api/chat", {
+            const res = await fetch("/api/grok", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: userMsg,
                     ticker: asset.ticker,
-                    name: asset.name,
+                    assetName: asset.name,
                     report: cleanReport,
+                    variation: asset.variation,
                     indicators: {
                         price: asset.price,
                         variation: asset.variation,
                         sector: asset.sector,
-                        isCrypto: asset.isCrypto,
                         roe: asset?.fundamentalData?.roe,
                         pvp: asset?.fundamentalData?.pvp,
                         pl: asset?.fundamentalData?.pl,
                         dy: asset?.fundamentalData?.dy,
-                        graham: asset?.valuation?.graham,
-                        bazin: asset?.valuation?.bazin,
-                        currency: asset.currency,
                         score: aiRatingData?.score,
                         verdict: aiRatingData?.verdict
                     }
                 })
             });
             const data = await res.json();
-            if (data.reply) setMessages((prev) => [...prev, { role: "ia", text: data.reply }]);
+            const aiReply = data.reply || data.text || "Sem resposta da IA.";
+            setMessages((prev) => [...prev, { role: "ia", text: aiReply }]);
         } catch (error) {
-            setMessages((prev) => [...prev, { role: "ia", text: "Erro ao conectar à IA." }]);
+            setMessages((prev) => [...prev, { role: "ia", text: "Erro ao conectar à IA (Grok)." }]);
+            console.error("Chat Error:", error);
         } finally {
             setIsLoadingChat(false);
         }
@@ -1382,8 +1580,8 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ticker: asset.ticker,
-                    name: asset.name,
-                    report: dueloPrompt,
+                    assetName: asset.name,
+                    prompt: dueloPrompt,
                     isComparison: true
                 }),
             });
@@ -1965,6 +2163,222 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                         </div>
                                     </div>
                                 </section>
+                                
+                                {/* MOBILIDADE: SENTIMENTO E PULSO ABAIXO DO RESUMO EM MOBILE */}
+                                <div className="lg:hidden space-y-6">
+                                    {/* SENTIMENTO DO MERCADO */}
+                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-slate-400">speed</span>
+                                                Sentimento do Mercado
+                                                <InfoTooltip text="Mostra se os investidores estão otimistas (Ganância) ou pessimistas (Medo) com o papel." />
+                                            </h3>
+                                            
+                                            {/* Botão exclusivo para o Administrador Lucas */}
+                                            {user?.email === 'carvalhodlucas@hotmail.com' && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        const baseT = ticker.toUpperCase().replace('.SA', '');
+                                                        console.log(`🛠️ Admin Refresh: Limpando Sentimento para ${baseT}...`);
+                                                        
+                                                        // Limpeza agressiva de cache para o ticker atual
+                                                        Object.keys(localStorage).forEach(key => {
+                                                            if (key.includes(`grok_sentiment`) && key.includes(baseT)) {
+                                                                localStorage.removeItem(key);
+                                                                console.log(`🧹 Cache removido: ${key}`);
+                                                            }
+                                                        });
+
+                                                        fetchMarketSentiment(asset, false, true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 border border-primary/20 rounded-lg text-[9px] font-black text-primary uppercase hover:bg-primary hover:text-black transition-all group"
+                                                    title="Forçar atualização do sentimento"
+                                                >
+                                                    <span className="material-symbols-outlined text-[12px] group-hover:rotate-180 transition-transform duration-500">refresh</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400 mb-6">Sentimento Social + Volatilidade do Mercado</p>
+                                        <div className="relative h-40 w-full flex items-end justify-center overflow-hidden">
+                                            <svg className="w-full h-full max-w-[240px]" viewBox="0 0 200 110">
+                                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#27272a" strokeLinecap="round" strokeWidth="20"></path>
+                                                <path className="opacity-30" d="M 20 100 A 80 80 0 0 1 70 38" fill="none" stroke="#ef4444" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <path className="opacity-30" d="M 70 38 A 80 80 0 0 1 130 38" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <path className="opacity-80" d="M 130 38 A 80 80 0 0 1 180 100" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <g transform={`rotate(${-90 + ((aiSentiment?.value || 50) / 100) * 180}, 100, 100)`}>
+                                                    <line stroke="white" strokeLinecap="round" strokeWidth="4" x1="100" x2="100" y1="100" y2="30"></line>
+                                                    <circle cx="100" cy="100" fill="white" r="6"></circle>
+                                                </g>
+                                            </svg>
+                                            <div className="absolute bottom-0 text-center">
+                                                <span className={`block text-3xl font-black ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
+                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
+                                                        'text-emerald-500'
+                                                    }`}>{aiSentiment?.value || 50}</span>
+                                                <span className={`text-xs uppercase tracking-widest font-bold ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
+                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
+                                                        'text-emerald-500'
+                                                    }`}>{aiSentiment?.label || "Neutro"}</span>
+                                                {aiSentiment?.lastUpdate && (
+                                                    <span className="block text-[9px] text-zinc-500 uppercase mt-1">
+                                                        Última atualização: {new Date(aiSentiment.lastUpdate).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* ALERTA DE DIVERGÊNCIA */}
+                                        {aiRatingData?.score >= 8.0 && (aiSentiment?.value || 50) <= 40 && (
+                                            <div className="mt-4 text-[10px] text-primary bg-primary/10 p-2 rounded-lg font-bold border border-primary/20 animate-pulse">
+                                                ⚠️ DIVERGÊNCIA DETECTADA: Fundamento forte com Sentimento de Medo. Possível zona de acumulação institucional.
+                                            </div>
+                                        )}
+                                        <div className="mt-6 space-y-3">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">Tendência Detectada</span>
+                                                <span className="text-white font-medium capitalize">{aiSentiment?.trend || "side"}</span>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* --- PULSO DE IA --- */}
+                                    <div className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
+
+                                        {/* Overlay de Standby: Só aparece se NÃO for cripto E o mercado estiver fechado */}
+                                        {!marketStatus.isOpen && !asset?.isCrypto && (
+                                            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center animate-in fade-in duration-500 rounded-3xl">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <div className="bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl shadow-2xl flex flex-col items-center min-w-[140px]">
+                                                        <span className="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em]">Mercado Fechado</span>
+                                                        <span className="text-xl font-mono font-bold text-white mt-1 leading-none">{marketStatus.countdown}</span>
+                                                        <span className="text-[9px] text-slate-500 uppercase mt-2">Para Abertura ({marketStatus.label})</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Efeito de Grade */}
+                                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:16px_16px] rounded-3xl pointer-events-none"></div>
+
+                                        <div className={`relative z-10 transition-all duration-700 ${!marketStatus.isOpen ? "grayscale blur-[2px]" : ""}`}>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative flex h-3 w-3">
+                                                        {marketStatus.isOpen && (
+                                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${asset?.isCrypto ? 'bg-blue-400' : 'bg-primary'}`}></span>
+                                                        )}
+                                                        <span className={`relative inline-flex rounded-full h-3 w-3 ${marketStatus.isOpen
+                                                            ? (asset?.isCrypto ? 'bg-blue-500' : 'bg-primary')
+                                                            : "bg-zinc-700"
+                                                            }`}></span>
+                                                    </div>
+                                                    <h2 className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-emerald-400 via-cyan-200 to-white bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] uppercase italic">
+                                                        Pulso de IA
+                                                    </h2>
+
+                                                    <div className="group/tooltip relative inline-block">
+                                                        <span
+                                                            className="material-symbols-outlined text-slate-500 text-[10px] cursor-help hover:text-primary transition-colors opacity-70"
+                                                        >
+                                                            help_outline
+                                                        </span>
+
+                                                        {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                                                            <div className="text-[10px] space-y-3">
+                                                                <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é o Pulso?</p>
+                                                                <p className="text-slate-300 italic mb-2">Diagnóstico em tempo real da 'saúde' de curto prazo do ativo.</p>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Força Relativa:</span>
+                                                                    <span className="text-slate-400">Mede a energia de compra/venda e o momento do mercado.</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Risco de Cauda:</span>
+                                                                    <span className="text-slate-400">Chances de eventos extremos fora do comum.</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Volatilidade:</span>
+                                                                    <span className="text-slate-400">Intensidade da variação do preço.</span>
+                                                                </div>
+                                                            </div>
+                                                            {/* Triângulo do Tooltip */}
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {asset?.isCrypto && (
+                                                        <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md font-bold uppercase">
+                                                            24/7 Mode
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-colors ${marketStatus.isOpen
+                                                        ? "text-primary bg-primary/10 border-primary/20"
+                                                        : "text-slate-500 bg-zinc-800 border-zinc-700"
+                                                        }`}>
+                                                        {marketStatus.isOpen ? "LIVE SCAN" : "STANDBY"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1 mb-4">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">
+                                                    Diagnóstico de Curto Prazo
+                                                </span>
+                                                <div className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
+                                                    {aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."}
+                                                    <div className="group/tooltip relative inline-block">
+                                                        <span
+                                                            className="material-symbols-outlined !text-[12px] text-slate-600 cursor-help hover:text-primary transition-colors"
+                                                        >
+                                                            help_outline
+                                                        </span>
+
+                                                        {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                                                            <div className="text-[10px] space-y-3">
+                                                                <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é a Força Relativa?</p>
+                                                                <p className="text-slate-300 leading-relaxed">
+                                                                    Mede a energia de compra/venda do ativo no curto prazo (0-100).
+                                                                </p>
+                                                                <div className="space-y-1">
+                                                                    <p className="text-slate-400"><span className="text-emerald-400 font-bold">Acima de 70:</span> Euforia (Pode estar caro)</p>
+                                                                    <p className="text-slate-400"><span className="text-amber-400 font-bold">Próximo a 60:</span> Tendência de alta saudável</p>
+                                                                    <p className="text-slate-400"><span className="text-accent-red font-bold">Abaixo de 30:</span> Pânico (Pode estar barato)</p>
+                                                                </div>
+                                                            </div>
+                                                            {/* Triângulo do Tooltip */}
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                                <div>
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-black">Risco de Cauda</span>
+                                                    <span className={`text-sm font-bold ${aiPulse?.tailRisk === 'Alto' ? 'text-accent-red' : aiPulse?.tailRisk === 'Baixo' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {aiPulse?.tailRisk || "N/D"}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-black">Volatilidade</span>
+                                                    <span className="text-sm font-bold text-white">{aiPulse?.volatility || "N/D"}</span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-[11px] text-slate-400 leading-relaxed italic border-l-2 border-primary/30 pl-3">
+                                                "{aiPulse?.insight || `VERIFICANDO SINAIS DO ATIVO: ${asset?.ticker}...`}"
+                                            </p>
+                                        </div>
+
+                                        {/* Efeito de Scanner: Lista branca que sobe e desce */}
+                                        <div className="absolute top-0 left-0 w-full h-[60px] bg-gradient-to-b from-transparent via-white/20 to-transparent animate-scan pointer-events-none z-10"></div>
+                                        <div className="absolute top-0 left-0 w-full h-[2px] bg-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)] animate-scan pointer-events-none z-10"></div>
+                                    </div>
+                                </div>
 
                                 {/* SAÚDE FUNDAMENTAL + VALOR JUSTO */}
                                 <div className="grid md:grid-cols-2 gap-6">
@@ -2077,9 +2491,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Taxa de Administração
                                                             <InfoTooltip text="Custo anual pago à gestora para administrar o fundo." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-primary">
-                                                            {aiRatingData?.etfMetrics?.taxa && aiRatingData.etfMetrics.taxa !== "0.00%"
-                                                                ? aiRatingData.etfMetrics.taxa
+                                                        <span className="text-sm font-bold text-primary flex items-center gap-2">
+                                                            {aiRatingData?.etfMetrics?.taxa && !["--", "0.00%", "N/D", "N/A"].includes(aiRatingData.etfMetrics.taxa)
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.etfMetrics.taxa}
+                                                                        <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-1 rounded">IA</span>
+                                                                    </>
+                                                                )
                                                                 : (asset?.taxaAdm || asset?.expenseRatio || "--")}
                                                         </span>
                                                     </div>
@@ -2096,9 +2515,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Índice de Referência
                                                             <InfoTooltip text="O índice que o ETF busca replicar (Benchmark)." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-accent-orange">
-                                                            {aiRatingData?.etfMetrics?.benchmark && aiRatingData.etfMetrics.benchmark !== "Índice"
-                                                                ? aiRatingData.etfMetrics.benchmark
+                                                        <span className="text-sm font-bold text-accent-orange flex items-center gap-2">
+                                                            {aiRatingData?.etfMetrics?.benchmark && !["--", "Índice", "N/D", "N/A"].includes(aiRatingData.etfMetrics.benchmark)
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.etfMetrics.benchmark}
+                                                                        <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded font-normal">IA</span>
+                                                                    </>
+                                                                )
                                                                 : (asset?.benchmark || "--")}
                                                         </span>
                                                     </div>
@@ -2115,9 +2539,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Patrimônio Líquido
                                                             <InfoTooltip text="Valor total de ativos sob gestão do ETF." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-purple-400">
-                                                            {aiRatingData?.etfMetrics?.patrimonio && aiRatingData.etfMetrics.patrimonio !== "R$ 0B"
-                                                                ? aiRatingData.etfMetrics.patrimonio
+                                                        <span className="text-sm font-bold text-purple-400 flex items-center gap-2">
+                                                            {aiRatingData?.etfMetrics?.patrimonio && !["--", "R$ 0B", "N/D", "N/A"].includes(aiRatingData.etfMetrics.patrimonio)
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.etfMetrics.patrimonio}
+                                                                        <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded font-normal">IA</span>
+                                                                    </>
+                                                                )
                                                                 : formatCompactNumber(asset?.netAssets || 0)}
                                                         </span>
                                                     </div>
@@ -2134,9 +2563,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Liquidez Diária
                                                             <InfoTooltip text="Volume médio diário de negociação." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-emerald-500">
-                                                            {aiRatingData?.etfMetrics?.liquidez && aiRatingData.etfMetrics.liquidez !== "R$ 0M"
-                                                                ? aiRatingData.etfMetrics.liquidez
+                                                        <span className="text-sm font-bold text-emerald-500 flex items-center gap-2">
+                                                            {aiRatingData?.etfMetrics?.liquidez && !["--", "R$ 0M", "N/D", "N/A"].includes(aiRatingData.etfMetrics.liquidez)
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.etfMetrics.liquidez}
+                                                                        <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded font-normal">IA</span>
+                                                                    </>
+                                                                )
                                                                 : formatCompactNumber(asset?.avgVolume || 0)}
                                                         </span>
                                                     </div>
@@ -2166,9 +2600,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             P/VP (Preço / Valor Patr.)
                                                             <InfoTooltip text="Mede o ágio ou deságio do fundo. Perto de 1.0 indica preço justo sobre os imóveis." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-primary">
-                                                            {(aiRatingData?.fiiMetrics?.pvp && aiRatingData.fiiMetrics.pvp !== "--" && aiRatingData.fiiMetrics.pvp !== "0.00")
-                                                                ? aiRatingData.fiiMetrics.pvp
+                                                        <span className="text-sm font-bold text-primary flex items-center gap-2">
+                                                            {(aiRatingData?.fiiMetrics?.pvp && !["--", "0.00", "N/D", "N/A"].includes(aiRatingData.fiiMetrics.pvp))
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.fiiMetrics.pvp}
+                                                                        <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-1 rounded">IA</span>
+                                                                    </>
+                                                                )
                                                                 : (asset?.fundamentalData?.pvp !== undefined && asset?.fundamentalData?.pvp !== null && asset.fundamentalData.pvp > 0)
                                                                     ? asset.fundamentalData.pvp.toFixed(2)
                                                                     : "--"}
@@ -2187,9 +2626,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Vacância Física
                                                             <InfoTooltip text="Porcentagem de área não locada. Quanto menor, mais eficiente o fundo." />
                                                         </span>
-                                                        <span className={`text-sm font-bold ${parseFloat(aiRatingData?.fiiMetrics?.vacancia || "0") > 15 ? "text-accent-red" : "text-emerald-500"}`}>
-                                                            {aiRatingData?.fiiMetrics?.vacancia && aiRatingData.fiiMetrics.vacancia !== "--" && aiRatingData.fiiMetrics.vacancia !== "0.0%"
-                                                                ? aiRatingData.fiiMetrics.vacancia
+                                                        <span className={`text-sm font-bold flex items-center gap-2 ${parseFloat(aiRatingData?.fiiMetrics?.vacancia || "0") > 15 ? "text-accent-red" : "text-emerald-500"}`}>
+                                                            {aiRatingData?.fiiMetrics?.vacancia && !["--", "0.0%", "N/D", "N/A"].includes(aiRatingData.fiiMetrics.vacancia)
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.fiiMetrics.vacancia}
+                                                                        <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded font-normal">IA</span>
+                                                                    </>
+                                                                )
                                                                 : (asset?.vacancia && asset.vacancia !== "--" ? asset.vacancia : "N/D")}
                                                         </span>
                                                     </div>
@@ -2208,9 +2652,19 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                         </span>
                                                         <span className="text-sm font-bold text-sky-400 flex items-center gap-2">
                                                             {(aiRatingData?.extractedDY && aiRatingData.extractedDY !== "N/D")
-                                                                ? aiRatingData.extractedDY
-                                                                : (aiRatingData?.fiiMetrics?.dy && aiRatingData.fiiMetrics.dy !== "--" && aiRatingData.fiiMetrics.dy !== "0.0%")
-                                                                    ? aiRatingData.fiiMetrics.dy
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.extractedDY}
+                                                                        <span className="text-[10px] bg-sky-400/20 text-sky-400 border border-sky-400/30 px-1 rounded">IA</span>
+                                                                    </>
+                                                                )
+                                                                : (aiRatingData?.fiiMetrics?.dy && !["--", "0.0%", "N/D", "N/A"].includes(aiRatingData.fiiMetrics.dy))
+                                                                    ? (
+                                                                        <>
+                                                                            {aiRatingData.fiiMetrics.dy}
+                                                                            <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded">IA</span>
+                                                                        </>
+                                                                    )
                                                                     : (asset?.fundamentalData?.dy ? `${asset.fundamentalData.dy.toFixed(2)}%` : "--")}
  
                                                             {aiRatingData?.extractedDY && aiRatingData.extractedDY !== "N/D" && (
@@ -2234,9 +2688,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             Patrimônio Líquido
                                                             <InfoTooltip text="Valor total do mercado somando todos os ativos do fundo." />
                                                         </span>
-                                                        <span className="text-sm font-bold text-purple-400">
-                                                            {(aiRatingData?.fiiMetrics?.patrimonio && aiRatingData.fiiMetrics.patrimonio !== "--" && aiRatingData.fiiMetrics.patrimonio !== "R$ 0.0B")
-                                                                ? aiRatingData.fiiMetrics.patrimonio
+                                                        <span className="text-sm font-bold text-purple-400 flex items-center gap-2">
+                                                            {(aiRatingData?.fiiMetrics?.patrimonio && !["--", "R$ 0.0B", "N/D", "N/A"].includes(aiRatingData.fiiMetrics.patrimonio))
+                                                                ? (
+                                                                    <>
+                                                                        {aiRatingData.fiiMetrics.patrimonio}
+                                                                        <span className="text-[10px] bg-white/10 text-white/60 border border-white/20 px-1 rounded font-normal">IA</span>
+                                                                    </>
+                                                                )
                                                                 : (asset?.marketCap ? `R$ ${asset.marketCap}` : "--")}
                                                         </span>
                                                     </div>
@@ -2576,8 +3035,19 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                 
                                                                 setAiRatingData(null);
                                                                 setAiAnalysis(null);
+                                                                setAiHealth(null);
+                                                                
+                                                                // Limpeza agressiva de cache para o ticker atual
+                                                                console.log(`🧹 Limpando cache localStorage para ${baseT}...`);
+                                                                Object.keys(localStorage).forEach(key => {
+                                                                    if (key.includes(`ai_rating`) && key.includes(baseT)) localStorage.removeItem(key);
+                                                                    if (key.includes(`analysis`) && key.includes(baseT)) localStorage.removeItem(key);
+                                                                    if (key.includes(`health`) && key.includes(baseT)) localStorage.removeItem(key);
+                                                                });
+
                                                                 fetchFundamentalRating(asset, false, true);
                                                                 fetchAiAnalysis(true);
+                                                                fetchAiHealth(true);
                                                             }}
                                                             className="flex items-center gap-1.5 px-3 py-1 bg-primary/10 border border-primary/20 rounded-lg text-[9px] font-black text-primary uppercase hover:bg-primary hover:text-black transition-all group"
                                                             title="Atualizar análise via RASTRO"
@@ -2619,9 +3089,12 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                         </div>
                                     ) : (
                                         /* ESTADO CASO NÃO TENHA RELATÓRIO */
-                                        <div className="flex flex-col items-center py-10 opacity-40">
-                                            <span className="material-symbols-outlined text-4xl mb-2">description_off</span>
-                                            <p className="text-[10px] font-bold uppercase">Aguardando dados de {asset?.ticker}...</p>
+                                        <div className="flex flex-col items-center py-10 opacity-60">
+                                            <span className="material-symbols-outlined text-4xl mb-4 text-slate-500">assignment_late</span>
+                                            <p className="text-xs font-bold uppercase text-slate-400 tracking-widest text-center">
+                                                Análise de IA Indisponível <br /> 
+                                                <span className="text-[9px] font-normal opacity-50 normal-case italic mt-1 block">Sem relatório de fundamentos no momento.</span>
+                                            </p>
                                         </div>
                                     )}
                                 </div>
@@ -2693,193 +3166,223 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                             {/* COLUNA DIREITA (4) */}
                             <div className="col-span-12 lg:col-span-4 space-y-6">
 
-                                {/* SENTIMENTO DO MERCADO */}
-                                <section className="rounded-xl border border-border-dark bg-card-dark p-6">
-                                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-slate-400">speed</span>
-                                        Sentimento do Mercado
-                                        <InfoTooltip text="Mostra se os investidores estão otimistas (Ganância) ou pessimistas (Medo) com o papel." />
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mb-6">Sentimento Social + Volatilidade do Mercado</p>
-                                    <div className="relative h-40 w-full flex items-end justify-center overflow-hidden">
-                                        <svg className="w-full h-full max-w-[240px]" viewBox="0 0 200 110">
-                                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#27272a" strokeLinecap="round" strokeWidth="20"></path>
-                                            <path className="opacity-30" d="M 20 100 A 80 80 0 0 1 70 38" fill="none" stroke="#ef4444" strokeDasharray="2 2" strokeWidth="20"></path>
-                                            <path className="opacity-30" d="M 70 38 A 80 80 0 0 1 130 38" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
-                                            <path className="opacity-80" d="M 130 38 A 80 80 0 0 1 180 100" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
-                                            <g transform={`rotate(${-90 + ((aiSentiment?.value || 50) / 100) * 180}, 100, 100)`}>
-                                                <line stroke="white" strokeLinecap="round" strokeWidth="4" x1="100" x2="100" y1="100" y2="30"></line>
-                                                <circle cx="100" cy="100" fill="white" r="6"></circle>
-                                            </g>
-                                        </svg>
-                                        <div className="absolute bottom-0 text-center">
-                                            <span className={`block text-3xl font-black ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                    'text-emerald-500'
-                                                }`}>{aiSentiment?.value || 50}</span>
-                                            <span className={`text-xs uppercase tracking-widest font-bold ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                    'text-emerald-500'
-                                                }`}>{aiSentiment?.label || "Neutro"}</span>
-                                            {aiSentiment?.lastUpdate && (
-                                                <span className="block text-[9px] text-zinc-500 uppercase mt-1">
-                                                    Última atualização: {new Date(aiSentiment.lastUpdate).toLocaleDateString()}
-                                                </span>
+                                <div className="hidden lg:block space-y-6">
+                                    {/* SENTIMENTO DO MERCADO */}
+                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-slate-400">speed</span>
+                                                Sentimento do Mercado
+                                                <InfoTooltip text="Mostra se os investidores estão otimistas (Ganância) ou pessimistas (Medo) com o papel." />
+                                            </h3>
+                                            
+                                            {/* Botão exclusivo para o Administrador Lucas */}
+                                            {user?.email === 'carvalhodlucas@hotmail.com' && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        const baseT = ticker.toUpperCase().replace('.SA', '');
+                                                        console.log(`🛠️ Admin Refresh: Limpando Sentimento para ${baseT}...`);
+                                                        
+                                                        // Limpeza agressiva de cache para o ticker atual
+                                                        Object.keys(localStorage).forEach(key => {
+                                                            if (key.includes(`grok_sentiment`) && key.includes(baseT)) {
+                                                                localStorage.removeItem(key);
+                                                                console.log(`🧹 Cache removido: ${key}`);
+                                                            }
+                                                        });
+
+                                                        fetchMarketSentiment(asset, false, true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 border border-primary/20 rounded-lg text-[9px] font-black text-primary uppercase hover:bg-primary hover:text-black transition-all group"
+                                                    title="Forçar atualização do sentimento"
+                                                >
+                                                    <span className="material-symbols-outlined text-[12px] group-hover:rotate-180 transition-transform duration-500">refresh</span>
+                                                </button>
                                             )}
                                         </div>
-                                    </div>
-
-                                    {/* ALERTA DE DIVERGÊNCIA */}
-                                    {aiRatingData?.score >= 8.0 && (aiSentiment?.value || 50) <= 40 && (
-                                        <div className="mt-4 text-[10px] text-primary bg-primary/10 p-2 rounded-lg font-bold border border-primary/20 animate-pulse">
-                                            ⚠️ DIVERGÊNCIA DETECTADA: Fundamento forte com Sentimento de Medo. Possível zona de acumulação institucional.
-                                        </div>
-                                    )}
-                                    <div className="mt-6 space-y-3">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-slate-400">Tendência Detectada</span>
-                                            <span className="text-white font-medium capitalize">{aiSentiment?.trend || "side"}</span>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                {/* --- PULSO DE IA --- */}
-                                <div className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
-
-                                    {/* Overlay de Standby: Só aparece se NÃO for cripto E o mercado estiver fechado */}
-                                    {!marketStatus.isOpen && !asset?.isCrypto && (
-                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center animate-in fade-in duration-500 rounded-3xl">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <div className="bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl shadow-2xl flex flex-col items-center min-w-[140px]">
-                                                    <span className="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em]">Mercado Fechado</span>
-                                                    <span className="text-xl font-mono font-bold text-white mt-1 leading-none">{marketStatus.countdown}</span>
-                                                    <span className="text-[9px] text-slate-500 uppercase mt-2">Para Abertura ({marketStatus.label})</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Efeito de Grade */}
-                                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:16px_16px] rounded-3xl pointer-events-none"></div>
-
-                                    <div className={`relative z-10 transition-all duration-700 ${!marketStatus.isOpen ? "grayscale blur-[2px]" : ""}`}>
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="relative flex h-3 w-3">
-                                                    {marketStatus.isOpen && (
-                                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${asset?.isCrypto ? 'bg-blue-400' : 'bg-primary'}`}></span>
-                                                    )}
-                                                    <span className={`relative inline-flex rounded-full h-3 w-3 ${marketStatus.isOpen
-                                                        ? (asset?.isCrypto ? 'bg-blue-500' : 'bg-primary')
-                                                        : "bg-zinc-700"
-                                                        }`}></span>
-                                                </div>
-                                                <h2 className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-emerald-400 via-cyan-200 to-white bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] uppercase italic">
-                                                    Pulso de IA
-                                                </h2>
-
-                                                <div className="group/tooltip relative inline-block">
-                                                    <span
-                                                        className="material-symbols-outlined text-slate-500 text-[10px] cursor-help hover:text-primary transition-colors opacity-70"
-                                                    >
-                                                        help_outline
-                                                    </span>
-
-                                                    {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
-                                                        <div className="text-[10px] space-y-3">
-                                                            <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é o Pulso?</p>
-                                                            <p className="text-slate-300 italic mb-2">Diagnóstico em tempo real da 'saúde' de curto prazo do ativo.</p>
-                                                            <div>
-                                                                <span className="text-white font-bold block">Força Relativa:</span>
-                                                                <span className="text-slate-400">Mede a energia de compra/venda e o momento do mercado.</span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-white font-bold block">Risco de Cauda:</span>
-                                                                <span className="text-slate-400">Chances de eventos extremos fora do comum.</span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-white font-bold block">Volatilidade:</span>
-                                                                <span className="text-slate-400">Intensidade da variação do preço.</span>
-                                                            </div>
-                                                        </div>
-                                                        {/* Triângulo do Tooltip */}
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {asset?.isCrypto && (
-                                                    <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md font-bold uppercase">
-                                                        24/7 Mode
+                                        <p className="text-xs text-slate-400 mb-6">Sentimento Social + Volatilidade do Mercado</p>
+                                        <div className="relative h-40 w-full flex items-end justify-center overflow-hidden">
+                                            <svg className="w-full h-full max-w-[240px]" viewBox="0 0 200 110">
+                                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#27272a" strokeLinecap="round" strokeWidth="20"></path>
+                                                <path className="opacity-30" d="M 20 100 A 80 80 0 0 1 70 38" fill="none" stroke="#ef4444" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <path className="opacity-30" d="M 70 38 A 80 80 0 0 1 130 38" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <path className="opacity-80" d="M 130 38 A 80 80 0 0 1 180 100" fill="none" stroke="#fbbf24" strokeDasharray="2 2" strokeWidth="20"></path>
+                                                <g transform={`rotate(${-90 + ((aiSentiment?.value || 50) / 100) * 180}, 100, 100)`}>
+                                                    <line stroke="white" strokeLinecap="round" strokeWidth="4" x1="100" x2="100" y1="100" y2="30"></line>
+                                                    <circle cx="100" cy="100" fill="white" r="6"></circle>
+                                                </g>
+                                            </svg>
+                                            <div className="absolute bottom-0 text-center">
+                                                <span className={`block text-3xl font-black ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
+                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
+                                                        'text-emerald-500'
+                                                    }`}>{aiSentiment?.value || 50}</span>
+                                                <span className={`text-xs uppercase tracking-widest font-bold ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
+                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
+                                                        'text-emerald-500'
+                                                    }`}>{aiSentiment?.label || "Neutro"}</span>
+                                                {aiSentiment?.lastUpdate && (
+                                                    <span className="block text-[9px] text-zinc-500 uppercase mt-1">
+                                                        Última atualização: {new Date(aiSentiment.lastUpdate).toLocaleDateString()}
                                                     </span>
                                                 )}
-                                                <span className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-colors ${marketStatus.isOpen
-                                                    ? "text-primary bg-primary/10 border-primary/20"
-                                                    : "text-slate-500 bg-zinc-800 border-zinc-700"
-                                                    }`}>
-                                                    {marketStatus.isOpen ? "LIVE SCAN" : "STANDBY"}
-                                                </span>
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col gap-1 mb-4">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">
-                                                Diagnóstico de Curto Prazo
-                                            </span>
-                                            <div className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
-                                                {aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."}
-                                                <div className="group/tooltip relative inline-block">
-                                                    <span
-                                                        className="material-symbols-outlined !text-[12px] text-slate-600 cursor-help hover:text-primary transition-colors"
-                                                    >
-                                                        help_outline
-                                                    </span>
+                                        {/* ALERTA DE DIVERGÊNCIA */}
+                                        {aiRatingData?.score >= 8.0 && (aiSentiment?.value || 50) <= 40 && (
+                                            <div className="mt-4 text-[10px] text-primary bg-primary/10 p-2 rounded-lg font-bold border border-primary/20 animate-pulse">
+                                                ⚠️ DIVERGÊNCIA DETECTADA: Fundamento forte com Sentimento de Medo. Possível zona de acumulação institucional.
+                                            </div>
+                                        )}
+                                        <div className="mt-6 space-y-3">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">Tendência Detectada</span>
+                                                <span className="text-white font-medium capitalize">{aiSentiment?.trend || "side"}</span>
+                                            </div>
+                                        </div>
+                                    </section>
 
-                                                    {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
-                                                        <div className="text-[10px] space-y-3">
-                                                            <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é a Força Relativa?</p>
-                                                            <p className="text-slate-300 leading-relaxed">
-                                                                Mede a energia de compra/venda do ativo no curto prazo (0-100).
-                                                            </p>
-                                                            <div className="space-y-1">
-                                                                <p className="text-slate-400"><span className="text-emerald-400 font-bold">Acima de 70:</span> Euforia (Pode estar caro)</p>
-                                                                <p className="text-slate-400"><span className="text-amber-400 font-bold">Próximo a 60:</span> Tendência de alta saudável</p>
-                                                                <p className="text-slate-400"><span className="text-accent-red font-bold">Abaixo de 30:</span> Pânico (Pode estar barato)</p>
-                                                            </div>
-                                                        </div>
-                                                        {/* Triângulo do Tooltip */}
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
+                                    {/* --- PULSO DE IA --- */}
+                                    <div className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
+
+                                        {/* Overlay de Standby: Só aparece se NÃO for cripto E o mercado estiver fechado */}
+                                        {!marketStatus.isOpen && !asset?.isCrypto && (
+                                            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center animate-in fade-in duration-500 rounded-3xl">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <div className="bg-zinc-900 border border-zinc-700 px-4 py-3 rounded-2xl shadow-2xl flex flex-col items-center min-w-[140px]">
+                                                        <span className="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em]">Mercado Fechado</span>
+                                                        <span className="text-xl font-mono font-bold text-white mt-1 leading-none">{marketStatus.countdown}</span>
+                                                        <span className="text-[9px] text-slate-500 uppercase mt-2">Para Abertura ({marketStatus.label})</span>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
 
-                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                            <div>
-                                                <span className="block text-[9px] text-slate-500 uppercase font-black">Risco de Cauda</span>
-                                                <span className={`text-sm font-bold ${aiPulse?.tailRisk === 'Alto' ? 'text-accent-red' : aiPulse?.tailRisk === 'Baixo' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    {aiPulse?.tailRisk || "N/D"}
+                                        {/* Efeito de Grade */}
+                                        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:16px_16px] rounded-3xl pointer-events-none"></div>
+
+                                        <div className={`relative z-10 transition-all duration-700 ${!marketStatus.isOpen ? "grayscale blur-[2px]" : ""}`}>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative flex h-3 w-3">
+                                                        {marketStatus.isOpen && (
+                                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${asset?.isCrypto ? 'bg-blue-400' : 'bg-primary'}`}></span>
+                                                        )}
+                                                        <span className={`relative inline-flex rounded-full h-3 w-3 ${marketStatus.isOpen
+                                                            ? (asset?.isCrypto ? 'bg-blue-500' : 'bg-primary')
+                                                            : "bg-zinc-700"
+                                                            }`}></span>
+                                                    </div>
+                                                    <h2 className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-emerald-400 via-cyan-200 to-white bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] uppercase italic">
+                                                        Pulso de IA
+                                                    </h2>
+
+                                                    <div className="group/tooltip relative inline-block">
+                                                        <span
+                                                            className="material-symbols-outlined text-slate-500 text-[10px] cursor-help hover:text-primary transition-colors opacity-70"
+                                                        >
+                                                            help_outline
+                                                        </span>
+
+                                                        {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                                                            <div className="text-[10px] space-y-3">
+                                                                <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é o Pulso?</p>
+                                                                <p className="text-slate-300 italic mb-2">Diagnóstico em tempo real da 'saúde' de curto prazo do ativo.</p>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Força Relativa:</span>
+                                                                    <span className="text-slate-400">Mede a energia de compra/venda e o momento do mercado.</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Risco de Cauda:</span>
+                                                                    <span className="text-slate-400">Chances de eventos extremos fora do comum.</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-white font-bold block">Volatilidade:</span>
+                                                                    <span className="text-slate-400">Intensidade da variação do preço.</span>
+                                                                </div>
+                                                            </div>
+                                                            {/* Triângulo do Tooltip */}
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {asset?.isCrypto && (
+                                                        <span className="text-[9px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md font-bold uppercase">
+                                                            24/7 Mode
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-[10px] font-mono px-2 py-1 rounded-full border transition-colors ${marketStatus.isOpen
+                                                        ? "text-primary bg-primary/10 border-primary/20"
+                                                        : "text-slate-500 bg-zinc-800 border-zinc-700"
+                                                        }`}>
+                                                        {marketStatus.isOpen ? "LIVE SCAN" : "STANDBY"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1 mb-4">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">
+                                                    Diagnóstico de Curto Prazo
                                                 </span>
+                                                <div className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
+                                                    {aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."}
+                                                    <div className="group/tooltip relative inline-block">
+                                                        <span
+                                                            className="material-symbols-outlined !text-[12px] text-slate-600 cursor-help hover:text-primary transition-colors"
+                                                        >
+                                                            help_outline
+                                                        </span>
+
+                                                        {/* CAIXA DE EXPLICAÇÃO (Aparece no hover) */}
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-4 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                                                            <div className="text-[10px] space-y-3">
+                                                                <p className="font-bold text-primary border-b border-white/5 pb-1 uppercase">O que é a Força Relativa?</p>
+                                                                <p className="text-slate-300 leading-relaxed">
+                                                                    Mede a energia de compra/venda do ativo no curto prazo (0-100).
+                                                                </p>
+                                                                <div className="space-y-1">
+                                                                    <p className="text-slate-400"><span className="text-emerald-400 font-bold">Acima de 70:</span> Euforia (Pode estar caro)</p>
+                                                                    <p className="text-slate-400"><span className="text-amber-400 font-bold">Próximo a 60:</span> Tendência de alta saudável</p>
+                                                                    <p className="text-slate-400"><span className="text-accent-red font-bold">Abaixo de 30:</span> Pânico (Pode estar barato)</p>
+                                                                </div>
+                                                            </div>
+                                                            {/* Triângulo do Tooltip */}
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-800"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span className="block text-[9px] text-slate-500 uppercase font-black">Volatilidade</span>
-                                                <span className="text-sm font-bold text-white">{aiPulse?.volatility || "N/D"}</span>
+
+                                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                                <div>
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-black">Risco de Cauda</span>
+                                                    <span className={`text-sm font-bold ${aiPulse?.tailRisk === 'Alto' ? 'text-accent-red' : aiPulse?.tailRisk === 'Baixo' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {aiPulse?.tailRisk || "N/D"}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-black">Volatilidade</span>
+                                                    <span className="text-sm font-bold text-white">{aiPulse?.volatility || "N/D"}</span>
+                                                </div>
                                             </div>
+
+                                            <p className="text-[11px] text-slate-400 leading-relaxed italic border-l-2 border-primary/30 pl-3">
+                                                "{aiPulse?.insight || `VERIFICANDO SINAIS DO ATIVO: ${asset?.ticker}...`}"
+                                            </p>
                                         </div>
 
-                                        <p className="text-[11px] text-slate-400 leading-relaxed italic border-l-2 border-primary/30 pl-3">
-                                            "{aiPulse?.insight || `Verificando sinais do ativo: ${asset?.ticker}...`}"
-                                        </p>
+                                        {/* Efeito de Scanner: Lista branca que sobe e desce */}
+                                        <div className="absolute top-0 left-0 w-full h-[60px] bg-gradient-to-b from-transparent via-white/20 to-transparent animate-scan pointer-events-none z-10"></div>
+                                        <div className="absolute top-0 left-0 w-full h-[2px] bg-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)] animate-scan pointer-events-none z-10"></div>
                                     </div>
-
-                                    {/* Efeito de Scanner que passa pelo card */}
-                                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-scan"></div>
                                 </div>
 
                                 {/* CHAT IA DINÂMICO */}
-                                <section className="rounded-xl border border-border-dark bg-card-dark flex flex-col h-[500px]">
+                                <section className="hidden md:flex rounded-xl border border-border-dark bg-card-dark flex-col h-[500px]">
                                     {/* Header do Chat */}
                                     <div className="p-4 border-b border-border-dark flex justify-between items-center bg-zinc-900/50">
                                         <div className="flex items-center gap-3">
@@ -3305,6 +3808,83 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                     </div>
                 )
             }
+            {/* CHATLIVE - EXCLUSIVO PARA MOBILE E TABLET (md:hidden) */}
+            <div className="md:hidden fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 pointer-events-none">
+                {/* Janela do ChatLive */}
+                {isChatLiveOpen && (
+                    <div className="w-[calc(100vw-48px)] max-w-[360px] h-[500px] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
+                        {/* Header */}
+                        <div className="p-4 border-b border-border-dark flex justify-between items-center bg-zinc-900/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-black font-bold">
+                                    <span className="material-symbols-outlined text-sm">smart_toy</span>
+                                </div>
+                                <span className="text-xs font-bold text-white uppercase tracking-widest">Analista RASTRO IA</span>
+                            </div>
+                            <button onClick={() => setIsChatLiveOpen(false)} className="text-slate-500 hover:text-white">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        {/* Mensagens */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-card-dark">
+                            <div className="flex gap-3">
+                                <div className="bg-zinc-800 rounded-2xl rounded-tl-none p-3 max-w-[85%] border border-zinc-700">
+                                    <p className="text-xs text-slate-200">
+                                        Monitorando {asset?.ticker} ao vivo. Como posso ajudar com sua análise?
+                                    </p>
+                                </div>
+                            </div>
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                                    <div className={`rounded-2xl p-3 max-w-[85%] ${msg.role === "user" ? "bg-primary/20 border border-primary/30 rounded-tr-none text-white text-xs" : "bg-zinc-800 border border-zinc-700 rounded-tl-none text-slate-200 text-xs"}`}>
+                                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {isLoadingChat && (
+                                <div className="flex gap-2 p-2">
+                                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+                                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></span>
+                                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Input */}
+                        <div className="p-4 bg-zinc-900 border-t border-zinc-800">
+                            <div className="relative">
+                                <input
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    className="w-full bg-black border border-zinc-700 rounded-full py-2 px-4 text-xs text-white outline-none focus:border-primary"
+                                    placeholder="Mensagem..."
+                                />
+                                <button onClick={handleSendMessage} className="absolute right-2 top-1.5 text-primary">
+                                    <span className="material-symbols-outlined text-sm">send</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Botão Flutuante (Bubble) */}
+                <button
+                    onClick={() => setIsChatLiveOpen(!isChatLiveOpen)}
+                    className="w-14 h-14 bg-primary hover:bg-primary/90 text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all pointer-events-auto"
+                >
+                    <span className="material-symbols-outlined text-2xl">
+                        {isChatLiveOpen ? "close" : "smart_toy"}
+                    </span>
+                    {!isChatLiveOpen && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-white border-2 border-primary"></span>
+                        </span>
+                    )}
+                </button>
+            </div>
         </div>
     );
 }

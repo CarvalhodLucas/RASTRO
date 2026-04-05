@@ -12,13 +12,6 @@ export async function POST(req: Request) {
 
         console.log(`[RASTRO IA] Iniciando análise Gemini para: ${ticker || name}`);
 
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-
-        if (!apiKey) {
-            console.error("[RASTRO IA] Erro: API_KEY não encontrada no servidor.");
-            return NextResponse.json({ error: "Chave da API não configurada no servidor." }, { status: 500 });
-        }
-
         const rastroPersona = "És o RASTRO, um Analista IA prático e objetivo. Sê extremamente conciso, direto e usa linguagem simples. Evita jargões técnicos a menos que o utilizador os use primeiro.";
 
         let systemInstruction = "";
@@ -100,44 +93,73 @@ REGRA DE PLATAFORMA: Se o utilizador perguntar sobre a diferença entre os núme
             systemInstruction = systemPrompt || `${rastroPersona}\n${chatRules}`;
         }
 
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
-            systemInstruction: systemInstruction,
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            ]
-        });
+        const googleKey = process.env.GOOGLE_API_KEY;
+        const geminiKey = process.env.GEMINI_API_KEY;
+        const apiKey = geminiKey || googleKey;
 
-        // Preparar el prompt final enriquecido si es una pregunta del chat
-        let finalPrompt = prompt || "Gere a análise requerida baseada nos dados do relatório.";
+        if (!apiKey) {
+            console.error("[RASTRO IA] ERRO: API_KEY ausente!");
+            return NextResponse.json({ error: "Chave da API n\u00E3o encontrada no .env" }, { status: 500 });
+        }
 
+        const genAI = new GoogleGenerativeAI(apiKey);
+        let responseText = "";
+        
+        let finalPrompt = prompt || "Gere a an\u00E1lise requerida baseada nos dados do relat\u00F3rio.";
+
+        // Preparar prompt final se n\u00E3o for uma tarefa estruturada (isSummary, etc)
         if (prompt && !isSummary && !isHealth && !isSentiment && !isRatingRequest) {
             finalPrompt = `${rastroPersona}
-REGRAS DE COMUNICAÇÃO E INTELIGÊNCIA (OBRIGATÓRIO):
+REGRAS DE COMUNICA\u00C7\u00C3O E INTELIG\u00CANCIA (OBRIGAT\u00D3RIO):
 
-CONTEXTO É REI: Nunca dês respostas genéricas ou teóricas de dicionário (ex: "Um score reflete a saúde da empresa"). Se o utilizador perguntar sobre uma nota, score ou dados, LÊ O RELATÓRIO DO ATIVO ABAIXO e elenca os motivos REAIS E ESPECÍFICOS desta empresa.
-
-Sê inteligente, analítico e específico, mostrando que leste os fundamentos.
-
-Mantém a resposta concisa e em linguagem simples.
-
-ATIVO EM ANÁLISE: ${name || ticker} (${ticker})
-
-RELATÓRIO COMPLETO DA EMPRESA:
-${report || "Relatório indisponível."}
+CONTEXTO \u00C9 REI: Nunca d\u00EAs respostas gen\u00E9ricas ou te\u00F3ricas de dicion\u00E1rio. Use o RELAT\u00D3RIO abaixo.
+ATIVO EM AN\u00C1LISE: ${name || ticker} (${ticker})
+RELAT\u00D3RIO COMPLETO DA EMPRESA:
+${report || "Relat\u00F3rio indispon\u00EDvel."}
 
 PERGUNTA DO UTILIZADOR:
 ${prompt}`;
         }
 
-        // Chamada com o contexto e regras completos
-        const result = await model.generateContent(finalPrompt);
+        // --- SISTEMA DE GERA\u00C7\u00C3O (PADR\u00C3O CRON) ---
+        const modelNames = ["gemini-flash-latest"];
+        let lastError = "";
 
-        const response = await result.response;
-        const responseText = response.text();
+        // Am\u00E1lgama de Prompt
+        const finalPromptText = `
+            ${systemInstruction}
+            
+            ${finalPrompt}
+        `;
+
+        for (const modelName of modelNames) {
+            try {
+                console.log(`[RASTRO IA] Tentando ${modelName}...`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+
+                const result = await model.generateContent(finalPromptText.substring(0, 30000));
+                responseText = result.response.text();
+                
+                if (responseText) {
+                    console.log(`[RASTRO IA] Sucesso: ${modelName}`);
+                    break;
+                }
+            } catch (err: any) {
+                console.warn(`[RASTRO IA] Falha ${modelName}:`, err.message);
+                lastError = err.message;
+            }
+        }
+
+        if (!responseText) {
+            return NextResponse.json({ 
+                error: `IA Indispon\u00EDvel: ${lastError}`,
+                debug: {
+                    key_source: googleKey ? "GOOGLE" : geminiKey ? "GEMINI" : "NONE",
+                    prompt_len: finalPromptText.length,
+                    ticker: ticker
+                }
+            }, { status: 500 });
+        }
 
         if (isSummary || isHealth || isSentiment || isRatingRequest) {
             try {

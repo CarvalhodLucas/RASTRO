@@ -26,6 +26,7 @@ export default function AssetLogo({ src, ticker, name, size = 16, className = ""
         width={size * 4} // rough estimate for pixels if using tailwind units
         height={size * 4}
         className={`rounded-full object-contain bg-white/5 ${className}`}
+        style={{ width: "auto", height: "auto" }}
         onError={() => setImgError(true)}
         unoptimized
       />

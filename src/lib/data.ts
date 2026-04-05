@@ -35,7 +35,34 @@ export interface Asset {
     onChainScore?: number;
 }
 
+/**
+ * Normaliza tickers para que o cache seja consistente entre as telas (Mercado, Ticker, Portfolio).
+ * Remove sufixos como .SA e -USD e converte para minúsculas.
+ */
+export const normalizeTickerForCache = (ticker: string | undefined): string => {
+    if (!ticker || typeof ticker !== 'string') return "unknown";
+    return ticker.toLowerCase().replace('.sa', '').replace('-usd', '').replace('usd', '').trim();
+};
+
 export const b3Assets: Asset[] = [
+    {
+        ticker: "MXRF11.SA",
+        type: "Fundo Imobiliário",
+        name: "Maxi Renda FII",
+        price: "0.00",
+        variation: "0.0",
+        sector: "Fundos Imobiliários",
+        exchange: "B3",
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
+        logo: "https://www.google.com/s2/favicons?domain=xpi.com.br&sz=128",
+        aiPulse: "Análise automatizada pendente.",
+        marketCap: "--",
+        peRatio: "--",
+        dividendYield: "--",
+        lastUpdate: "03/04/2026"
+    },
     {
         ticker: "ABEV3.SA",
         type: "Ações",

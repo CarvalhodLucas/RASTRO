@@ -14,24 +14,24 @@ interface ReportStatus {
 const cleanTicker = (k: string) => {
   if (!k) return '';
   let c = k.toUpperCase().trim();
-  
+
   // 1. Remove parênteses e extensões comuns
   c = c.replace(/[()]/g, '');
   c = c.replace(/\.(HTML|HTM|PDF)$/, '');
-  
+
   // 2. Remove todos os prefixos de cache conhecidos
   c = c.replace(/^(AI_RATING_|ANALYSIS_|REPORT_|CHAT_HISTORY_|SENTIMENT_CACHE_|HEALTH_CACHE_|FAIR_PRICE_CACHE_|PULSE_CACHE_|ONCHAIN_CACHE_|SOLIDITY_EVAL_|PRICE_CACHE_)/, '');
 
   // 3. Remove sufixo de versão de cache (ex: _V12345)
   c = c.replace(/_V\d+$/, '');
-  
+
   // 4. Remove sufixos de mercado apenas no final da string
   c = c.replace(/\.SA$/, '');
   c = c.replace(/-?USD$/, '');
-  
+
   // 5. Limpa símbolos e separa números se necessário (PETR4 -> PETR4)
   c = c.replace(/[^A-Z0-9]/g, '');
-  
+
   return c;
 };
 
@@ -47,9 +47,9 @@ export default function AdminReportsPage() {
   const [activityLogs, setActivityLogs] = useState<string[]>([]);
   const [reportDataMap, setReportDataMap] = useState<Record<string, any>>({});
   const [availableReportFiles, setAvailableReportFiles] = useState<Set<string>>(new Set());
-  const [stats, setStats] = useState({ 
-    total: 0, 
-    coverage: 0, 
+  const [stats, setStats] = useState({
+    total: 0,
+    coverage: 0,
     memory: 0,
     categories: {
       B3: { total: 0, current: 0 },
@@ -79,7 +79,7 @@ export default function AdminReportsPage() {
 
     // Scan localStorage once to gather all analyzed tickers
     const analyzedNormalizedTickers = new Set<string>();
-    const localDataMap: Record<string, any> = {}; 
+    const localDataMap: Record<string, any> = {};
 
     // 1. Fetch available report files from server
     const fileNormalized = new Set<string>();
@@ -102,22 +102,22 @@ export default function AdminReportsPage() {
       if (!key) continue;
 
       const keyUpper = key.toUpperCase();
-      const isReportKey = keyUpper.startsWith('AI_RATING_') || 
-                          keyUpper.startsWith('ANALYSIS_') || 
-                          keyUpper.startsWith('REPORT_') ||
-                          keyUpper.startsWith('CHAT_HISTORY_') ||
-                          keyUpper.startsWith('HEALTH_CACHE_') ||
-                          keyUpper.startsWith('SENTIMENT_CACHE_') ||
-                          keyUpper.startsWith('FAIR_PRICE_CACHE_') ||
-                          keyUpper.startsWith('PULSE_CACHE_') ||
-                          keyUpper.startsWith('SOLIDITY_EVAL_');
+      const isReportKey = keyUpper.startsWith('AI_RATING_') ||
+        keyUpper.startsWith('ANALYSIS_') ||
+        keyUpper.startsWith('REPORT_') ||
+        keyUpper.startsWith('CHAT_HISTORY_') ||
+        keyUpper.startsWith('HEALTH_CACHE_') ||
+        keyUpper.startsWith('SENTIMENT_CACHE_') ||
+        keyUpper.startsWith('FAIR_PRICE_CACHE_') ||
+        keyUpper.startsWith('PULSE_CACHE_') ||
+        keyUpper.startsWith('SOLIDITY_EVAL_');
 
       if (isReportKey) {
         const normalized = cleanTicker(key);
         if (normalized) {
           analyzedNormalizedTickers.add(normalized);
           const rawData = localStorage.getItem(key) || "";
-          
+
           // Inicializa se não existir
           if (!localDataMap[normalized]) {
             localDataMap[normalized] = { _totalLength: 0 };
@@ -126,10 +126,10 @@ export default function AdminReportsPage() {
           try {
             const parsed = JSON.parse(rawData);
             // Faz MERGE dos dados para não perder o texto quando encontrar o score
-            localDataMap[normalized] = { 
-              ...localDataMap[normalized], 
+            localDataMap[normalized] = {
+              ...localDataMap[normalized],
               ...parsed,
-              _totalLength: localDataMap[normalized]._totalLength + rawData.length 
+              _totalLength: localDataMap[normalized]._totalLength + rawData.length
             };
           } catch (e) {
             localDataMap[normalized]._totalLength += rawData.length;
@@ -157,12 +157,12 @@ export default function AdminReportsPage() {
       const hasAi = analyzedNormalizedTickers.has(assetNormalized);
       const hasFile = fileNormalized.has(assetNormalized);
       const reportData = localDataMap[assetNormalized];
-      
+
       // O usuário deseja que o status "GERADO" dependa da existência de um arquivo de relatório.
       // Se houver IA E houver o arquivo correspondente, marcamos como GERADO.
       // Caso contrário (apenas pulse ou sem nada), fica PENDENTE.
       const isFullReport = hasAi && hasFile;
-      
+
       if (isFullReport) {
         status[asset.ticker] = 'GERADO';
       } else {
@@ -247,7 +247,7 @@ export default function AdminReportsPage() {
       `solidity_eval_${baseTicker}`,
       `price_cache_${baseTicker}`
     ];
-    
+
     if (confirm(`Deseja realmente apagar o relatório de ${ticker}?`)) {
       keys.forEach(key => localStorage.removeItem(key));
       addLog(`REMOVIDO: Relatório de ${ticker} excluído.`);
@@ -277,7 +277,7 @@ export default function AdminReportsPage() {
         keys.push(key);
       }
     }
-    
+
     if (confirm(`Deseja resetar TODOS os dados (IA, Preço e Análise) de ${ticker}?`)) {
       keys.forEach(key => localStorage.removeItem(key));
       addLog(`RESETADO: Dados e cache de ${ticker} resetados.`);
@@ -319,8 +319,8 @@ export default function AdminReportsPage() {
       }
 
       // Search Filter
-      const matchesSearch = asset.ticker.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            asset.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = asset.ticker.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.name.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesCategory && matchesSearch;
     })
@@ -346,7 +346,7 @@ export default function AdminReportsPage() {
             Monitoramento de Cobertura de Inteligência Artificial // v1.8.2
           </p>
         </div>
-        
+
         <div className="flex flex-wrap gap-3">
           <button
             onClick={clearAllReports}
@@ -391,7 +391,7 @@ export default function AdminReportsPage() {
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <ShieldCheck className="w-16 h-16" />
             </div>
-            
+
             <div className="flex justify-between items-start mb-6">
               <div>
                 <p className="text-zinc-500 text-[10px] items-center font-black uppercase tracking-widest mb-1 flex gap-2">
@@ -403,24 +403,22 @@ export default function AdminReportsPage() {
                   </h3>
                 </div>
               </div>
-              
-              <div className={`px-4 py-1.5 rounded-full text-[10px] font-black border tracking-widest transition-colors ${
-                coveragePercentage < 30 ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' :
-                coveragePercentage > 70 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                'bg-blue-500/10 border-blue-500/20 text-blue-500'
-              }`}>
+
+              <div className={`px-4 py-1.5 rounded-full text-[10px] font-black border tracking-widest transition-colors ${coveragePercentage < 30 ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' :
+                  coveragePercentage > 70 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                    'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                }`}>
                 {coveragePercentage}% coverage
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <div className="w-full bg-zinc-800/50 h-3 rounded-full overflow-hidden border border-zinc-900">
-                <div 
-                  className={`h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(16,185,129,0.3)] ${
-                    coveragePercentage < 30 ? 'bg-yellow-500 shadow-yellow-500/20' :
-                    coveragePercentage > 70 ? 'bg-emerald-500 shadow-emerald-500/20' :
-                    'bg-blue-500 shadow-blue-500/20'
-                  }`}
+                <div
+                  className={`h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(16,185,129,0.3)] ${coveragePercentage < 30 ? 'bg-yellow-500 shadow-yellow-500/20' :
+                      coveragePercentage > 70 ? 'bg-emerald-500 shadow-emerald-500/20' :
+                        'bg-blue-500 shadow-blue-500/20'
+                    }`}
                   style={{ width: `${coveragePercentage}%` }}
                 />
               </div>
@@ -452,8 +450,8 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden relative">
-                  <div 
-                    className="absolute inset-0 bg-blue-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover/bar:bg-blue-400" 
+                  <div
+                    className="absolute inset-0 bg-blue-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover/bar:bg-blue-400"
                     style={{ width: `${stats.categories.B3.total > 0 ? (stats.categories.B3.current / stats.categories.B3.total) * 100 : 0}%` }}
                   />
                 </div>
@@ -468,8 +466,8 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden relative">
-                  <div 
-                    className="absolute inset-0 bg-emerald-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(16,185,129,0.5)] group-hover/bar:bg-emerald-400" 
+                  <div
+                    className="absolute inset-0 bg-emerald-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(16,185,129,0.5)] group-hover/bar:bg-emerald-400"
                     style={{ width: `${stats.categories.EUA.total > 0 ? (stats.categories.EUA.current / stats.categories.EUA.total) * 100 : 0}%` }}
                   />
                 </div>
@@ -484,8 +482,8 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div className="w-full bg-zinc-800/50 h-2 rounded-full overflow-hidden relative">
-                  <div 
-                    className="absolute inset-0 bg-orange-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(249,115,22,0.5)] group-hover/bar:bg-orange-400" 
+                  <div
+                    className="absolute inset-0 bg-orange-500 h-full transition-all duration-1000 group-hover/bar:shadow-[0_0_10px_rgba(249,115,22,0.5)] group-hover/bar:bg-orange-400"
                     style={{ width: `${stats.categories.Cripto.total > 0 ? (stats.categories.Cripto.current / stats.categories.Cripto.total) * 100 : 0}%` }}
                   />
                 </div>
@@ -524,11 +522,10 @@ export default function AdminReportsPage() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
-                    selectedCategory === cat 
-                      ? 'bg-emerald-500 border-emerald-500 text-black' 
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${selectedCategory === cat
+                      ? 'bg-emerald-500 border-emerald-500 text-black'
                       : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -537,8 +534,8 @@ export default function AdminReportsPage() {
 
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="BUSCAR ATIVO..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -560,7 +557,7 @@ export default function AdminReportsPage() {
                         <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">Categoria</th>
                         <th className="px-6 py-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">Nota</th>
                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest leading-none text-center">
-                          <button 
+                          <button
                             onClick={toggleSort}
                             className={`flex items-center gap-2 mx-auto hover:text-white transition-colors ${sortOrder ? 'text-emerald-500' : 'text-zinc-500'}`}
                           >
@@ -579,8 +576,8 @@ export default function AdminReportsPage() {
                           const score = reportData?.score || reportData?.rating || '---';
 
                           return (
-                            <tr 
-                              key={asset.ticker} 
+                            <tr
+                              key={asset.ticker}
                               className={`transition-colors group ${index % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.01]'} hover:bg-zinc-800/50`}
                             >
                               <td className="px-6 py-4">
@@ -593,8 +590,8 @@ export default function AdminReportsPage() {
                               </td>
                               <td className="px-6 py-4">
                                 <span className="text-zinc-600 text-[10px] font-black uppercase tracking-widest">
-                                  {asset.exchange === 'B3' || asset.ticker.endsWith('.SA') ? 'B3' : 
-                                   asset.exchange === 'NASDAQ' || asset.exchange === 'NYSE' ? 'EUA' : 'CRIPTO'}
+                                  {asset.exchange === 'B3' || asset.ticker.endsWith('.SA') ? 'B3' :
+                                    asset.exchange === 'NASDAQ' || asset.exchange === 'NYSE' ? 'EUA' : 'CRIPTO'}
                                 </span>
                               </td>
                               <td className="px-6 py-4">
@@ -627,7 +624,7 @@ export default function AdminReportsPage() {
                               </td>
                               <td className="px-6 py-4 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <button 
+                                  <button
                                     onClick={() => handleResetAsset(asset.ticker)}
                                     className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all md:opacity-0 group-hover:opacity-100"
                                     title="Resetar Dados e IA"
@@ -635,7 +632,7 @@ export default function AdminReportsPage() {
                                     <RefreshCw className="w-4 h-4" />
                                   </button>
                                   {reportStatus[asset.ticker] && (
-                                    <button 
+                                    <button
                                       onClick={() => deleteReport(asset.ticker)}
                                       className="p-2 text-zinc-700 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all md:opacity-0 group-hover:opacity-100"
                                       title="Apagar Relatório"
@@ -668,7 +665,7 @@ export default function AdminReportsPage() {
                   <Activity className="w-4 h-4 text-emerald-500" />
                   <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Atividade Recente</h4>
                 </div>
-                
+
                 <div className="space-y-4">
                   {activityLogs.length > 0 ? (
                     activityLogs.map((log, i) => (

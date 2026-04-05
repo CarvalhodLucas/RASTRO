@@ -71,7 +71,7 @@ export async function GET(request: Request) {
                 }
 
                 // 1. Geração de Resumo (Gemini)
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
                 const summaryPrompt = `
                     Analise o seguinte relatório sobre o ativo ${asset.name} (${asset.ticker}) e gere um resumo executivo técnico.
                     O resumo deve conter exatamente 3 pontos positivos (Bull Case) e 3 pontos negativos (Bear Case).

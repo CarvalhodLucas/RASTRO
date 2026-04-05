@@ -121,7 +121,7 @@ export default function Home() {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const CACHE_KEY = "ticker_cache";
-    const CACHE_EXPIRATION = 12 * 60 * 60 * 1000; // 12 hours in ms
+    const CACHE_EXPIRATION = 6 * 60 * 60 * 1000; // 6 hours (21600 seconds)
 
     const getRelativeTimeString = (timestamp: number | null) => {
         if (!timestamp) return "";
@@ -439,8 +439,8 @@ export default function Home() {
                                         // Font sizes based on slot tier
                                         const tickerSize = slot.tier === 'xl' ? 'text-4xl md:text-5xl'
                                             : slot.tier === 'lg' ? 'text-3xl md:text-4xl'
-                                            : slot.tier === 'md' ? 'text-2xl md:text-3xl'
-                                            : 'text-lg md:text-xl';
+                                                : slot.tier === 'md' ? 'text-2xl md:text-3xl'
+                                                    : 'text-lg md:text-xl';
 
                                         const varSize = slot.tier === 'xl' || slot.tier === 'lg'
                                             ? 'text-lg md:text-xl'
@@ -460,8 +460,8 @@ export default function Home() {
                                                     {cleanTicker}
                                                 </span>
 
-                                                {/* Variation — top-right */}
-                                                <span className={`absolute top-3 right-4 ${varSize} font-bold ${varColor}`}>
+                                                {/* Variation — top-right for large, below ticker for small to avoid overlap */}
+                                                <span className={`absolute ${slot.tier === 'sm' || slot.tier === 'md' ? 'top-9 md:top-12 left-4' : 'top-3 right-4'} ${varSize} font-bold ${varColor}`}>
                                                     {isPositive ? '+' : ''}{displayVar.toFixed(1)}%
                                                 </span>
 

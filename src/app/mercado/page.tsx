@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { assetsDatabase, Asset } from "@/lib/data";
+import { assetsDatabase, Asset, normalizeTickerForCache } from "@/lib/data";
 import Header from "@/components/Header";
 import AssetLogo from "@/components/AssetLogo";
 import MarketTicker from "@/components/MarketTicker";
@@ -52,7 +52,7 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
                 // 0. Sistema de Cache 24h
                 if (cached) {
                     const { data, timestamp } = JSON.parse(cached);
-                    const isOld = Date.now() - timestamp > 24 * 60 * 60 * 1000;
+                    const isOld = Date.now() - timestamp > 6 * 60 * 60 * 1000; // 6h (21600s)
                     const isDataValid = data && data.price && data.price !== "--" && data.price !== "0.00" && data.price !== 0 && data.marketCap !== "--" && data.marketCap !== undefined;
 
                     if (!isOld && isDataValid) {
@@ -200,10 +200,12 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
     const getSentimentData = () => {
         if (typeof window === 'undefined') return { value: asset.sentiment || 50, isCached: false };
         
-        const cleanKey = getCleanKey(asset.ticker);
+        const cleanT = normalizeTickerForCache(asset.ticker);
         const keysToTry = [
-            `sentiment_cache_${cleanKey}`,      // Chave Padronizada (sem .SA)
-            `sentiment_cache_${asset.ticker}`   // Fallback para legado
+            `grok_sent_v3_${cleanT}`,
+            `grok_sentiment_v2_${asset.ticker}`,
+            `sentiment_cache_${cleanT}`,
+            `sentiment_cache_${asset.ticker}`
         ];
 
         for (const key of keysToTry) {
@@ -211,14 +213,42 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
             if (cached) {
                 try {
                     const parsed = JSON.parse(cached);
-                    if (parsed.value !== undefined) return { value: parsed.value, isCached: true };
+                    // Busca abrangente pelo valor (cobre múltiplas estruturas que a IA pode ter devolvido)
+                    const val = parsed.data?.value ?? parsed.value ?? parsed.data?.sentiment ?? parsed.sentiment ?? (typeof parsed.data === 'number' ? parsed.data : undefined);
+                    
+                    if (val !== undefined && !isNaN(val)) {
+                        return { value: Number(val), isCached: true };
+                    }
                 } catch (e) {}
             }
         }
         return { value: asset.sentiment || 50, isCached: false };
     };
 
-    const { value: sentimentValue, isCached } = getSentimentData();
+    const [localSentiment, setLocalSentiment] = useState<{value: number, isCached: boolean}>({ value: asset.sentiment || 50, isCached: false });
+
+    React.useEffect(() => {
+        // Hydration via React (read real value only on client)
+        setLocalSentiment(getSentimentData());
+
+        const handleUpdate = () => {
+            setLocalSentiment(getSentimentData());
+        };
+
+        window.addEventListener('sentimentUpdated', handleUpdate);
+        window.addEventListener('storage', (e) => {
+            if (e.key?.startsWith('grok_sentiment_v2_') || e.key?.startsWith('sentiment_cache_')) handleUpdate();
+        });
+        window.addEventListener('focus', handleUpdate);
+
+        return () => {
+            window.removeEventListener('sentimentUpdated', handleUpdate);
+            window.removeEventListener('focus', handleUpdate);
+            // removing anonymous storage listener can be tricky, but this is a light component
+        };
+    }, [asset.ticker]);
+
+    const { value: sentimentValue, isCached } = localSentiment;
 
     // Usa a nota vinda do pai (estado centralizado) se disponível
     const aiScore = aiScoreFromParent ?? null;
@@ -465,17 +495,24 @@ export default function MercadoPage() {
 
         // 2. Mapeia chaves para assets (O(N + K))
         assetsDatabase.forEach(asset => {
-            const cleanT = asset.ticker.replace('.SA', '').replace('-USD', '').toUpperCase();
-            const prefix1 = `ai_rating_${cleanT}`;
-            const prefix2 = `ai_rating_${asset.ticker.toUpperCase()}`;
+            const cleanT = normalizeTickerForCache(asset.ticker);
+            const legacyClean = asset.ticker.replace('.SA', '').replace('-USD', '').toUpperCase();
             
             let bestScore: number | null = null;
             let lastTimestamp = -1;
 
-            // Filtra apenas chaves relevantes para este ticker
-            const relevantKeys = aiKeys.filter(k => k.includes(cleanT) || k.includes(asset.ticker.toUpperCase()));
+            // Filtra chaves relevantes (incluindo as novas normalizadas v2)
+            const keysToSearch = [
+                `ai_rating_v2_${cleanT}`,
+                `ai_rating_${asset.ticker.toUpperCase()}`,
+                `ai_rating_${legacyClean}`
+            ];
 
-            relevantKeys.forEach(k => {
+            // Também considera chaves capturadas no scan inicial que contenham o ticker
+            const additionalKeys = aiKeys.filter(k => k.includes(cleanT) || k.includes(legacyClean));
+            const allKeys = Array.from(new Set([...keysToSearch, ...additionalKeys]));
+
+            allKeys.forEach(k => {
                 const saved = localStorage.getItem(k);
                 if (!saved) return;
 
@@ -485,7 +522,9 @@ export default function MercadoPage() {
                     const updateTime = parsed.lastUpdate ? new Date(parsed.lastUpdate).getTime() : 0;
                     
                     if (val !== undefined && val !== null) {
-                        if (bestScore === null || updateTime > lastTimestamp) {
+                        // Prioriza chaves com a marca v2 ou a mais recente cronologicamente
+                        const isV2 = k.includes('_v2_');
+                        if (bestScore === null || isV2 || updateTime > lastTimestamp) {
                             lastTimestamp = updateTime;
                             bestScore = parseFloat(String(val));
                         }
@@ -506,8 +545,37 @@ export default function MercadoPage() {
     };
 
     useEffect(() => {
+        // --- LIMPEZA DE ALUCINAÇÕES (PURGE) ---
+        // Se encontrarmos notas que foram geradas sem relatório (usando o prompt genérico antigo),
+        // nós as removemos do localStorage para que não apareçam mais no rastreamento.
+        const purgeHallucinations = () => {
+            let purgedCount = 0;
+            const keysToRemove: string[] = [];
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith('ai_rating_')) {
+                    const saved = localStorage.getItem(key);
+                    if (saved && saved.includes("Avaliação do ativo") && saved.includes("como criptomoeda")) {
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+            
+            keysToRemove.forEach(k => {
+                localStorage.removeItem(k);
+                purgedCount++;
+            });
+            
+            if (purgedCount > 0) {
+                console.log(`🧹 [Purge] Removidas ${purgedCount} análises alucinadas sem relatório.`);
+                loadRatings(); // Recarrega as notas após a limpeza
+            }
+        };
+
         // Força uma re-avaliação do cache na hidratação do cliente
         setCacheTrigger(prev => prev + 1);
+        purgeHallucinations();
         loadRatings();
         loadMarketData();
         
@@ -742,12 +810,13 @@ export default function MercadoPage() {
                 } else if (activeQuickFilter === 'dividendos') {
                     matchesQuickFilter = dy > 6;
                 } else if (activeQuickFilter === 'otimistas') {
-                    const cachedStr = typeof window !== 'undefined' ? localStorage.getItem(`sentiment_cache_${asset.ticker}`) : null;
+                    const cachedStr = typeof window !== 'undefined' ? (localStorage.getItem(`grok_sentiment_v2_${asset.ticker}`) || localStorage.getItem(`sentiment_cache_${asset.ticker}`)) : null;
                     let sentVal = asset.sentiment || 0;
                     if (cachedStr) {
                         try {
                             const parsed = JSON.parse(cachedStr);
-                            sentVal = parsed.value !== undefined ? parsed.value : sentVal;
+                            const val = parsed.data?.value ?? parsed.value;
+                            sentVal = val !== undefined ? val : sentVal;
                         } catch (e) {}
                     }
                     matchesQuickFilter = sentVal >= 70;

@@ -25,7 +25,7 @@ export async function GET(req: Request) {
                 "Accept": "application/json",
                 ...(apiKey ? { "x-cg-demo-api-key": apiKey } : {})
             },
-            next: { revalidate: 60 } // Cache opcional de 1 minuto
+            next: { revalidate: 21600 } // Cache de 6 horas (21600 segundos)
         });
 
         if (!response.ok) {

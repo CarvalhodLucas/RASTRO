@@ -35,7 +35,7 @@ const MarketTicker: React.FC = () => {
 
     const fetchMarketData = async () => {
         const CACHE_KEY = 'market_ticker_cache_v1';
-        const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+        const SIX_HOURS = 6 * 60 * 60 * 1000;
 
         try {
             // 1. Check Cache
@@ -43,7 +43,7 @@ const MarketTicker: React.FC = () => {
             if (cached) {
                 try {
                     const { data, timestamp } = JSON.parse(cached);
-                    const isOld = Date.now() - timestamp > TWELVE_HOURS;
+                    const isOld = Date.now() - timestamp > SIX_HOURS;
                     if (!isOld && data && data.length > 0) {
                         setItems(data);
                         setIsLoading(false);

@@ -25,6 +25,7 @@ export default function SquarePage() {
     }, []);
 
     const [activeTab, setActiveTab] = useState<'Recommended' | 'Following'>('Recommended');
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [postText, setPostText] = useState("");
     const [showPaywall, setShowPaywall] = useState(false);
 
@@ -580,6 +581,82 @@ export default function SquarePage() {
 
                 {/* Center Column - Feed */}
                 <div className="flex-1 w-full lg:w-[740px] lg:shrink-0 mx-auto flex flex-col gap-6 overflow-y-visible lg:overflow-y-auto scrollbar-hide pb-10 lg:pb-20 min-w-0">
+                    
+                    {/* User Profile Card (Mobile Only) */}
+                    <div className="lg:hidden px-4 pt-4">
+                        {isLogged ? (
+                            <div className="bg-zinc-900/80 backdrop-blur-sm border border-white/5 rounded-[1.5rem] p-4 flex flex-col gap-4 group/profile hover:bg-zinc-900/90 transition-all">
+                                {/* Header do Perfil */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-zinc-800 border border-white/5 flex items-center justify-center overflow-hidden font-bold transition-transform group-hover/profile:scale-105">
+                                        {user?.avatarImage ? (
+                                            <img src={user.avatarImage} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-lg font-black text-primary">{user?.name?.substring(0, 2).toUpperCase() || 'U'}</span>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-white font-black text-sm truncate">{user?.name || 'Investidor Anônimo'}</h3>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <div className="bg-primary/20 p-0.5 rounded-full">
+                                                <span className="material-symbols-outlined !text-[10px] text-primary block">military_tech</span>
+                                            </div>
+                                            <span className="text-[8px] text-primary font-black uppercase tracking-[0.2em]">Nível 1 • Iniciante</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Grid de Estatísticas */}
+                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                    <div className="bg-zinc-950/40 rounded-xl p-3 flex flex-col items-center justify-center border border-white/5 hover:border-primary/20 transition-all">
+                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                                            {followersCount === 1 ? 'Seguidor' : 'Seguidores'}
+                                        </span>
+                                        <span className="text-white font-black text-sm">{followersCount}</span>
+                                    </div>
+                                    <div className="bg-zinc-950/40 rounded-xl p-3 flex flex-col items-center justify-center border border-white/5 hover:border-primary/20 transition-all">
+                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">Seguindo</span>
+                                        <span className="text-white font-black text-sm">{followingCount}</span>
+                                    </div>
+                                    <div className="bg-zinc-950/40 rounded-xl p-3 flex flex-col items-center justify-center border border-white/5 hover:border-primary/20 transition-all">
+                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                                            {myPosts.length === 1 ? 'Post' : 'Posts'}
+                                        </span>
+                                        <span className="text-white font-black text-sm">{myPosts.length}</span>
+                                    </div>
+                                    <div className="bg-zinc-950/40 rounded-xl p-3 flex flex-col items-center justify-center border border-white/5 hover:border-primary/20 transition-all">
+                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                                            {likesReceived === 1 ? 'Curtida' : 'Curtidas'}
+                                        </span>
+                                        <span className="text-white font-black text-sm">{likesReceived}</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Link para o perfil completo */}
+                                <Link href="/perfil" className="w-full mt-1 py-2.5 bg-zinc-800 border border-white/10 hover:bg-zinc-800/80 hover:border-primary/30 text-[10px] text-white font-black uppercase tracking-[0.2em] rounded-xl transition-all text-center">
+                                    Ver Meu Perfil
+                                </Link>
+                            </div>
+                        ) : (
+                            /* Estado Deslogado - Call to Action */
+                            <div className="bg-zinc-900 border border-white/5 rounded-[1.5rem] p-6 text-center flex flex-col items-center gap-4 shadow-sm">
+                                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-1">
+                                    <span className="material-symbols-outlined text-[32px] text-primary">group_add</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <h3 className="text-white font-black text-sm uppercase tracking-tight">Junte-se à Comunidade</h3>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Faça login para interagir com o mercado e compartilhar suas teses.</p>
+                                </div>
+                                <button 
+                                    onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }))} 
+                                    className="w-full mt-2 py-3 bg-primary text-black font-black uppercase tracking-[0.2em] text-[10px] rounded-xl hover:bg-primary-hover transition-all shadow-lg shadow-primary/10"
+                                >
+                                    Fazer Login
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                    {/* Feed Header */}
                    <div className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-white/5 pb-2 mb-4">
                         {/* Tabs */}
@@ -877,6 +954,120 @@ export default function SquarePage() {
                     </div>
                 </aside>
             </main>
+
+            {/* Mobile Sidebar Trigger (FAB) */}
+            <button 
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="lg:hidden fixed bottom-10 right-6 z-[40] w-14 h-14 bg-primary hover:bg-primary-hover text-black rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:scale-110 active:scale-95 transition-all"
+                title="Abrir Menu do Mercado"
+            >
+                <span className="material-symbols-outlined text-2xl font-black">dashboard_customize</span>
+            </button>
+
+            {/* Mobile Sidebar Drawer */}
+            <div className={`lg:hidden fixed inset-0 z-[60] transition-opacity duration-300 ${isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                {/* Backdrop Layer */}
+                <div 
+                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                ></div>
+
+                {/* Content Panel */}
+                <div className={`absolute right-0 top-0 h-full w-[300px] bg-zinc-950 border-l border-white/5 shadow-2xl transition-transform duration-500 overflow-y-auto no-scrollbar p-6 flex flex-col gap-8 ${isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-white font-black text-base uppercase tracking-tighter italic">Mercado & Comunidade</h2>
+                        <button 
+                            onClick={() => setIsMobileSidebarOpen(false)}
+                            className="bg-zinc-900 p-2 rounded-xl text-slate-500 hover:text-white transition-colors"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    {/* Following Section */}
+                    <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
+                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] mb-4 flex items-center gap-2 opacity-50">
+                            <span className="material-symbols-outlined text-primary text-[16px]">group</span>
+                            SEGUINDO
+                        </h2>
+                        
+                        {following.length === 0 ? (
+                            <div className="py-2 text-center text-balance overflow-hidden">
+                                <p className="text-slate-500 text-[10px] mb-4 leading-relaxed">Você ainda não segue ninguém.</p>
+                                <button 
+                                    onClick={() => { setActiveTab('Recommended'); setIsMobileSidebarOpen(false); }}
+                                    className="w-full py-2 bg-primary/10 border border-primary/20 rounded-xl text-primary text-[10px] font-black hover:bg-primary hover:text-black transition-all uppercase tracking-widest"
+                                >
+                                    Explorar
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                {following.map(author => (
+                                    <div key={author} className="flex items-center justify-between group/item">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="h-7 w-7 rounded-full bg-zinc-800 border border-white/5 flex items-center justify-center font-bold text-[9px] text-primary shrink-0">
+                                                {author.substring(0, 2).toUpperCase()}
+                                            </div>
+                                            <span className="text-white text-xs font-bold truncate group-hover/item:text-primary transition-colors cursor-pointer">{author}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => toggleFollow(author)}
+                                            className="text-slate-500 hover:text-red-500 transition-all shrink-0"
+                                            title="Deixar de seguir"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">person_remove</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Hot Tickers (Mobile) */}
+                    <div className="flex flex-col gap-4">
+                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] opacity-50 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-[20px]">local_fire_department</span>
+                            HOT TICKERS (24H)
+                        </h2>
+                        <div className="flex flex-col gap-1">
+                            {[
+                                { rank: 1, ticker: "NVDA", name: "Nvidia Corp.", change: "+3.10%", color: "text-[#11d473]" },
+                                { rank: 2, ticker: "BTC", name: "Bitcoin", change: "+1.25%", color: "text-[#11d473]" },
+                                { rank: 3, ticker: "TSLA", name: "Tesla, Inc.", change: "-2.45%", color: "text-[#ef4444]" },
+                                { rank: 4, ticker: "ETH", name: "Ethereum", change: "+0.85%", color: "text-[#11d473]" },
+                                { rank: 5, ticker: "PETR4", name: "Petrobras", change: "-0.50%", color: "text-[#ef4444]" },
+                            ].map((item) => (
+                                <div key={item.ticker} className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-900 transition-colors cursor-pointer group">
+                                    <span className={`text-xs font-black ${item.rank <= 3 ? 'text-primary' : 'text-slate-600'} w-4`}>{item.rank}</span>
+                                    <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
+                                        <span className="text-[10px] font-bold text-slate-400">{item.ticker.substring(0, 2)}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-white font-bold text-xs group-hover:text-primary transition-colors">{item.ticker}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end shrink-0">
+                                        <span className={`text-xs font-bold ${item.color}`}>{item.change}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Sentiment (Mobile) */}
+                    <div className="flex flex-col gap-6 pb-12">
+                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] opacity-50 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
+                            SENTIMENTO
+                        </h2>
+                        <SentimentGauge label="B3" value={sentiments.b3.value} type="b3" />
+                        <SentimentGauge label="EUA" value={sentiments.eua.value} type="eua" />
+                        <SentimentGauge label="CRIPTO" value={sentiments.crypto.value} type="crypto" />
+                    </div>
+                </div>
+            </div>
 
             {/* Repost Overlay/Modal Simulator */}
             {reposting && (

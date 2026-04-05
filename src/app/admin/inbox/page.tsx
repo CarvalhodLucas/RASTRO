@@ -88,7 +88,7 @@ export default function AdminInboxPage() {
                         </h1>
                         <p className="text-slate-400 mt-2 text-sm">Gerencie as mensagens e reclamações enviadas pelos usuários.</p>
                     </div>
-                    <button 
+                    <button
                         onClick={fetchMessages}
                         disabled={isLoading}
                         className="p-2 bg-neutral-dark-surface border border-neutral-dark-border rounded-lg hover:bg-neutral-dark-border transition-colors text-slate-400 hover:text-white"
@@ -119,19 +119,18 @@ export default function AdminInboxPage() {
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
                         {messages.map((msg) => (
-                            <div 
+                            <div
                                 key={msg.id}
                                 className="group bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl p-6 hover:border-primary/30 transition-all hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden"
                             >
                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                     <div className="space-y-3 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
-                                                msg.subject === 'Bug' ? 'bg-red-500/20 text-red-400' :
-                                                msg.subject === 'Reclamação' ? 'bg-amber-500/20 text-amber-400' :
-                                                msg.subject === 'Sugestão' ? 'bg-blue-500/20 text-blue-400' :
-                                                'bg-primary/20 text-primary'
-                                            }`}>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${msg.subject === 'Bug' ? 'bg-red-500/20 text-red-400' :
+                                                    msg.subject === 'Reclamação' ? 'bg-amber-500/20 text-amber-400' :
+                                                        msg.subject === 'Sugestão' ? 'bg-blue-500/20 text-blue-400' :
+                                                            'bg-primary/20 text-primary'
+                                                }`}>
                                                 {msg.subject}
                                             </span>
                                             <span className="text-xs text-slate-500 font-medium italic">
@@ -150,16 +149,16 @@ export default function AdminInboxPage() {
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-2 h-full">
-                                        <button 
+                                        <button
                                             onClick={() => handleDelete(msg.id)}
                                             className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
                                             title="Excluir mensagem"
                                         >
                                             <span className="material-symbols-outlined">delete</span>
                                         </button>
-                                        <button 
+                                        <button
                                             className="p-3 text-slate-500 hover:text-market-up hover:bg-market-up/10 rounded-xl transition-all"
                                             title="Marcar como resolvido"
                                             onClick={() => handleDelete(msg.id)} // For now same as delete

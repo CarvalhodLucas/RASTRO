@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useAuth } from "@/lib/useAuth";
 import MarketTicker from "@/components/MarketTicker";
 import Link from "next/link";
-import { Asset } from "@/lib/data";
+import { Asset, assetsDatabase, normalizeTickerForCache } from "@/lib/data";
 
 interface PortfolioAsset extends Asset {
     symbol?: string;
@@ -441,7 +441,32 @@ const PortfolioPage: React.FC = () => {
                     tickerUpper.endsWith('USD')
                 ) && !tickerUpper.endsWith('.SA');
 
-                const rating = staticA?.sentiment ?? 50;
+                // --- SENTIMENTO IA (Sincronizado) ---
+                let rating = staticA?.sentiment ?? 50;
+                if (typeof window !== 'undefined') {
+                    const cleanT = normalizeTickerForCache(asset.ticker);
+                    const keysToTry = [
+                        `grok_sent_v3_${cleanT}`,
+                        `grok_sentiment_v2_${asset.ticker}`,
+                        `sentiment_cache_${cleanT}`,
+                        `sentiment_cache_${asset.ticker}`
+                    ];
+
+                    for (const key of keysToTry) {
+                        const cached = localStorage.getItem(key);
+                        if (cached) {
+                            try {
+                                const parsed = JSON.parse(cached);
+                                const val = parsed.data?.value ?? parsed.value ?? parsed.data?.sentiment ?? parsed.sentiment ?? (typeof parsed.data === 'number' ? parsed.data : undefined);
+                                
+                                if (val !== undefined && !isNaN(val)) {
+                                    rating = Number(val);
+                                    break;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
 
                 // Lógica de Momento Refinada
                 let momento = { label: "Neutro", color: "bg-slate-500", icon: "remove" };
@@ -467,30 +492,26 @@ const PortfolioPage: React.FC = () => {
                 let aiScore = null;
 
                 if (typeof window !== 'undefined') {
-                    const cleanTicker = asset.ticker.replace('.SA', '');
+                    const cleanT = normalizeTickerForCache(asset.ticker);
+                    const keysToSearch = [
+                        `ai_rating_v2_${cleanT}`,
+                        `ai_rating_${asset.ticker.toUpperCase()}`,
+                        `ai_rating_${cleanT.toUpperCase()}`,
+                        `ai_rating_${asset.ticker}`
+                    ];
 
-                    // Varredura completa no LocalStorage do navegador
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        // Se a chave contiver o nome do ticker (ex: BBDC3 ou BBDC3.SA)
-                        if (key && (key.includes(asset.ticker) || key.includes(cleanTicker))) {
+                    for (const k of keysToSearch) {
+                        const cached = localStorage.getItem(k);
+                        if (cached) {
                             try {
-                                const cached = localStorage.getItem(key);
-                                if (cached) {
-                                    const parsed = JSON.parse(cached);
-
-                                    // Procura a nota em todas as propriedades possíveis
-                                    const rawScore = parsed.score || parsed.rating || parsed.aiScore || parsed.finalScore || (parsed.analysis && parsed.analysis.score);
-
-                                    if (rawScore !== undefined && rawScore !== null && !isNaN(parseFloat(String(rawScore)))) {
-                                        aiScore = parseFloat(String(rawScore));
-                                        if (aiScore > 10) aiScore = aiScore / 10; // Normaliza para base 10
-                                        break; // Encontrou a nota! Para de procurar.
-                                    }
+                                const parsed = JSON.parse(cached);
+                                const rawScore = parsed.score ?? parsed.aiScore ?? parsed.rating ?? parsed.data?.score;
+                                if (rawScore !== undefined && rawScore !== null && !isNaN(parseFloat(String(rawScore)))) {
+                                    aiScore = parseFloat(String(rawScore));
+                                    if (aiScore > 10) aiScore = aiScore / 10;
+                                    break;
                                 }
-                            } catch (e) {
-                                // Ignora se não for JSON
-                            }
+                            } catch (e) {}
                         }
                     }
                 }
@@ -599,6 +620,18 @@ const PortfolioPage: React.FC = () => {
     useEffect(() => {
         if (!hasMounted) return;
         loadAllData();
+
+        const handleUpdate = () => loadAllData();
+        window.addEventListener('sentimentUpdated', handleUpdate);
+        window.addEventListener('focus', handleUpdate);
+        window.addEventListener('storage', (e) => {
+            if (e.key?.startsWith('grok_sentiment_v2_') || e.key?.startsWith('sentiment_cache_')) handleUpdate();
+        });
+
+        return () => {
+            window.removeEventListener('sentimentUpdated', handleUpdate);
+            window.removeEventListener('focus', handleUpdate);
+        };
     }, [hasMounted, loadAllData]);
 
     // Gatilho automático removido - Silenciando a inicialização

@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
                         Gestão de Usuários
                     </h1>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                     <div className="bg-primary/10 px-4 py-2 rounded-lg border border-primary/20">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-2">Total de Registros:</span>
@@ -110,7 +110,7 @@ export default function AdminUsersPage() {
                                                 <span className="text-sm font-medium text-white">{email}</span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button 
+                                                <button
                                                     onClick={() => handleRemoveEmail(email)}
                                                     className="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-500 transition-all rounded-lg hover:bg-red-500/10"
                                                     title="Remover Acesso"
@@ -136,7 +136,7 @@ export default function AdminUsersPage() {
                             <div>
                                 <h3 className="font-bold text-blue-400 mb-1">Acesso via Google</h3>
                                 <p className="text-sm text-slate-400 leading-relaxed">
-                                    Apenas os e-mails listados acima (mais os administradores permitidos) podem utilizar a opção "Continuar com o Google". 
+                                    Apenas os e-mails listados acima (mais os administradores permitidos) podem utilizar a opção "Continuar com o Google".
                                 </p>
                             </div>
                         </div>

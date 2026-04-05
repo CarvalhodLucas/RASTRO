@@ -18,6 +18,7 @@ export default function RootLayout({
     return (
         <html lang="pt-br" className="dark">
             <head>
+                <meta charSet="utf-8" />
                 {/* Fontes usadas pelo Tailwind Theme */}
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
