@@ -201,7 +201,7 @@ const PortfolioPage: React.FC = () => {
             }
 
             // 2. Se não houver cache ou for antigo, buscar real
-            const url = `/api/coingecko?endpoint=global`;
+            const url = `/api/proxy?target=price&endpoint=global`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Global fetch failed');
             
@@ -326,7 +326,7 @@ const PortfolioPage: React.FC = () => {
             if (cryptoToFetch.length > 0) {
                 const ids = cryptoToFetch.map(c => c.cgId).join(',');
                 const apiKey = process.env.NEXT_PUBLIC_COINGECKO_KEY;
-                const url = `/api/coingecko?endpoint=coins/markets&vs_currency=brl&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+                const url = `/api/proxy?target=price&endpoint=coins/markets&vs_currency=brl&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
 
                 try {
                     const response = await fetch(url);

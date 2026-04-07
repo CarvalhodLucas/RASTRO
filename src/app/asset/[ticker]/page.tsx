@@ -1711,7 +1711,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                 if (isCrypto) {
                     const cgId = KNOWN_CRYPTO_IDS[baseTicker] || localAsset?.cgId;
                     if (cgId) {
-                        const cgRes = await fetch(`/api/coingecko?endpoint=simple/price&ids=${cgId}&vs_currencies=brl&include_24hr_change=true`);
+                        const cgRes = await fetch(`/api/proxy?target=price&ids=${cgId}&vs_currencies=brl&include_24hr_change=true`);
                         const cgData = await cgRes.json();
                         if (cgData[cgId] && cgData[cgId].brl) {
                             assetPrice = cgData[cgId].brl.toFixed(2);

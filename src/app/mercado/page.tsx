@@ -70,9 +70,7 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
                 // 1. Lógica Universal: Se tiver cgId no data.ts, é Cripto
                 if (isCrypto) {
                     const cgId = asset.cgId!;
-                    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=brl&include_24hr_change=true&include_market_cap=true`, {
-                        headers: { 'x-cg-demo-api-key': process.env.NEXT_PUBLIC_COINGECKO_KEY || '' }
-                    });
+                    const res = await fetch(`/api/proxy?target=price&ids=${cgId}&vs_currencies=brl&include_24hr_change=true&include_market_cap=true`);
                     const data = await res.json();
 
                     if (data[cgId]) {

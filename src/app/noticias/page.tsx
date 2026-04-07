@@ -36,22 +36,34 @@ export default function NoticiasPage() {
         setError(null);
         setNews([]);
 
-        const apiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY;
+        const cacheKey = `news_cache_${query.toLowerCase().trim()}`;
+        const cached = localStorage.getItem(cacheKey);
 
-        if (!apiKey) {
-            console.error("ERRO: NEXT_PUBLIC_NEWS_API_KEY não configurada.");
-            setError("Chave da API de Notícias (GNews) não configurada no arquivo .env.local");
-            setIsSearching(false);
-            return;
+        if (cached) {
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                const isOld = Date.now() - timestamp > 60 * 60 * 1000; // 1 hora (3600s)
+
+                if (!isOld && data && data.articles) {
+                    console.log(`🟢 [CACHE] Usando notícias em cache para: ${query}`);
+                    const mappedNews = mapNews(data.articles);
+                    setNews(mappedNews);
+                    setIsSearching(false);
+                    return;
+                }
+            } catch (e) {
+                console.error("Erro ao ler cache de notícias:", e);
+            }
         }
 
         try {
-            const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=pt&country=br&max=5&apikey=${apiKey}`;
+            // Chamada para a nossa nova API Proxy unificada
+            const url = `/api/proxy?target=news&q=${encodeURIComponent(query)}`;
             const response = await fetch(url);
             const data = await response.json();
 
-            if (data.errors) {
-                throw new Error(data.errors[0] || "Erro na API de Notícias");
+            if (data.error) {
+                throw new Error(data.error || "Erro na API de Notícias");
             }
 
             if (!data.articles || data.articles.length === 0) {
@@ -59,22 +71,28 @@ export default function NoticiasPage() {
                 return;
             }
 
-            const mappedNews = data.articles.map((article: any, idx: number) => ({
-                id: Date.now() + idx,
-                title: article.title,
-                source: article.source.name,
-                url: article.url,
-                time: formatTimeAgo(article.publishedAt),
-                logo: `https://www.google.com/s2/favicons?domain=${new URL(article.url).hostname}&sz=64`
-            }));
+            // Salva no cache com timestamp
+            localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
 
+            const mappedNews = mapNews(data.articles);
             setNews(mappedNews);
         } catch (err: any) {
             console.error("Erro na busca de notícias:", err);
-            setError("Ocorreu um erro ao buscar notícias reais. Tente novamente mais tarde.");
+            setError("Ocorreu um erro ao buscar notícias. Tente novamente mais tarde.");
         } finally {
             setIsSearching(false);
         }
+    };
+
+    const mapNews = (articles: any[]) => {
+        return articles.map((article: any, idx: number) => ({
+            id: Date.now() + idx,
+            title: article.title,
+            source: article.source.name,
+            url: article.url,
+            time: formatTimeAgo(article.publishedAt),
+            logo: `https://www.google.com/s2/favicons?domain=${new URL(article.url).hostname}&sz=64`
+        }));
     };
 
     const handleSearch = (query: string) => {
