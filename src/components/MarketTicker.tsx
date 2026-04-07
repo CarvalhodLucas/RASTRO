@@ -55,8 +55,8 @@ const MarketTicker: React.FC = () => {
             }
 
             // 2. Refresh Data
-            // Fetch Global Data (CoinGecko)
-            const globalRes = await fetch('/api/coingecko?endpoint=global');
+            // Fetch Global Data (CoinGecko via Proxy)
+            const globalRes = await fetch('/api/proxy?target=price&endpoint=global');
             const globalData = await globalRes.json();
             
             // Fetch Commodities & IBOV (Quote API)

@@ -43,21 +43,37 @@ export async function GET(req: Request) {
             cgParams.delete("endpoint");
 
             const apiKey = process.env.NEXT_PUBLIC_COINGECKO_KEY;
-            const baseUrl = `https://api.coingecko.com/api/v3/${endpoint}`;
+            
+            // Recomenda-se o uso do domínio demo-api para chaves do plano Demo (que começam com CG-)
+            const baseUrl = apiKey 
+                ? `https://demo-api.coingecko.com/api/v3/${endpoint}` 
+                : `https://api.coingecko.com/api/v3/${endpoint}`;
+                
             const url = `${baseUrl}?${cgParams.toString()}`;
 
-            console.log("🪙 Proxying CoinGecko Request:", url);
+            console.log(`🪙 [PROXY] Calling CoinGecko (${apiKey ? 'with key' : 'no key'}):`, url);
+            
             const response = await fetch(url, {
                 headers: {
                     "Accept": "application/json",
+                    "User-Agent": "RASTRO-Analytics/1.0",
                     ...(apiKey ? { "x-cg-demo-api-key": apiKey } : {})
                 },
-                next: { revalidate: endpoint.includes("global") ? 3600 : 60 } // Cache mais longo (1h) para dados globais
+                next: { revalidate: endpoint.includes("global") ? 3600 : 30 } // Cache ligeiramente menor para preços em tempo real
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                return NextResponse.json({ error: "Erro na API do CoinGecko", details: errorData }, { status: response.status });
+                const errorBody = await response.text();
+                let errorData = {};
+                try { errorData = JSON.parse(errorBody); } catch (e) { errorData = { raw: errorBody }; }
+                
+                console.error(`❌ [PROXY] CoinGecko Error [${response.status}]:`, errorData);
+                
+                return NextResponse.json({ 
+                    error: "Erro na API do CoinGecko", 
+                    status: response.status,
+                    details: errorData 
+                }, { status: response.status });
             }
 
             const data = await response.json();
