@@ -131,6 +131,46 @@ const calculateSolidityScore = (assetData: any) => {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+const getSentimentDetails = (value: number) => {
+    if (value <= 25) return { label: 'Medo Extremo', textColor: 'text-red-500', bgColor: 'bg-red-500/10' };
+    if (value <= 44) return { label: 'Medo', textColor: 'text-orange-400', bgColor: 'bg-orange-400/10' };
+    if (value <= 55) return { label: 'Neutro', textColor: 'text-slate-400', bgColor: 'bg-slate-400/10' };
+    if (value <= 75) return { label: 'Ganância', textColor: 'text-green-400', bgColor: 'bg-green-400/10' };
+    return { label: 'Ganância Extrema', textColor: 'text-emerald-500', bgColor: 'bg-emerald-500/10' };
+};
+
+const TerminalStatus = () => {
+    const [index, setIndex] = useState(0);
+    const [tick, setTick] = useState(0);
+    const messages = [
+        "[ ANALISANDO DADOS DO MERCADO... ]",
+        "[ SINCRONIZANDO INSIGHTS DE IA... ]",
+        "[ CALIBRANDO SENTIMENTO... ]"
+    ];
+    const spinners = ["|", "/", "-", "\\"];
+
+    useEffect(() => {
+        const msgInterval = setInterval(() => {
+            setIndex((prev) => (prev + 1) % messages.length);
+        }, 3000);
+        const tickInterval = setInterval(() => {
+            setTick((prev) => (prev + 1) % spinners.length);
+        }, 150);
+        return () => {
+            clearInterval(msgInterval);
+            clearInterval(tickInterval);
+        };
+    }, []);
+
+    return (
+        <div className="font-mono text-amber-500/80 text-[10px] md:text-xs flex items-center gap-2 tracking-widest bg-amber-500/5 px-3 py-1.5 rounded border border-amber-500/10">
+            <span className="shrink-0">{spinners[tick]}</span>
+            <span className="animate-pulse">{messages[index]}</span>
+        </div>
+    );
+};
+
+
 export default function AssetPage() {
     const params = useParams();
     const { user, hasMounted } = useAuth();
@@ -249,6 +289,8 @@ export default function AssetPage() {
     const [onChainMetrics, setOnChainMetrics] = useState<any>(null);
     const [isLoadingOnChain, setIsLoadingOnChain] = useState(false);
     const [aiSentiment, setAiSentiment] = useState<any>({ value: 50, label: "Neutro", trend: "side" });
+    const [isLoadingSentiment, setIsLoadingSentiment] = useState(false);
+
     const [aiPulse, setAiPulse] = useState<any>(null);
     const [compareAiPulse, setCompareAiPulse] = useState<any>(null);
     const [isLoadingPulse, setIsLoadingPulse] = useState(false);
@@ -800,7 +842,11 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
             }
         }
 
-        if (!isComparison) setAiSentiment(null); // Reset Loading
+        if (!isComparison) {
+            setAiSentiment(null);
+            setIsLoadingSentiment(true);
+        }
+
         
         const fetchWithRetry = async (retryCount = 0): Promise<void> => {
             // --- AGUARDAR LOCK GLOBAL (MULTI-ABA) ---
@@ -858,9 +904,11 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 console.error("Erro no sentimento:", e);
                 if (!isComparison) setAiSentiment({ value: 50, label: "Indisponível", trend: "side" });
             } finally {
+                setIsLoadingSentiment(false);
                 releaseGlobalAiLock();
                 fetchLocks.current[lockKey] = false;
             }
+
         };
 
         fetchWithRetry();
@@ -2108,8 +2156,9 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                 </button>
                                             )}
                                             {isLoadingAnalysis ? (
-                                                <span className="text-xs text-zinc-500 animate-pulse">IA está analisando...</span>
+                                                <TerminalStatus />
                                             ) : (
+
                                                 <span className="text-xs text-zinc-500">
                                                     {asset.lastUpdate ? `Última atualização: ${new Date(asset.lastUpdate).toLocaleDateString('pt-BR')}` : "Atualizado semanalmente"}
                                                 </span>
@@ -2225,14 +2274,21 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                 </g>
                                             </svg>
                                             <div className="absolute bottom-0 text-center">
-                                                <span className={`block text-3xl font-black ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                        'text-emerald-500'
-                                                    }`}>{aiSentiment?.value || 50}</span>
-                                                <span className={`text-xs uppercase tracking-widest font-bold ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                        'text-emerald-500'
-                                                    }`}>{aiSentiment?.label || "Neutro"}</span>
+                                                {(() => {
+                                                    const sentimentVal = Math.round(aiSentiment?.value ?? 50);
+                                                    const details = getSentimentDetails(sentimentVal);
+                                                    return (
+                                                        <>
+                                                            <span className={`block text-3xl font-black ${details.textColor} ${isLoadingSentiment ? 'animate-pulse opacity-50' : ''}`}>
+                                                                {isLoadingSentiment ? '--' : sentimentVal}
+                                                            </span>
+                                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold ${details.textColor} ${details.bgColor} ${isLoadingSentiment ? 'animate-pulse' : ''}`}>
+                                                                {isLoadingSentiment ? 'PROCESSANDO...' : details.label}
+                                                            </span>
+                                                        </>
+
+                                                    );
+                                                })()}
                                                 {aiSentiment?.lastUpdate && (
                                                     <span className="block text-[9px] text-zinc-500 uppercase mt-1">
                                                         Última atualização: {new Date(aiSentiment.lastUpdate).toLocaleDateString()}
@@ -2340,7 +2396,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                     Diagnóstico de Curto Prazo
                                                 </span>
                                                 <div className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
-                                                    {aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."}
+                                                    {isLoadingPulse ? (
+                                                        <span className="text-amber-500/80 font-mono text-sm animate-pulse tracking-tighter">
+                                                            [ SCANNING PULSE... ]
+                                                        </span>
+                                                    ) : (
+                                                        aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."
+                                                    )}
+
                                                     <div className="group/tooltip relative inline-block">
                                                         <span
                                                             className="material-symbols-outlined !text-[12px] text-slate-600 cursor-help hover:text-primary transition-colors"
@@ -2405,14 +2468,16 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                         </h3>
 
                                         {isLoadingHealth ? (
-                                            <div className="animate-pulse space-y-8">
-                                                <div className="h-4 bg-zinc-800 rounded w-full"></div>
-                                                <div className="h-4 bg-zinc-800 rounded w-full"></div>
-                                                <div className="h-4 bg-zinc-800 rounded w-full"></div>
-                                                <div className="h-4 bg-zinc-800 rounded w-full"></div>
-                                                <div className="h-4 bg-zinc-800 rounded w-full"></div>
+                                            <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                                <TerminalStatus />
+                                                <div className="w-full space-y-4 animate-pulse">
+                                                    <div className="h-2 bg-zinc-800 rounded w-full"></div>
+                                                    <div className="h-2 bg-zinc-800 rounded w-3/4"></div>
+                                                    <div className="h-2 bg-zinc-800 rounded w-full"></div>
+                                                </div>
                                             </div>
                                         ) : isCryptoAsset ? (
+
                                             /* === MÉTRICAS CRIPTO === */
                                             <div className="space-y-6">
                                                 {/* 1. TVL / Market Cap */}
@@ -2833,11 +2898,12 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                         </h3>
 
                                         {isLoadingHealth ? (
-                                            <div className="animate-pulse space-y-6">
-                                                <div className="h-20 bg-zinc-800 rounded-lg w-full"></div>
-                                                <div className="h-10 bg-zinc-800 rounded-lg w-full"></div>
+                                            <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                                <div className="w-full h-12 bg-zinc-800 animate-pulse rounded-full opacity-50"></div>
+                                                <TerminalStatus />
                                             </div>
                                         ) : (
+
                                             <div className="flex flex-col gap-6 items-center justify-center h-full pb-4">
                                                 <div className="w-full space-y-5">
                                                     {/* BARRA VISUAL DE PREÇO */}
@@ -3004,9 +3070,9 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                     {isRatingLoading ? (
                                         /* ESTADO DE CARREGAMENTO */
                                         <div className="flex flex-col items-center justify-center py-12">
-                                            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                                            <p className="text-[10px] text-primary font-black uppercase tracking-widest animate-pulse">Lucas Analítico lendo o Relatório 360...</p>
+                                            <TerminalStatus />
                                         </div>
+
                                     ) : aiRatingData ? (
                                         /* ESTADO COM A NOTA */
                                         <div className="animate-in fade-in zoom-in-95 duration-700">
@@ -3226,14 +3292,21 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                 </g>
                                             </svg>
                                             <div className="absolute bottom-0 text-center">
-                                                <span className={`block text-3xl font-black ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                        'text-emerald-500'
-                                                    }`}>{aiSentiment?.value || 50}</span>
-                                                <span className={`text-xs uppercase tracking-widest font-bold ${(aiSentiment?.value || 50) <= 40 ? 'text-red-500' :
-                                                    (aiSentiment?.value || 50) <= 65 ? 'text-amber-500' :
-                                                        'text-emerald-500'
-                                                    }`}>{aiSentiment?.label || "Neutro"}</span>
+                                                {(() => {
+                                                    const sentimentVal = Math.round(aiSentiment?.value ?? 50);
+                                                    const details = getSentimentDetails(sentimentVal);
+                                                    return (
+                                                        <>
+                                                            <span className={`block text-3xl font-black ${details.textColor} ${isLoadingSentiment ? 'animate-pulse opacity-50' : ''}`}>
+                                                                {isLoadingSentiment ? '--' : sentimentVal}
+                                                            </span>
+                                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold ${details.textColor} ${details.bgColor} ${isLoadingSentiment ? 'animate-pulse' : ''}`}>
+                                                                {isLoadingSentiment ? 'PROCESSANDO...' : details.label}
+                                                            </span>
+                                                        </>
+
+                                                    );
+                                                })()}
                                                 {aiSentiment?.lastUpdate && (
                                                     <span className="block text-[9px] text-zinc-500 uppercase mt-1">
                                                         Última atualização: {new Date(aiSentiment.lastUpdate).toLocaleDateString()}
@@ -3341,7 +3414,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                     Diagnóstico de Curto Prazo
                                                 </span>
                                                 <div className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
-                                                    {aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."}
+                                                    {isLoadingPulse ? (
+                                                        <span className="text-amber-500/80 font-mono text-sm animate-pulse tracking-tighter">
+                                                            [ SCANNING PULSE... ]
+                                                        </span>
+                                                    ) : (
+                                                        aiPulse?.score ? `Força Relativa: ${aiPulse.score}/100` : "A analisar Força Relativa..."
+                                                    )}
+
                                                     <div className="group/tooltip relative inline-block">
                                                         <span
                                                             className="material-symbols-outlined !text-[12px] text-slate-600 cursor-help hover:text-primary transition-colors"

@@ -35,6 +35,7 @@ export async function POST(req: Request) {
             - "volatility": "Baixa", "Moderada" ou "Alta".`;
         } else if (isSentiment) {
             systemInstruction += `\nTAREFA: ANALISTA DE SENTIMENTO. Você receberá o Fear & Greed Index global (0-100). Seu papel é ajustar esse valor ligeiramente para o ativo específico solicitado, baseado na variação e contexto. 
+            O valor de sentiment (value) deve ser estritamente um número entre 0 e 100, onde 0 é pânico total e 100 é euforia.
             Retorne RIGOROSAMENTE APENAS um JSON no formato: { "value": <numero_de_0_a_100> }.`;
         } else if (isSummary) {
             systemInstruction += `\nTAREFA: RESUMO EXECUTIVO. Analise o relatório qualitativo e forneça 3 pontos positivos (bullCase) e 3 pontos negativos (bearCase) para ${ticker} (${assetName}).

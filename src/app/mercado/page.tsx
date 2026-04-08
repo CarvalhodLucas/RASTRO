@@ -388,9 +388,9 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
                         </div>
                     </div>
                 ) : (
-                    <div className="flex items-center justify-center text-slate-500 hover:text-primary transition-colors cursor-pointer group/btn" title="Análise pendente. Clique para abrir o ativo e gerar o relatório.">
-                        <span className="material-symbols-outlined text-[14px] group-hover/btn:scale-110 transition-transform">psychology</span>
-                        <span className="text-[9px] font-bold ml-1 uppercase tracking-tight underline decoration-slate-600 group-hover/btn:decoration-primary">Gerar Análise</span>
+                    <div className="flex items-center justify-center opacity-40 group-hover:opacity-80 transition-opacity" title="Aguardando análise automática (abra o ativo para carregar)">
+                        <span className="material-symbols-outlined text-[14px]">terminal</span>
+                        <span className="text-[9px] font-mono ml-1 uppercase tracking-tighter text-amber-500/80">[ PENDING ]</span>
                     </div>
                 )}
             </div>
