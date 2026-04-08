@@ -44,10 +44,8 @@ export async function GET(req: Request) {
 
             const apiKey = process.env.NEXT_PUBLIC_COINGECKO_KEY;
             
-            // Recomenda-se o uso do domínio demo-api para chaves do plano Demo (que começam com CG-)
-            const baseUrl = apiKey 
-                ? `https://demo-api.coingecko.com/api/v3/${endpoint}` 
-                : `https://api.coingecko.com/api/v3/${endpoint}`;
+            // Recomenda-se o uso do domínio principal. Vercel não consegue resolver demo-api.
+            const baseUrl = `https://api.coingecko.com/api/v3/${endpoint}`;
                 
             const url = `${baseUrl}?${cgParams.toString()}`;
 
