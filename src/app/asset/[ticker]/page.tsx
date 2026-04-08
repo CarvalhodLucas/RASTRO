@@ -1711,12 +1711,24 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                 if (isCrypto) {
                     const cgId = KNOWN_CRYPTO_IDS[baseTicker] || localAsset?.cgId;
                     if (cgId) {
+                        console.log(`🪙 Fetching CoinGecko for ${cgId}...`);
                         const cgRes = await fetch(`/api/proxy?target=price&ids=${cgId}&vs_currencies=brl&include_24hr_change=true`);
-                        const cgData = await cgRes.json();
+                        
+                        let cgData;
+                        try {
+                            cgData = await cgRes.json();
+                        } catch(e) {
+                            console.error("❌ Failed to parse CoinGecko proxy response:", e);
+                            cgData = {};
+                        }
+                        console.log(`🪙 CoinGecko Response for ${cgId}:`, cgData);
+                        
                         if (cgData[cgId] && cgData[cgId].brl) {
                             assetPrice = cgData[cgId].brl.toFixed(2);
                             assetVariation = cgData[cgId].brl_24h_change?.toFixed(2) || "0.00";
                             assetCurrency = "R$";
+                        } else {
+                            console.error(`❌ Data format error or missing price for ${cgId}:`, cgData);
                         }
                     }
                 } else {
@@ -1833,7 +1845,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                 sector: localAsset?.sector || (isCryptoLocal ? "Criptomoedas" : "Setor Não Definido"),
                 exchange: isUS ? localAsset?.exchange || "US Market" : "B3",
                 isCrypto: isCryptoLocal,
-                dataSource: "Yahoo Finance",
+                dataSource: isCryptoLocal ? "CoinGecko API" : "Yahoo Finance",
                 marketCap: localAsset?.marketCap || yahooData?.marketCap || "--",
                 vacancia: localAsset?.vacancia || (localAsset as any)?.vacancy || "--",
                 sharesOutstanding: finalTotalCotas,
