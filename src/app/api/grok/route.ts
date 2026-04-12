@@ -16,9 +16,14 @@ async function fetchLatestNews(ticker: string) {
         const rs = await fetch(rssUrl);
         if (rs.ok) {
             const xml = await rs.text();
-            // Pegar os títulos das notícias (o primeiro costuma ser o nome da busca, então pegamos a partir do segundo)
-            const titles = Array.from(xml.matchAll(/<title>(.*?)<\/title>/g)).slice(1, 6).map(m => m[1]);
-            return titles.join(" | ").replace(/ - Google Notícias/g, '');
+            const titles: string[] = [];
+            const regex = /<title>(.*?)<\/title>/g;
+            let match;
+            while ((match = regex.exec(xml)) !== null) {
+                if (match[1]) titles.push(match[1]);
+            }
+            const finalTitles = titles.slice(1, 6);
+            return finalTitles.join(" | ").replace(/ - Google Notícias/g, '');
         }
     } catch (e) {
         console.error("News fetch error", e);
