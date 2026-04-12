@@ -10,6 +10,9 @@ import Footer from "@/components/Footer";
 export const metadata: Metadata = {
     title: "Rastro - Análise de Ativos",
     description: "Plataforma de análise com IA",
+    icons: {
+        icon: "/icon.svg",
+    },
 };
 
 export default function RootLayout({
