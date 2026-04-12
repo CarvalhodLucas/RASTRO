@@ -4,6 +4,8 @@ import SupportChat from "@/components/SupportChat";
 import AuthModal from "@/components/AuthModal";
 import Providers from "@/components/Providers";
 import LogoutModal from "@/components/LogoutModal";
+import Footer from "@/components/Footer";
+
 
 export const metadata: Metadata = {
     title: "Rastro - Análise de Ativos",
@@ -30,9 +32,12 @@ export default function RootLayout({
                     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
                 />
             </head>
-            <body suppressHydrationWarning className="antialiased">
+            <body suppressHydrationWarning className="antialiased min-h-screen flex flex-col">
                 <Providers>
-                    {children}
+                    <main className="flex-1">
+                        {children}
+                    </main>
+                    <Footer />
                     <SupportChat />
                     <AuthModal />
                     <LogoutModal />

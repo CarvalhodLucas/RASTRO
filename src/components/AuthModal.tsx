@@ -204,7 +204,7 @@ export default function AuthModal() {
                     {/* Close Button */}
                     <button 
                         onClick={handleClose}
-                        className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors z-20"
+                        className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors cursor-pointer z-20"
                     >
                         <span className="material-symbols-outlined">close</span>
                     </button>
@@ -214,13 +214,13 @@ export default function AuthModal() {
                         <div className="flex border-b border-neutral-dark-border">
                             <button
                                 onClick={() => { setActiveTab("login"); setError(""); }}
-                                className={`flex-1 py-4 text-sm font-bold transition-colors ${activeTab === "login" ? "text-primary border-b-2 border-primary bg-neutral-dark-surface" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+                                className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer ${activeTab === "login" ? "text-primary border-b-2 border-primary bg-neutral-dark-surface" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
                             >
                                 Entrar
                             </button>
                             <button
                                 onClick={() => { setActiveTab("register"); setError(""); }}
-                                className={`flex-1 py-4 text-sm font-bold transition-colors ${activeTab === "register" ? "text-primary border-b-2 border-primary bg-neutral-dark-surface" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+                                className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer ${activeTab === "register" ? "text-primary border-b-2 border-primary bg-neutral-dark-surface" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
                             >
                                 Criar Conta
                             </button>
@@ -246,7 +246,7 @@ export default function AuthModal() {
                                         onClick={() => {
                                             setActiveTab("register");
                                         }}
-                                        className="w-full h-12 bg-primary hover:bg-primary-hover text-black font-bold rounded-xl transition-all shadow-lg shadow-primary/20"
+                                        className="w-full h-12 bg-primary hover:bg-primary-hover text-black font-bold rounded-xl transition-all shadow-lg shadow-primary/20 cursor-pointer"
                                     >
                                         Criar minha conta
                                     </button>
@@ -255,7 +255,7 @@ export default function AuthModal() {
                                             handleClose();
                                             router.push("/");
                                         }}
-                                        className="w-full h-12 bg-transparent hover:bg-white/5 text-slate-400 hover:text-white font-medium rounded-xl transition-all"
+                                        className="w-full h-12 bg-transparent hover:bg-white/5 text-slate-400 hover:text-white font-medium rounded-xl transition-all cursor-pointer"
                                     >
                                         Voltar ao início
                                     </button>
@@ -296,7 +296,7 @@ export default function AuthModal() {
                                                     localStorage.setItem("pending_auth_mode", "login");
                                                     signIn('google', { callbackUrl: '/' });
                                                 }}
-                                                className="w-full h-12 bg-white hover:bg-gray-50 text-[#3c4043] font-medium text-[15px] rounded-lg transition-all flex items-center justify-center gap-3 border border-gray-300 shadow-sm mb-4"
+                                                className="w-full h-12 bg-white hover:bg-gray-50 text-[#3c4043] font-medium text-[15px] rounded-lg transition-all flex items-center justify-center gap-3 border border-gray-300 shadow-sm mb-4 cursor-pointer"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                                                     <path fill="#FBBC05" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -367,7 +367,7 @@ export default function AuthModal() {
                                             <button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full h-11 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-2"
+                                                className="w-full h-11 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-2 cursor-pointer"
                                             >
                                                 {isLoading ? (
                                                     <>
@@ -396,7 +396,7 @@ export default function AuthModal() {
                                                     localStorage.setItem("pending_auth_mode", "register");
                                                     signIn('google', { callbackUrl: '/' });
                                                 }}
-                                                className="w-full h-12 bg-white hover:bg-gray-50 text-[#3c4043] font-medium text-[15px] rounded-lg transition-all flex items-center justify-center gap-3 border border-gray-300 shadow-sm mb-4"
+                                                className="w-full h-12 bg-white hover:bg-gray-50 text-[#3c4043] font-medium text-[15px] rounded-lg transition-all flex items-center justify-center gap-3 border border-gray-300 shadow-sm mb-4 cursor-pointer"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                                                     <path fill="#FBBC05" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -481,7 +481,7 @@ export default function AuthModal() {
                                             <button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full h-11 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-2"
+                                                className="w-full h-11 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-2 cursor-pointer"
                                             >
                                                 {isLoading ? (
                                                     <>

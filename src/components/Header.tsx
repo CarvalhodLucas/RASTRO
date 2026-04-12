@@ -63,7 +63,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                     {!hideNav && (
                         <button 
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="lg:hidden text-white p-1"
+                            className="lg:hidden text-white p-1 cursor-pointer"
                         >
                             <span className="material-symbols-outlined text-2xl">
                                 {isMobileMenuOpen ? 'close' : 'menu'}
@@ -178,7 +178,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                                 </Link>
                                 <button
                                     onClick={confirmLogout}
-                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
                                     title="Sair"
                                 >
                                     <span className="material-symbols-outlined text-xl">logout</span>
@@ -187,7 +187,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                         ) : (
                             <button 
                                 onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }))}
-                                className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary-hover transition-all"
+                                className="px-4 py-2 bg-primary text-black rounded-lg text-sm font-bold hover:bg-primary-hover transition-all cursor-pointer"
                             >
                                 Entrar
                             </button>

@@ -70,8 +70,9 @@ const MarketTicker: React.FC = () => {
                 { id: 'soy', ticker: 'ZS=F', label: 'Soja', icon: '🌱', currency: 'USD' },
             ];
 
-            const quotePromises = tickers.map(t => fetch(`/api/quote?ticker=${encodeURIComponent(t.ticker)}`).then(r => r.json()));
-            const quotes = await Promise.all(quotePromises);
+            const tickerString = tickers.map(t => t.ticker).join(',');
+            const res = await fetch(`/api/quote?ticker=${encodeURIComponent(tickerString)}&mode=compact`);
+            const quotes = await res.json();
 
             const newItems: TickerItem[] = [
                 { 

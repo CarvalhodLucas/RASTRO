@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
-
 export const dynamic = "force-dynamic";
-
-// Inicializa o SDK usando a variável GOOGLE_API_KEY ou GEMINI_API_KEY
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: Request) {
     try {
         const { ticker, name, report, indicators, systemInstruction: instructionOverride, systemPrompt, isSummary, isHealth, isSentiment, isRatingRequest, prompt } = await req.json();
 
-        console.log(`[RASTRO IA] Iniciando análise Gemini para: ${ticker || name}`);
+        console.log(`[RASTRO IA] Iniciando análise OpenRouter para: ${ticker || name}`);
 
         const rastroPersona = "És o RASTRO, um Analista IA prático e objetivo. Sê extremamente conciso, direto e usa linguagem simples. Evita jargões técnicos a menos que o utilizador os use primeiro.";
 
@@ -93,16 +88,13 @@ REGRA DE PLATAFORMA: Se o utilizador perguntar sobre a diferença entre os núme
             systemInstruction = systemPrompt || `${rastroPersona}\n${chatRules}`;
         }
 
-        const googleKey = process.env.GOOGLE_API_KEY;
-        const geminiKey = process.env.GEMINI_API_KEY;
-        const apiKey = geminiKey || googleKey;
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
 
-        if (!apiKey) {
-            console.error("[RASTRO IA] ERRO: API_KEY ausente!");
+        if (!openRouterKey) {
+            console.error("[RASTRO IA] ERRO: OPENROUTER_API_KEY ausente!");
             return NextResponse.json({ error: "Chave da API n\u00E3o encontrada no .env" }, { status: 500 });
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
         let responseText = "";
         
         let finalPrompt = prompt || "Gere a an\u00E1lise requerida baseada nos dados do relat\u00F3rio.";
@@ -121,8 +113,7 @@ PERGUNTA DO UTILIZADOR:
 ${prompt}`;
         }
 
-        // --- SISTEMA DE GERA\u00C7\u00C3O (PADR\u00C3O CRON) ---
-        const modelNames = ["gemini-flash-latest"];
+        // --- SISTEMA DE GERA\u00C7\u00C3O ---
         let lastError = "";
 
         // Am\u00E1lgama de Prompt
@@ -132,29 +123,42 @@ ${prompt}`;
             ${finalPrompt}
         `;
 
-        for (const modelName of modelNames) {
-            try {
-                console.log(`[RASTRO IA] Tentando ${modelName}...`);
-                const model = genAI.getGenerativeModel({ model: modelName });
+        try {
+            console.log(`[RASTRO IA] Solicitando OpenRouter (nvidia/nemotron-3-super) para: ${ticker || name}...`);
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${openRouterKey}`,
+                    "HTTP-Referer": "https://rastro-sooty.vercel.app",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "nvidia/nemotron-3-super-120b-a12b:free",
+                    messages: [{ role: "user", content: finalPromptText.substring(0, 30000) }]
+                })
+            });
 
-                const result = await model.generateContent(finalPromptText.substring(0, 30000));
-                responseText = result.response.text();
-                
-                if (responseText) {
-                    console.log(`[RASTRO IA] Sucesso: ${modelName}`);
-                    break;
-                }
-            } catch (err: any) {
-                console.warn(`[RASTRO IA] Falha ${modelName}:`, err.message);
-                lastError = err.message;
+            if (!res.ok) {
+                const errData = await res.text();
+                throw new Error(`Erro na API: ${res.status} - ${errData}`);
             }
+
+            const data = await res.json();
+            responseText = data.choices[0]?.message?.content || "";
+            
+            if (responseText) {
+                console.log(`[RASTRO IA] Sucesso: OpenRouter (nvidia/nemotron-3-super)`);
+            }
+        } catch (err: any) {
+            console.warn(`[RASTRO IA] Falha OpenRouter:`, err.message);
+            lastError = err.message;
         }
 
         if (!responseText) {
             return NextResponse.json({ 
                 error: `IA Indispon\u00EDvel: ${lastError}`,
                 debug: {
-                    key_source: googleKey ? "GOOGLE" : geminiKey ? "GEMINI" : "NONE",
+                    key_source: "OPENROUTER",
                     prompt_len: finalPromptText.length,
                     ticker: ticker
                 }
@@ -168,7 +172,7 @@ ${prompt}`;
                 const jsonString = match ? match[0] : responseText;
                 return NextResponse.json(JSON.parse(jsonString));
             } catch (e) {
-                console.error("[GEMINI PARSE ERROR] Recebido:", responseText);
+                console.error("[OPENROUTER PARSE ERROR] Recebido:", responseText);
                 // Retornar um JSON vazio estruturado em vez de erro 500 para não quebrar a tela
                 return NextResponse.json({
                     score: 5,
@@ -185,7 +189,7 @@ ${prompt}`;
         return NextResponse.json({ reply: responseText });
 
     } catch (error: any) {
-        console.error("[GEMINI API ROUTE ERROR]:", error.message);
+        console.error("[OPENROUTER API ROUTE ERROR]:", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

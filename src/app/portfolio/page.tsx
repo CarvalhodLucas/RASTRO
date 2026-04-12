@@ -354,49 +354,58 @@ const PortfolioPage: React.FC = () => {
                 }
             }
 
-            const stockPromises = stocksToFetch.map(async (ticker) => {
-                const ST_CACHE_KEY = `price_cache_${ticker}`;
-                const staticData = allStatic.find(a => a.ticker.toUpperCase() === ticker.toUpperCase());
-                // Determine currency from the exchange
-                const isUSD = staticData?.exchange === 'NYSE' || staticData?.exchange === 'NASDAQ' || ticker.endsWith('-USD');
-                const currencySymbol = isUSD ? '$ ' : 'R$ ';
-
+            let stockResults: any[] = [];
+            if (stocksToFetch.length > 0) {
+                const tickerString = stocksToFetch.join(',');
                 try {
-                    const res = await fetch(`/api/quote?ticker=${ticker}`);
+                    const res = await fetch(`/api/quote?ticker=${encodeURIComponent(tickerString)}`);
                     const data = await res.json();
-                    if (data.error || !data.price || data.price === "0.00") throw new Error("API fail");
+                    
+                    // Normalize data to array if it's a single result
+                    const rawResults = Array.isArray(data) ? data : [data];
+                    
+                    stockResults = rawResults.map((item: any, idx: number) => {
+                        const ticker = stocksToFetch[idx];
+                        const staticData = allStatic.find(a => a.ticker.toUpperCase() === ticker.toUpperCase());
+                        const isUSD = staticData?.exchange === 'NYSE' || staticData?.exchange === 'NASDAQ' || ticker.endsWith('-USD');
+                        const currencySymbol = isUSD ? '$ ' : 'R$ ';
 
-                    const formatted = {
-                        symbol: ticker.replace('.SA', ''),
-                        name: data.name || staticData?.name || ticker,
-                        price: `${currencySymbol}${data.price}`,
-                        change: `${data.variation}%`,
-                        mcap: formatMarketCap(data.marketCap || staticData?.marketCap || 0),
-                        color: parseFloat(data.variation) >= 0 ? 'success' : 'danger',
-                        spark: "",
-                        image: staticData?.logo || `https://www.google.com/s2/favicons?sz=128&domain=${ticker.toLowerCase()}.com.br`,
-                        ticker: ticker
-                    };
-                    localStorage.setItem(ST_CACHE_KEY, JSON.stringify({ data: formatted, timestamp: Date.now() }));
-                    return formatted;
+                        if (item.error || !item.price || item.price === "0.00") {
+                             // Fallback
+                             const ST_CACHE_KEY = `price_cache_${ticker}`;
+                             const cached = localStorage.getItem(ST_CACHE_KEY);
+                             if (cached) return JSON.parse(cached).data;
+                             return {
+                                 symbol: ticker.replace('.SA', ''),
+                                 name: staticData?.name || ticker,
+                                 price: staticData?.price && staticData.price !== "0.00" ? `${currencySymbol}${staticData.price}` : "N/D",
+                                 change: "0.00%",
+                                 mcap: staticData?.marketCap || "---",
+                                 color: 'neutral',
+                                 spark: "",
+                                 image: staticData?.logo || "",
+                                 ticker: ticker
+                             };
+                        }
+
+                        const formatted = {
+                            symbol: ticker.replace('.SA', ''),
+                            name: item.name || staticData?.name || ticker,
+                            price: `${currencySymbol}${item.price}`,
+                            change: `${item.variation}%`,
+                            mcap: item.marketCap || "---",
+                            color: parseFloat(item.variation) >= 0 ? 'success' : 'danger',
+                            spark: "",
+                            image: staticData?.logo || `https://www.google.com/s2/favicons?sz=128&domain=${ticker.toLowerCase()}.com.br`,
+                            ticker: ticker
+                        };
+                        localStorage.setItem(`price_cache_${ticker}`, JSON.stringify({ data: formatted, timestamp: Date.now() }));
+                        return formatted;
+                    });
                 } catch (e) {
-                    const cached = localStorage.getItem(ST_CACHE_KEY);
-                    if (cached) return JSON.parse(cached).data;
-                    return {
-                        symbol: ticker.replace('.SA', ''),
-                        name: staticData?.name || ticker,
-                        price: staticData?.price && staticData.price !== "0.00" ? `${currencySymbol}${staticData.price}` : "N/D",
-                        change: "0.00%",
-                        mcap: staticData?.marketCap || "---",
-                        color: 'neutral',
-                        spark: "",
-                        image: staticData?.logo || "",
-                        ticker: ticker
-                    };
+                    console.error("Batch stock fetch error", e);
                 }
-            });
-
-            const stockResults = await Promise.all(stockPromises);
+            }
 
             // --- DASHBOARD INTELLIGENCE LOGIC ---
 

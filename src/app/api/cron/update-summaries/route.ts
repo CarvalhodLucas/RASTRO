@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import pdf from 'pdf-parse';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
 import { b3Assets, cryptoAssets } from '@/lib/data';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
 
 export async function GET(request: Request) {
@@ -62,7 +59,7 @@ export async function GET(request: Request) {
                         .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
                         .replace(/<!DOCTYPE[^>]*>/gi, '');
 
-                    // Extrai texto bruto para o resumo do Gemini (opcionalmente limpar tags)
+                    // Extrai texto bruto para o resumo do OpenRouter (opcionalmente limpar tags)
                     text = htmlContent.replace(/<[^>]*>/g, ' ');
                 } else if (pdfPath) {
                     const dataBuffer = fs.readFileSync(pdfPath);
@@ -70,8 +67,7 @@ export async function GET(request: Request) {
                     text = pdfData.text;
                 }
 
-                // 1. Geração de Resumo (Gemini)
-                const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+                // 1. Geração de Resumo (OpenRouter)
                 const summaryPrompt = `
                     Analise o seguinte relatório sobre o ativo ${asset.name} (${asset.ticker}) e gere um resumo executivo técnico.
                     O resumo deve conter exatamente 3 pontos positivos (Bull Case) e 3 pontos negativos (Bear Case).
@@ -85,8 +81,26 @@ export async function GET(request: Request) {
                     ${text.substring(0, 10000)}
                 `;
 
-                const summaryResult = await model.generateContent(summaryPrompt);
-                const summaryResponse = summaryResult.response.text();
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        "HTTP-Referer": "https://rastro-sooty.vercel.app",
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        model: "nvidia/nemotron-3-super-120b-a12b:free",
+                        messages: [{ role: "user", content: summaryPrompt }]
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.text();
+                    throw new Error(`Erro na API OpenRouter: ${res.status} - ${errData}`);
+                }
+
+                const data = await res.json();
+                const summaryResponse = data.choices[0]?.message?.content || "";
 
                 // 2. Formatação do Relatório Completo (Groq) - Apenas se for PDF
                 let formattedReport = "";
@@ -106,7 +120,7 @@ export async function GET(request: Request) {
                     formattedReport = groqResult.choices[0]?.message?.content || "";
                 }
 
-                // Limpeza básica para extrair JSON se o Gemini colocar markdown
+                // Limpeza básica para extrair JSON se o OpenRouter colocar markdown
                 const jsonMatch = summaryResponse.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     const analysis = JSON.parse(jsonMatch[0]);

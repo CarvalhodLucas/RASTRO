@@ -3053,6 +3053,25 @@ export const cryptoAssets: Asset[] = [
         dividendYield: "--",
         lastUpdate: "29/03/2026"
     },
+    {
+        ticker: "TAO-USD",
+        name: "Bittensor",
+        price: "0.00",
+        variation: "0.0",
+        sector: "Criptomoedas (IA)",
+        exchange: "Crypto Market",
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
+        logo: "https://icons.duckduckgo.com/ip3/bittensor.com.ico",
+        size: 25,
+        cgId: "bittensor",
+        aiPulse: "Rede descentralizada de aprendizado de máquina peer-to-peer.",
+        marketCap: "4B",
+        peRatio: "--",
+        dividendYield: "--",
+        lastUpdate: "10/04/2026"
+    },
 ];
 
 export const sp500Assets: Asset[] = [
