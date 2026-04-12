@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Youtube, Instagram, Music2 } from "lucide-react";
+import { YouTube, Instagram, Music2 } from "lucide-react";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
@@ -28,7 +28,7 @@ export default function Footer() {
         {
             name: "YouTube",
             href: "https://www.youtube.com/@RastroIA",
-            icon: Youtube,
+            icon: YouTube,
             hoverColor: "hover:text-[#FF0000]",
         },
         {
