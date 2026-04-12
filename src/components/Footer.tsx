@@ -2,34 +2,45 @@
 
 import React from "react";
 import Link from "next/link";
-import { Twitter, Youtube, Instagram, Music2 } from "lucide-react";
+import { Youtube, Instagram, Music2 } from "lucide-react";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
 
+    const XIcon = ({ size = 20 }: { size?: number }) => (
+        <svg 
+            width={size} 
+            height={size} 
+            viewBox="0 0 24 24" 
+            fill="currentColor"
+        >
+            <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932 6.064-6.932zm-1.294 19.497h2.039L6.486 3.24H4.298l13.31 17.41z" />
+        </svg>
+    );
+
     const socialLinks = [
         {
-            name: "Twitter",
-            href: "https://twitter.com",
-            icon: Twitter,
-            hoverColor: "hover:text-[#1DA1F2]",
+            name: "X (Twitter)",
+            href: "https://x.com/rastroia",
+            icon: XIcon,
+            hoverColor: "hover:text-white",
         },
         {
             name: "YouTube",
-            href: "https://youtube.com",
+            href: "https://www.youtube.com/@RastroIA",
             icon: Youtube,
             hoverColor: "hover:text-[#FF0000]",
         },
         {
             name: "Instagram",
-            href: "https://instagram.com",
+            href: "https://www.instagram.com/rastroia",
             icon: Instagram,
             hoverColor: "hover:text-[#E4405F]",
         },
         {
             name: "TikTok",
-            href: "https://tiktok.com",
-            icon: Music2, // Lucide doesn't have a direct TikTok icon in all versions, Music2 is a good fallback or we use a custom SVG
+            href: "https://www.tiktok.com/@rastroia",
+            icon: Music2,
             hoverColor: "hover:text-[#00f2ea]",
         },
     ];
