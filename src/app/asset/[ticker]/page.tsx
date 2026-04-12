@@ -890,10 +890,10 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 setIsLoadingSentiment(false);
                 fetchLocks.current[lockKey] = false;
             }
-
+            return true;
         };
 
-        fetchWithRetry();
+        return await fetchWithRetry();
     };
 
     // 4. FUNÇÃO: SAÚDE FINANCEIRA - GROK
