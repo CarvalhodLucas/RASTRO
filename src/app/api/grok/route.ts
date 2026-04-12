@@ -17,7 +17,7 @@ async function fetchLatestNews(ticker: string) {
         if (rs.ok) {
             const xml = await rs.text();
             // Pegar os títulos das notícias (o primeiro costuma ser o nome da busca, então pegamos a partir do segundo)
-            const titles = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 6).map(m => m[1]);
+            const titles = Array.from(xml.matchAll(/<title>(.*?)<\/title>/g)).slice(1, 6).map(m => m[1]);
             return titles.join(" | ").replace(/ - Google Notícias/g, '');
         }
     } catch (e) {
