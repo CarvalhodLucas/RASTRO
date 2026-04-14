@@ -62,35 +62,68 @@ export default function Footer() {
     ];
 
     return (
-        <footer className="w-full bg-zinc-950 border-t border-zinc-800/50 py-12 pb-24 md:pb-12">
-            <div className="max-w-[1440px] mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                {/* Left Side: Logo & Copyright */}
-                <div className="flex flex-col items-center md:items-start gap-3">
-                    <Link href="/" className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity">
-                        <div className="size-6 flex items-center justify-center text-primary">
-                            <span className="material-symbols-outlined !text-[24px]">candlestick_chart</span>
+        <footer className="w-full bg-zinc-950 border-t border-zinc-800/50 pt-16 pb-24 md:pb-16 mt-auto">
+            <div className="max-w-[1440px] mx-auto px-4 md:px-8 space-y-12">
+                <div className="flex flex-col md:flex-row items-start justify-between gap-12">
+                    {/* Left Side: Logo & Disclaimer */}
+                    <div className="max-w-[600px] flex flex-col gap-6">
+                        <Link href="/" className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity w-fit">
+                            <div className="size-6 flex items-center justify-center text-primary">
+                                <span className="material-symbols-outlined !text-[24px]">candlestick_chart</span>
+                            </div>
+                            <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+                        </Link>
+                        
+                        <div className="space-y-4">
+                            <h3 className="text-white text-xs font-bold uppercase tracking-widest opacity-50">Aviso Legal (Resolução CVM 20/2021)</h3>
+                            <p className="text-zinc-500 text-[11px] leading-relaxed text-justify">
+                                O RASTRO é uma plataforma de inteligência de mercado e análise de dados financeiros. Todas as análises, métricas e scores exibidos são gerados de forma automatizada através de modelos de Inteligência Artificial e processamento de dados históricos. 
+                                <span className="text-zinc-400 font-medium"> NENHUM CONTEÚDO aqui apresentado constitui recomendação de investimento, oferta de compra/venda ou consultoria financeira.</span> 
+                                O mercado financeiro envolve riscos significativos e a performance passada não garante resultados futuros. As decisões de investimento são de responsabilidade total e exclusiva do usuário. Recomendamos a consulta a profissionais certificados antes de qualquer operação.
+                            </p>
                         </div>
-                        <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
-                    </Link>
-                    <p className="text-zinc-500 text-sm font-medium">
-                        © {currentYear} Rastro. Todos os direitos reservados.
-                    </p>
+                    </div>
+
+                    {/* Right Side: Links & Social */}
+                    <div className="flex flex-col md:items-end gap-8">
+                        <div className="flex items-center gap-6">
+                            {socialLinks.map((social) => (
+                                <a
+                                    key={social.name}
+                                    href={social.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-zinc-500 transition-all duration-300 transform hover:scale-110 ${social.hoverColor}`}
+                                    aria-label={social.name}
+                                >
+                                    <social.icon size={20} />
+                                </a>
+                            ))}
+                        </div>
+
+                        <nav className="flex flex-wrap items-center gap-x-8 gap-y-4 md:justify-end">
+                            <button 
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-feedback-chat'))}
+                                className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-black text-xs font-black rounded-full transition-all uppercase tracking-widest cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.2)] hover:shadow-primary/40 hover:scale-105 active:scale-95"
+                            >
+                                Feedback
+                            </button>
+                            <Link href="/termos" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Termos de Uso</Link>
+                            <Link href="/privacidade" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Política de Privacidade</Link>
+                            <Link href="/square" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Comunidade</Link>
+                        </nav>
+                    </div>
                 </div>
 
-                {/* Right Side: Social Media */}
-                <div className="flex items-center gap-6">
-                    {socialLinks.map((social) => (
-                        <a
-                            key={social.name}
-                            href={social.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`text-zinc-500 transition-all duration-300 transform hover:scale-110 ${social.hoverColor}`}
-                            aria-label={social.name}
-                        >
-                            <social.icon size={20} />
-                        </a>
-                    ))}
+                {/* Bottom line */}
+                <div className="pt-8 border-t border-zinc-800/30 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <p className="text-zinc-600 text-[10px] font-medium tracking-tight">
+                        © {currentYear} Rastro Intelligence Service. Inteligência de Mercado para Ativos Globais.
+                    </p>
+                    <div className="flex items-center gap-2 opacity-30 grayscale hover:grayscale-0 transition-all duration-500">
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">Powered by</span>
+                        <span className="text-white text-xs font-black tracking-tighter">AI AGENTS</span>
+                    </div>
                 </div>
             </div>
         </footer>

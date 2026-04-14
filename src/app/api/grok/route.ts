@@ -34,13 +34,13 @@ async function fetchLatestNews(ticker: string) {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { messages, ticker, assetName, isPulse, isHealth, isRatingRequest, isSentiment, isComparison, isOnChain, isSummary, isFairPrice, isChat, prompt, report, variation } = body;
+        const { messages, ticker, assetName, isPulse, isHealth, isRatingRequest, isSentiment, isComparison, isOnChain, isSummary, isFairPrice, isChat, prompt, report, variation, indicators, systemContext } = body;
 
         // --- DEFINIÇÃO DO MOTOR DE IA ---
         // Desativando Gemini devido a limites de tokens, conforme solicitado.
         const useGemini = false;
-        // O usuário solicitou que Score de IA (Rating) use Llama 3 (Groq/Original Engine).
-        const useOpenRouter = isSentiment ? true : false;
+        // O usuário solicitou que Score de IA (Rating) use o motor NVIDIA Nemotron e o Chat use o Llama.
+        const useOpenRouter = (isSentiment || isRatingRequest || isChat) ? true : false;
         
         let apiURL = "";
         let apiKey = "";
@@ -54,8 +54,8 @@ export async function POST(req: Request) {
             // MOTOR OpenRouter
             apiKey = process.env.OPENROUTER_API_KEY || "";
             apiURL = "https://openrouter.ai/api/v1/chat/completions";
-            // Rating usa Nemotron (potente/lento). Saúde e Sentimento usam Llama 3 70B (rápido e inteligente).
-            model = isHealth || isSentiment ? "meta-llama/llama-3.3-70b-instruct:free" : "nvidia/nemotron-3-super-120b-a12b:free";
+            // Rating usa o Nemotron (potente/lento). Saúde, Sentimento e CHAT usam Llama 3 70B (rápido e inteligente).
+            model = isRatingRequest ? "nvidia/nemotron-3-super-120b-a12b:free" : "meta-llama/llama-3.3-70b-instruct:free";
             headers["Authorization"] = `Bearer ${apiKey}`;
             headers["HTTP-Referer"] = "https://rastro-sooty.vercel.app";
         } else {
@@ -81,8 +81,12 @@ export async function POST(req: Request) {
 
         let systemInstruction = `Você é um analista sênior da RASTRO, uma plataforma premium de inteligência de mercado com estética Bloomberg/Terminal.
         Seu tom é extremamente profissional, direto, técnico e imparcial. 
-        Evite frases genéricas. Vá direto aos dados. 
-        Use português do Brasil.`;
+        REGRAS LEGAIS RESTRITAS (CVM 20/2021):
+        - JAMAIS use termos como "lucro garantido", "rendimento certo", "sem risco" ou "fique rico".
+        - JAMAIS prometa rentabilidade futura.
+        - JAMAIS dê ordens diretas de "Compre" ou "Venda".
+        - Diferencie fatos (balanços passados) de projeções (IA).
+        - Use português do Brasil.`;
 
         if (isPulse) {
             systemInstruction += `\nTAREFA: PULSO DE IA. Forneça um diagnóstico de CURTÍSSIMO PRAZO (Day Trade/Swing Trade) para ${ticker} (${assetName}).
@@ -110,7 +114,6 @@ export async function POST(req: Request) {
 
             systemInstruction += `\nSaída obrigatória em JSON: { "score": number, "label": string, "analysis": string }.`;
         } else if (isSummary) {
-        } else if (isSummary) {
             systemInstruction += `\nTAREFA: RESUMO EXECUTIVO. Analise o relatório qualitativo e forneça 3 pontos positivos (bullCase) e 3 pontos negativos (bearCase) para ${ticker} (${assetName}).
             Retorne EXCLUSIVAMENTE um JSON com:
             - "bullCase": array de 3 objetos com { "title": "título curto", "desc": "descrição curta" }.
@@ -119,7 +122,7 @@ export async function POST(req: Request) {
             systemInstruction += `\nTAREFA: SAÚDE E RATING. Retorne EXCLUSIVAMENTE um JSON com:
             - "score": nota de 0 a 100 (onde 100 é excelente e 0 é péssimo).
             - "obs": um Veredito/Opinião curtíssima (máx 12 palavras) avaliando a qualidade dos fundamentos. Exemplo: "Boa rentabilidade, mas muito cara." NÃO repita os números.
-            - "verdict": "Compra", "Venda", "Neutro" ou "Alerta".
+            - "verdict": "Oportunidade", "Risco Alto", "Neutro" ou "Alerta".
             - "summary": tese de investimento resumida.
             - "pillars": array de 4-5 objetos com { "label": "...", "score": 9.5, "status": "pos", "neg" ou "neu", "desc": "..." }.
             - "fiiMetrics": objeto contendo OBRIGATORIAMENTE (se for FII) { "pvp", "vacancia", "dy", "patrimonio" } encontrados no texto. Use "N/D" se não achar.
@@ -132,8 +135,42 @@ export async function POST(req: Request) {
             - "fairPrice": número representando o preço alvo / intrínseco.
             - "upside": número representando o potencial de valorização em porcentagem.`;
         } else if (isChat) {
-            systemInstruction += `\nTAREFA: ANALISTA DE CHAT. RESPONDA ao usuário sobre o ativo ${ticker} (${assetName}) baseando-se no relatório fornecido.
-            Seja curto, grosso, técnico e sênior. Não use frases amigáveis demais.
+            systemInstruction += `\nTAREFA: ANALISTA DE CHAT. Sua missão é EXPLICAR e JUSTIFICAR tecnicamente os dados do ativo ${ticker} (${assetName}) e a nota atribuída.
+            
+            ${systemContext ? systemContext : ''}
+            
+            DIRETRIZES DE TOM:
+            - Tom: Bloomberg Terminal / Sênior Institutional. 
+            - Estilo: Curto, direto, focado em números e fatos. Zero "papo furado".
+            - Autonomia: Você É o autor da Nota de Solidez abaixo.
+            
+            REGRA DE OURO: Nunca contradiga o Score ou a Tese de Investimento que já estão na tela (${indicators?.investorThesis || 'N/A'}). Baseie suas respostas nesses números atuais e no relatório 360.
+            
+            CONTEXTO ATUAL DO ATIVO:
+            - Sua Nota de Solidez: ${indicators?.score || 'N/A'}/10
+            - Setor: ${indicators?.sector || 'N/A'}
+            - Preço Atual: R$ ${indicators?.price || 'N/A'}
+            - Dividend Yield: ${indicators?.dy || 'N/A'}%
+            - ROE: ${indicators?.roe || 'N/A'}%
+            - P/L: ${indicators?.pl || 'N/A'}x
+            - Valor Justo DCF: R$ ${indicators?.fairPrice || 'N/A'}
+            - Número de Graham: R$ ${indicators?.graham || 'N/A'}
+            - Preço-teto de Bazin: R$ ${indicators?.bazin || 'N/A'}
+            
+            SENTIMENTO E MOMENTO (DADOS DA TELA):
+            - Sentimento do Mercado: Nota ${indicators?.sentiment?.score || 'N/A'} (${indicators?.sentiment?.label || 'N/A'}). Justificativa: ${indicators?.sentiment?.analysis || 'N/A'}
+            - Pulso de IA: Nota ${indicators?.pulse?.score || 'N/A'}. Insight: ${indicators?.pulse?.insight || 'N/A'}
+            - Pontos Positivos (Bull Case): ${indicators?.analysis?.bullCase?.map((b: any) => b.title).join(', ') || 'N/A'}
+            - Pontos Negativos (Bear Case): ${indicators?.analysis?.bearCase?.map((b: any) => b.title).join(', ') || 'N/A'}
+            
+            REGRAS CRÍTICAS:
+            1. Quando o usuário questionar a nota (ex: "pq a nota X?"), faça um DEEP DIVE técnico. Relacione os indicadores (ROE, Margens, Endividamento) citados no RELATÓRIO DE FUNDAMENTOS com o peso que você deu para chegar no resultado final.
+            2. Se questionado sobre SENTIMENTO (ex: "pq o sentimento está em X?"), use a Justificativa do Sentimento fornecida acima para fundamentar sua resposta.
+            3. Se questionado sobre VALUATION (Bazin, Graham, DCF), utilize EXCLUSIVAMENTE os valores fornecidos no CONTEXTO acima.
+            4. NUNCA sugira "Compra" ou "Venda". Se perguntado se deve comprar, analise os fundamentos e riscos, deixando o veredito para o usuário.
+            5. ADICIONE SEMPRE esta nota no final da resposta: "\n\n*Nota: Esta é uma análise automatizada para fins informativos. Não constitui recomendação de investimento.*"
+            6. Evite disclaimers repetitivos além da nota obrigatória acima.
+            
             Retorne EXCLUSIVAMENTE um JSON com a chave "reply".`;
         }
 

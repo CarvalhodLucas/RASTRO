@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import MarketTicker from "@/components/MarketTicker";
 import Link from "next/link";
 import { Asset, assetsDatabase, normalizeTickerForCache } from "@/lib/data";
+import { LUCAS_KNOWLEDGE } from "@/lib/knowledge";
 
 interface PortfolioAsset extends Asset {
     symbol?: string;
@@ -743,27 +744,40 @@ ESTRUTURA DE RESPOSTA:
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || isAIThinking) return;
         const userMsg = text.trim();
-        const isFirst = messages.filter(m => m.role === 'user').length === 0;
         setMessages(prev => [...prev, { role: "user", text: userMsg }]);
         setChatInput("");
         setIsAIThinking(true);
+        
         const ctx = prepareAgentContext();
-        const fullPrompt = `${ctx}\n\nPERGUNTA DO USUÁRIO: ${userMsg}`;
+        
+        // System Prompt Oculto para o Rastro Sênior
+        const seniorSystemPrompt = `Você é o RASTRO SÊNIOR, um analista de investimentos de elite. Sua base de conhecimento e diretrizes são: ${LUCAS_KNOWLEDGE}
+
+        DIRETRIZ DE RESPOSTA: Nunca contradiga a tese ou o score que aparecem na tela para os ativos da watchlist. Aja como um mentor que explica esses números com base na sua metodologia.
+        
+        SNAPSHOT EM TEMPO REAL:
+        ${ctx}`;
 
         try {
-            const res = await fetch("/api/chat", {
+            // Migrando para a rota /api/grok que suporta Llama 3 e injeção de Conhecimento
+            const res = await fetch("/api/grok", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    prompt: fullPrompt,
-                    systemPrompt: SENIOR_AGENT_PROMPT,
-                    history: messages.map(m => ({ role: m.role === 'ia' ? 'assistant' : 'user', content: m.text }))
+                    prompt: userMsg,
+                    isChat: true,
+                    systemContext: seniorSystemPrompt,
+                    ticker: "PORTFOLIO",
+                    assetName: "Minha Carteira",
+                    indicators: {
+                        portfolioSnapshot: ctx
+                    }
                 })
             });
             const data = await res.json();
             setMessages(prev => [...prev, { role: "ia", text: data.reply || data.text || "Sem resposta." }]);
         } catch (e) {
-            setMessages(prev => [...prev, { role: "ia", text: "Erro na análise." }]);
+            setMessages(prev => [...prev, { role: "ia", text: "Erro na análise sênior." }]);
         } finally {
             setIsAIThinking(false);
         }

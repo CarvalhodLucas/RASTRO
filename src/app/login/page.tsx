@@ -163,7 +163,10 @@ export default function LoginPage() {
                 {/* Forms */}
                 {!showTerms && !verifyingSignup && activeTab === "login" && (
                     <form onSubmit={handleLogin} className="space-y-4">
-                        <button type="button" onClick={() => { localStorage.setItem("pending_auth_mode", "login"); signIn("google"); }} className="w-full py-3 bg-white text-black font-bold rounded-lg flex items-center justify-center gap-2 mb-6">Continuar com Google</button>
+                        <button type="button" onClick={() => { localStorage.setItem("pending_auth_mode", "login"); signIn("google"); }} className="w-full py-3 bg-white text-black font-bold rounded-lg flex items-center justify-center gap-2 mb-2">Continuar com Google</button>
+                        <p className="text-[10px] text-slate-500 text-center mb-6 leading-tight">
+                            Ao continuar, você concorda com nossos <Link href="/termos" className="text-primary hover:underline">Termos de Uso</Link> e <Link href="/privacidade" className="text-primary hover:underline">Política de Privacidade</Link>.
+                        </p>
                         <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black border border-neutral-dark-border p-3 rounded-lg outline-none focus:border-primary" />
                         <input type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-neutral-dark-border p-3 rounded-lg outline-none focus:border-primary" />
                         <button type="submit" className="w-full py-3 bg-primary text-black font-bold rounded-lg">Entrar</button>
@@ -172,7 +175,10 @@ export default function LoginPage() {
 
                 {!showTerms && !verifyingSignup && activeTab === "register" && (
                     <form onSubmit={handleRegister} className="space-y-4">
-                        <button type="button" onClick={() => { localStorage.setItem("pending_auth_mode", "register"); signIn("google"); }} className="w-full py-3 bg-white text-black font-bold rounded-lg flex items-center justify-center gap-2 mb-6">Continuar com Google</button>
+                        <button type="button" onClick={() => { localStorage.setItem("pending_auth_mode", "register"); signIn("google"); }} className="w-full py-3 bg-white text-black font-bold rounded-lg flex items-center justify-center gap-2 mb-2">Continuar com Google</button>
+                        <p className="text-[10px] text-slate-500 text-center mb-6 leading-tight">
+                            Ao continuar, você concorda com nossos <Link href="/termos" className="text-primary hover:underline">Termos de Uso</Link> e <Link href="/privacidade" className="text-primary hover:underline">Política de Privacidade</Link>.
+                        </p>
                         <input type="text" placeholder="Nome" value={regName} onChange={e => setRegName(e.target.value)} className="w-full bg-black border border-neutral-dark-border p-3 rounded-lg outline-none focus:border-primary" />
                         <input type="email" placeholder="E-mail" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full bg-black border border-neutral-dark-border p-3 rounded-lg outline-none focus:border-primary" />
                         <input type="password" placeholder="Senha" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-black border border-neutral-dark-border p-3 rounded-lg outline-none focus:border-primary" />

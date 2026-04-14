@@ -21,124 +21,16 @@ const InfoTooltip = ({ text }: { text: string }) => (
     </div>
 );
 
-// Função para gerir horários internacionais e contagem regressiva
-const getMarketStatus = (asset: any) => {
-    try {
-        // 1. Identificação Robusta de Cripto
-        const ticker = asset?.ticker?.toUpperCase() || "";
-        // Se tiver 'isCrypto' no banco, ou se o ticker contiver padrões comuns de cripto
-        const isCrypto = asset?.isCrypto ||
-            ticker.includes("BTC") ||
-            ticker.includes("ETH") ||
-            ticker.includes("USDT") ||
-            (!ticker.includes(".SA") && !asset?.fundamentalData); // Criptos não têm P/L
-
-        if (isCrypto) {
-            return { isOpen: true, label: "LIVE 24/7", countdown: "" };
-        }
-
-        // 2. Lógica de Horário para B3 e EUA
-        const brTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-        const hours = brTime.getHours();
-        const minutes = brTime.getMinutes();
-        const day = brTime.getDay();
-        const currentTime = hours * 60 + minutes;
-
-        const isWeekend = day === 0 || day === 6;
-        // Truque: Tickers dos EUA não têm números, os da B3 têm (ex: PETR4)
-        const hasNumbers = /\d/.test(ticker);
-        const isB3 = ticker.includes(".SA") || hasNumbers;
-        const isUS = !isB3;
-
-        const openTime = isUS ? 630 : 600; // EUA 10h30, B3 10h
-        const closeTime = 1020; // 17h
-
-        const isOpen = !isWeekend && currentTime >= openTime && currentTime < closeTime;
-
-        // 3. Cálculo da Contagem (Só para Ações)
-        let countdown = "";
-        if (!isOpen) {
-            let diff;
-            if (isWeekend || currentTime >= closeTime) {
-                const daysToAdd = day === 5 ? 3 : day === 6 ? 2 : 1;
-                const nextOpen = (daysToAdd * 1440) + openTime;
-                diff = nextOpen - currentTime;
-            } else {
-                diff = openTime - currentTime;
-            }
-            const h = Math.floor(diff / 60);
-            const m = diff % 60;
-            countdown = `${h}h ${m}min`;
-        }
-
-        return { isOpen, countdown, label: isUS ? "NYSE/NASDAQ" : "B3" };
-    } catch (e) {
-        return { isOpen: true, countdown: "", label: "B3" };
-    }
-};
-
-// Função para calcular o Score de Solidez Híbrida (Ações + Criptos)
-const calculateSolidityScore = (assetData: any) => {
-    if (!assetData) return 0;
-
-    const isCrypto = assetData.isCrypto;
-    let score = 0;
-
-    if (isCrypto) {
-        // --- LÓGICA PARA CRIPTOMOEDAS ---
-        const ticker = assetData.ticker?.toUpperCase() || "";
-        // 1. Market Cap / Relevância (Peso 40)
-        if (ticker.includes("BTC")) score += 40;
-        else if (ticker.includes("ETH")) score += 35;
-        else if (ticker.includes("SOL") || ticker.includes("BNB") || ticker.includes("USDT")) score += 25;
-        else score += 15;
-
-        // 2. Estabilidade de Preço / Volatilidade (Peso 30)
-        const variation = Math.abs(parseFloat(assetData.variation) || 0);
-        if (variation < 2) score += 30;
-        else if (variation < 5) score += 20;
-        else if (variation < 10) score += 10;
-
-        // 3. Dominância e Confiança (Peso 30)
-        score += 30; // Base para ativos top listados
-    } else {
-        // --- LÓGICA PARA AÇÕES ---
-        if (!assetData.fundamentalData) return 0;
-        const { roe, dy, margin } = assetData.fundamentalData;
-        const currentPrice = parseFloat(assetData.price) || 0;
-        const grahamPrice = parseFloat(assetData.valuation?.graham) || 0;
-
-        // 1. Rentabilidade (Peso 30)
-        if (parseFloat(roe) > 15) score += 30;
-        else if (parseFloat(roe) > 8) score += 15;
-
-        // 2. Dividendos (Peso 20)
-        if (parseFloat(dy) > 6) score += 20;
-        else if (parseFloat(dy) > 2) score += 10;
-
-        // 3. Preço de Graham (Peso 30)
-        if (currentPrice > 0 && grahamPrice > 0) {
-            if (currentPrice < grahamPrice) score += 30;
-            else if (currentPrice < grahamPrice * 1.2) score += 15;
-        }
-
-        // 4. Margem (Peso 20)
-        if (parseFloat(margin) > 10) score += 20;
-        else if (parseFloat(margin) > 5) score += 10;
-    }
-
-    return Math.min(score, 100);
-};
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-const getSentimentDetails = (value: number) => {
-    if (value <= 25) return { label: 'Medo Extremo', textColor: 'text-red-500', bgColor: 'bg-red-500/10' };
-    if (value <= 44) return { label: 'Medo', textColor: 'text-orange-400', bgColor: 'bg-orange-400/10' };
-    if (value <= 55) return { label: 'Neutro', textColor: 'text-slate-400', bgColor: 'bg-slate-400/10' };
-    if (value <= 75) return { label: 'Ganância', textColor: 'text-green-400', bgColor: 'bg-green-400/10' };
-    return { label: 'Ganância Extrema', textColor: 'text-emerald-500', bgColor: 'bg-emerald-500/10' };
-};
+import { 
+    getMarketStatus, 
+    calculateSolidityScore, 
+    sleep, 
+    getSentimentDetails, 
+    cleanAIText, 
+    hashCode, 
+    formatValue as formatValueUtil, 
+    formatCompactNumber as formatCompactNumberUtil
+} from "@/lib/utils";
 
 const TerminalStatus = () => {
     const [index, setIndex] = useState(0);
@@ -196,12 +88,14 @@ export default function AssetPage() {
     }, [asset]);
     const [htmlReport, setHtmlReport] = useState<string | null>(null);
 
-    // --- ESTADOS DO CHAT ---
+    // --- INÍCIO: ESTADOS DE TELA E INTERAÇÃO ---
     const [chatInput, setChatInput] = useState("");
     const [messages, setMessages] = useState<Array<{ role: "user" | "ia"; text: string }>>([]);
     const [isLoadingChat, setIsLoadingChat] = useState(false);
     const [isReportVisible, setIsReportVisible] = useState(false);
     const [reportDate, setReportDate] = useState<string>("");
+    
+    // Modais e Alertas
     const [showModal, setShowModal] = useState(false);
     const [isInWatchlist, setIsInWatchlist] = useState(false);
     const [modalConfig, setModalConfig] = useState({ title: "", message: "", icon: "check_circle" });
@@ -252,17 +146,8 @@ export default function AssetPage() {
     const [isRatingLoading, setIsRatingLoading] = useState(false);
     const [lastAnalyzedTicker, setLastAnalyzedTicker] = useState("");
 
-    // Helper para limpar formatação Markdown da IA
-    const cleanAIText = (text: string) => {
-        if (!text) return "";
-        return text
-            .replace(/\*\*/g, '') // Remove negrito
-            .replace(/\*/g, '')   // Remove itálico ou bullets
-            .replace(/#/g, '')    // Remove headers
-            .replace(/^[-•]\s+/gm, '') // Remove bullets no início da linha
-            .trim();
-    };
-
+    // Helper importado do Utils
+    // const cleanAIText = ...
     const [compareAiRatingData, setCompareAiRatingData] = useState<any>(null);
     const [compareAiSentiment, setCompareAiSentiment] = useState<any>(null);
     const [aiAnalysis, setAiAnalysis] = useState<any>(null);
@@ -280,7 +165,9 @@ export default function AssetPage() {
     const [fairPriceData, setFairPriceData] = useState<{ fairPrice: number; upside: number } | null>(null);
     const [isLoadingFairPrice, setIsLoadingFairPrice] = useState(false);
     const [isChatLiveOpen, setIsChatLiveOpen] = useState(false);
+    // --- FIM: ESTADOS DE TELA E INTERAÇÃO ---
 
+    // --- INÍCIO: LÓGICA DE IA E FETCHING ---
     // Función para buscar a nota baseada no relatório e indicadores
     const fetchFundamentalRating = async (targetAsset = asset, isComparison = false, force = false): Promise<boolean> => {
         if (!targetAsset?.ticker) return false;
@@ -318,7 +205,7 @@ export default function AssetPage() {
                     if (htmlText.length > 1000) rawReport = htmlText;
                 }
             } catch (e) {
-                console.log("Sem HTML para comparação:", e);
+                // silencioso
             }
         }
 
@@ -356,15 +243,12 @@ export default function AssetPage() {
                 console.warn("Erro ao limpar HTML no processamento de cache:", e);
             }
         }
-        cleanTextForAI = (cleanTextForAI || "").substring(0, 15000).trim();
+        // Limitando o relatório para 10000 caracteres para poupar tokens, dando espaço para o Conhecimento do Lucas.
+        cleanTextForAI = (cleanTextForAI || "").substring(0, 10000).trim();
 
         // --- LÓGICA DE CACHE BASEADA EM CONTEÚDO (OTIMIZAÇÃO E HASH) ---
         const baseTicker = targetAsset.ticker.toUpperCase().replace('.SA', '');
-        const hashCode = (s: string) => {
-            let h = 0;
-            for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
-            return h;
-        };
+        // hashCode imported from Utils
         let reportVersion = cleanTextForAI ? `${cleanTextForAI.length}_${hashCode(cleanTextForAI)}` : 'empty';
         let cacheKey = `ai_rating_v11_${baseTicker}_v${reportVersion}`;
 
@@ -511,7 +395,7 @@ export default function AssetPage() {
             ? `\nINSTRUÇÃO DE EXTRAÇÃO FII: O ativo atual é explicitamente um Fundo Imobiliário (FII). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: P/VP, Vacância Física, Dividend Yield e Patrimônio Líquido. Retorne-os no objeto "fiiMetrics". Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
             : `\nINSTRUÇÃO DE EXTRAÇÃO AÇÕES: O ativo atual é uma Ação Tradicional. Para ROE, P/VP e P/L, use a seção "DADOS NUMÉRICOS COMPLEMENTARES" como fonte prioritária se estiverem corretos. ATENÇÃO MÁXIMA PARA O DIVIDEND YIELD (DY): Procure o valor real do Dividend Yield PRIMEIRAMENTE DENTRO DO "RELATÓRIO DE FUNDAMENTOS" (no corpo do texto). Apenas se não houver citação de DY no texto do relatório, você deve usar o valor fornecido nos "DADOS NUMÉRICOS COMPLEMENTARES" (API). Retorne-os no objeto "stockMetrics". Use "N/D" se não achar nada. NUNCA alucine valores acima de 100% sem evidência extrema no texto.`;
 
-        const reportWithNumbers = `DADOS NUMÉRICOS COMPLEMENTARES (USE ESTA SEÇÃO PARA VALIDAR OS NÚMEROS):
+        const reportWithNumbers = `Você é um analista sênior. Use a seguinte base de conhecimento metodológica para basear sua análise: \n\n${LUCAS_KNOWLEDGE}\n\nAgora, aplique essa metodologia para interpretar o seguinte Relatório 360 do ativo e me dê o Score:\n\nDADOS NUMÉRICOS COMPLEMENTARES (USE ESTA SEÇÃO PARA VALIDAR OS NÚMEROS):
 ROE: ${safeFormatNumber(indicators.roe, true)}%
 P/L: ${safeFormatNumber(indicators.pl)}x
 P/VP: ${safeFormatNumber(indicators.pvp)}x
@@ -1487,6 +1371,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     report: cleanReport,
                     variation: asset.variation,
                     isChat: true,
+                    systemContext: `Você é o Assistente Rastro. Siga estritamente esta metodologia: ${LUCAS_KNOWLEDGE}`,
                     indicators: {
                         price: asset.price,
                         variation: asset.variation,
@@ -1496,7 +1381,10 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                         pl: asset?.fundamentalData?.pl,
                         dy: asset?.fundamentalData?.dy,
                         score: aiRatingData?.score,
-                        verdict: aiRatingData?.verdict
+                        verdict: aiRatingData?.verdict,
+                        investorThesis: investorThesis,
+                        sentiment: aiSentiment,
+                        analysis: aiAnalysis
                     }
                 })
             });
@@ -1992,47 +1880,12 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
             ? "B3"
             : "NASDAQ / NYSE";
 
+    // --- INÍCIO: FUNÇÕES DE FORMATAÇÃO ---
     // 3. Função inteligente de formatação de moeda
-    const formatValue = (value: number | string) => {
-        if (value === "N/D" || value === null || value === undefined) return "N/A";
-        
-        // Se for string, tenta limpar formatação (remove pontos de milhar, troca vírgula por ponto)
-        let numValue: any = value;
-        if (typeof value === 'string') {
-            // Remove símbolos de moeda etc, mantém apenas números, pontos, vírgulas e sinal de menos
-            const cleanStr = value.replace(/[^\d.,-]/g, "");
-            
-            // Heurística: se tem vírgula, assume formato PT-BR (1.234,56)
-            // Se não tem vírgula, assume formato US/Internacional (1234.56)
-            if (cleanStr.includes(',')) {
-                numValue = parseFloat(cleanStr.replace(/\./g, '').replace(',', '.'));
-            } else {
-                numValue = parseFloat(cleanStr);
-            }
-        }
-            
-        if (isNaN(numValue)) return "0.00";
-
-        // Moeda dinâmica baseada no ativo carregado
-        const currencyType = asset.currency === '$' ? 'USD' : 'BRL';
-
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: currencyType,
-            minimumFractionDigits: 2
-        }).format(numValue);
-    };
-
-    const formatCompactNumber = (value: number) => {
-        if (!value || value === 0) return "--";
-        const symbol = asset.currency || "R$";
-        if (value >= 1e12) return `${symbol} ${(value / 1e12).toFixed(1)}T`;
-        if (value >= 1e9) return `${symbol} ${(value / 1e9).toFixed(1)}B`;
-        if (value >= 1e6) return `${symbol} ${(value / 1e6).toFixed(1)}M`;
-        if (value >= 1e3) return `${symbol} ${(value / 1e3).toFixed(1)}K`;
-        return `${symbol} ${value.toFixed(2)}`;
-    };
-
+    // Funções migradas para Utils e envelopadas para manter O JSX intocável
+    const formatValue = (value: number | string) => formatValueUtil(value, asset);
+    const formatCompactNumber = (value: number) => formatCompactNumberUtil(value, asset);
+    // --- FIM: FUNÇÕES DE FORMATAÇÃO ---
 
 
     return (

@@ -109,6 +109,7 @@ export default function SupportChat() {
     const [isLoading, setIsLoading] = useState(false);
     const [showBadge, setShowBadge] = useState(true);
     const [hasTriggeredIdle, setHasTriggeredIdle] = useState(false);
+    const [isFeedbackFlow, setIsFeedbackFlow] = useState(false);
 
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -170,12 +171,27 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         };
 
         window.addEventListener('open-support-chat', handleOpenChatEvent);
+        
+        const handleFeedbackChatEvent = () => {
+            setIsOpen(true);
+            setIsMinimized(false);
+            setShowBadge(false);
+            setIsFeedbackFlow(true);
+            setMessages([{
+                role: "assistant",
+                text: "Olá! Como podemos melhorar o RASTRO? Que feedback você gostaria de enviar?"
+            }]);
+        };
+        window.addEventListener('open-feedback-chat', handleFeedbackChatEvent);
 
         // Sorteando os itens do pool (exibindo todos os 30+ itens no carrossel)
         const shuffled = [...suggestionPool].sort(() => 0.5 - Math.random());
         setRandomSuggestions(shuffled);
 
-        return () => window.removeEventListener('open-support-chat', handleOpenChatEvent);
+        return () => {
+            window.removeEventListener('open-support-chat', handleOpenChatEvent);
+            window.removeEventListener('open-feedback-chat', handleFeedbackChatEvent);
+        };
     }, []);
     const chatRef = useRef<HTMLDivElement>(null);
     const carouselRef = useRef<HTMLDivElement>(null);
@@ -208,6 +224,35 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         setMessages(updatedMessages);
         setInput("");
         setIsLoading(true);
+
+        // --- FLUXO DE FEEDBACK DIRETO (SEM IA) ---
+        if (isFeedbackFlow) {
+            try {
+                // 1. Enviar para a Inbox do Admin
+                await fetch('/api/support/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: user?.email || "usuario@anonimo.com",
+                        subject: "Feedback do Usuário (Rodapé)",
+                        message: text
+                    })
+                });
+
+                // 2. Resposta de agradecimento imediata
+                setTimeout(() => {
+                    setMessages(prev => [...prev, { 
+                        role: "assistant", 
+                        text: "Muito obrigado! Registramos sua mensagem. Como posso te ajudar mais hoje?" 
+                    }]);
+                    setIsFeedbackFlow(false);
+                    setIsLoading(false);
+                }, 800);
+                return;
+            } catch (err) {
+                console.error("Erro ao enviar feedback:", err);
+            }
+        }
 
         try {
             const response = await fetch("/api/chat", {

@@ -5,6 +5,8 @@ import AuthModal from "@/components/AuthModal";
 import Providers from "@/components/Providers";
 import LogoutModal from "@/components/LogoutModal";
 import Footer from "@/components/Footer";
+import CookieBanner from "@/components/CookieBanner";
+import Analytics from "@/components/Analytics";
 
 
 export const metadata: Metadata = {
@@ -44,6 +46,8 @@ export default function RootLayout({
                     <SupportChat />
                     <AuthModal />
                     <LogoutModal />
+                    <CookieBanner />
+                    <Analytics />
                 </Providers>
             </body>
         </html>
