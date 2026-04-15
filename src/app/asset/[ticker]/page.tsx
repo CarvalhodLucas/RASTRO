@@ -1889,12 +1889,12 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
 
     return (
-        <div className="flex h-screen w-full flex-col bg-background-dark text-slate-100 font-display overflow-x-hidden antialiased">
+        <div className="flex min-h-screen w-full flex-col bg-background-dark text-slate-100 font-display overflow-x-hidden antialiased">
             <Header currentPath="/mercado" />
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1">
 
-                <main className="flex-1 overflow-y-auto custom-scrollbar bg-background-dark p-4 md:p-6">
+                <main className="flex-1 bg-background-dark p-4 md:p-6">
                     <div className="mx-auto max-w-7xl space-y-6">
 
                         {/* BACK BUTTON */}
