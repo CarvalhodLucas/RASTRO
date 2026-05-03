@@ -49,6 +49,7 @@ NUNCA dê conselhos financeiros. Se o usuário perguntar "Qual ação eu compro?
 interface Message {
     role: "user" | "assistant";
     text: string;
+    isIdle?: boolean;
 }
 
 const suggestionPool = [
@@ -110,6 +111,7 @@ export default function SupportChat() {
     const [showBadge, setShowBadge] = useState(true);
     const [hasTriggeredIdle, setHasTriggeredIdle] = useState(false);
     const [isFeedbackFlow, setIsFeedbackFlow] = useState(false);
+    const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
 
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -139,7 +141,8 @@ export default function SupportChat() {
             role: "assistant",
             text: `Olá! Notei que você está na seção de **${pageName}** há alguns minutos. 
 
-Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?`
+Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?`,
+            isIdle: true
         };
         setMessages([idleMessage]);
     }, [isOpen, hasTriggeredIdle, pathname, getPageName]);
@@ -177,9 +180,10 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
             setIsMinimized(false);
             setShowBadge(false);
             setIsFeedbackFlow(true);
+            setFeedbackRating(null);
             setMessages([{
                 role: "assistant",
-                text: "Olá! Como podemos melhorar o RASTRO? Que feedback você gostaria de enviar?"
+                text: "Olá! Muito obrigado por testar a fase Beta do RASTRO. Por favor, selecione uma nota de 1 a 5 estrelas abaixo para avaliar sua experiência:"
             }]);
         };
         window.addEventListener('open-feedback-chat', handleFeedbackChatEvent);
@@ -227,6 +231,13 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
 
         // --- FLUXO DE FEEDBACK DIRETO (SEM IA) ---
         if (isFeedbackFlow) {
+            if (feedbackRating === null) {
+                // Se a pessoa digitar sem clicar na estrela, ignoramos ou assumimos 0. Vamos forçar clicar.
+                setMessages(prev => [...prev, { role: "assistant", text: "Por favor, selecione a quantidade de estrelas antes de enviar seu comentário." }]);
+                setIsLoading(false);
+                return;
+            }
+
             try {
                 // 1. Enviar para a Inbox do Admin
                 await fetch('/api/support/message', {
@@ -234,7 +245,7 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email: user?.email || "usuario@anonimo.com",
-                        subject: "Feedback do Usuário (Rodapé)",
+                        subject: `Feedback do Usuário (Beta) - ${feedbackRating} Estrelas`,
                         message: text
                     })
                 });
@@ -243,9 +254,10 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                 setTimeout(() => {
                     setMessages(prev => [...prev, { 
                         role: "assistant", 
-                        text: "Muito obrigado! Registramos sua mensagem. Como posso te ajudar mais hoje?" 
+                        text: "Muito obrigado por sua avaliação! Registramos sua mensagem com sucesso. Como posso te ajudar mais hoje?" 
                     }]);
                     setIsFeedbackFlow(false);
+                    setFeedbackRating(null);
                     setIsLoading(false);
                 }, 800);
                 return;
@@ -255,12 +267,13 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         }
 
         try {
-            const response = await fetch("/api/chat", {
+            const response = await fetch("/api/grok", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: text,
-                    systemPrompt: SUPPORT_PROMPT,
+                    systemContext: SUPPORT_PROMPT,
+                    isSupportChat: true
                 }),
             });
 
@@ -354,15 +367,60 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                         )}
 
                         {messages.map((msg, idx) => (
-                            <div key={idx} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                                <div className={`w-7 h-7 rounded-full flex-none flex items-center justify-center text-[10px] font-bold ${msg.role === "user" ? "bg-slate-700 text-white" : "bg-primary/20 text-primary border border-primary/20"}`}>
-                                    {msg.role === "user" ? "EU" : "S"}
+                            <React.Fragment key={idx}>
+                                <div className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                                    <div className={`w-7 h-7 rounded-full flex-none flex items-center justify-center text-[10px] font-bold ${msg.role === "user" ? "bg-slate-700 text-white" : "bg-primary/20 text-primary border border-primary/20"}`}>
+                                        {msg.role === "user" ? "EU" : "S"}
+                                    </div>
+                                    <div className={`rounded-2xl p-3 max-w-[85%] ${msg.role === "user" ? "bg-primary/20 border border-primary/30 rounded-tr-none text-white" : "bg-zinc-800 border border-zinc-700 rounded-tl-none text-slate-200"}`}>
+                                        <p className="text-xs whitespace-pre-wrap">{msg.text}</p>
+                                    </div>
                                 </div>
-                                <div className={`rounded-2xl p-3 max-w-[85%] ${msg.role === "user" ? "bg-primary/20 border border-primary/30 rounded-tr-none text-white" : "bg-zinc-800 border border-zinc-700 rounded-tl-none text-slate-200"}`}>
-                                    <p className="text-xs whitespace-pre-wrap">{msg.text}</p>
+                                {msg.isIdle && !isFeedbackFlow && (
+                                    <div className="ml-9 mt-1 mb-2 animate-in fade-in slide-in-from-bottom-2">
+                                        <button 
+                                            onClick={() => window.dispatchEvent(new CustomEvent('open-feedback-chat'))}
+                                            className="w-[85%] bg-gradient-to-r from-primary/10 to-transparent hover:from-primary/20 hover:to-primary/5 border border-primary/20 hover:border-primary/50 text-white p-3 rounded-xl flex items-center justify-between group transition-all shadow-lg"
+                                        >
+                                            <div className="flex flex-col text-left gap-0.5">
+                                                <span className="font-bold text-[13px] text-white group-hover:text-primary transition-colors flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined !text-[16px] text-primary">rate_review</span>
+                                                    Testando a fase Beta?
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-medium">Toque aqui para deixar uma avaliação</span>
+                                            </div>
+                                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
+                                                <span className="material-symbols-outlined !text-[14px]">arrow_forward</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        ))}
+
+                        {/* Interactive Stars for Feedback Flow */}
+                        {isFeedbackFlow && feedbackRating === null && !isLoading && (
+                            <div className="flex gap-2 ml-9 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="bg-zinc-800 border border-primary/30 rounded-xl p-3 shadow-lg flex gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            onClick={() => {
+                                                setFeedbackRating(star);
+                                                setMessages(prev => [...prev, 
+                                                    { role: "user", text: `${star} ${star === 1 ? 'Estrela' : 'Estrelas'} ⭐` },
+                                                    { role: "assistant", text: "Excelente! Agora, por favor, digite seu comentário sobre o que achou da plataforma:" }
+                                                ]);
+                                            }}
+                                            className="text-slate-600 hover:text-primary transition-colors focus:outline-none hover:scale-125 transform"
+                                            title={`${star} Estrelas`}
+                                        >
+                                            <span className="material-symbols-outlined !text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                        ))}
+                        )}
 
                         {isLoading && (
                             <div className="flex gap-2">

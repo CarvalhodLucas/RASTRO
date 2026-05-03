@@ -1,0 +1,64 @@
+{
+    "_instrucoes": "Edite apenas os campos 'provider' e 'model' abaixo. O servidor Next.js recarregará automaticamente.",
+    "_providers_disponiveis": [
+        "gemini",
+        "groq",
+        "groq2",
+        "openrouter"
+    ],
+    "sections": {
+        "resumo": {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile"
+        },
+        "pulso": {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile"
+        },
+        "rating": {
+            "provider": "openrouter",
+            "model": "nvidia/nemotron-3-super-120b-a12b:free"
+        },
+        "saude": {
+            "provider": "groq2",
+            "model": "llama-3.3-70b-versatile"
+        },
+        "sentimento": {
+            "provider": "groq2",
+            "model": "llama-3.3-70b-versatile"
+        },
+        "chat": {
+            "provider": "openrouter",
+            "model": "nvidia/nemotron-3-super-120b-a12b:free"
+        },
+        "portfolio_chat": {
+            "provider": "openrouter",
+            "model": "google/gemini-2.0-flash-exp:free"
+        },
+        "support_chat": {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile"
+        }
+    },
+    "_modelos_sugeridos": {
+        "gemini": [
+            "gemini-3-flash-preview",
+            "gemini-3.1-flash-lite-preview"
+        ],
+        "groq": [
+            "llama-3.3-70b-versatile",
+            "llama3-70b-8192",
+            "mixtral-8x7b-32768"
+        ],
+        "groq2": [
+            "llama-3.3-70b-versatile",
+            "llama3-70b-8192",
+            "mixtral-8x7b-32768"
+        ],
+        "openrouter": [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "google/gemini-2.0-flash-exp:free"
+        ]
+    }
+}

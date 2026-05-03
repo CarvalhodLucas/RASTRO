@@ -14,6 +14,7 @@ export default function Home() {
     const [searchFocused, setSearchFocused] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const [hasMounted, setHasMounted] = useState(false);
+    const [liveReviews, setLiveReviews] = useState<any[]>([]);
 
     // -- State for Heatmap --
     const [heatmapMarket, setHeatmapMarket] = useState("B3");
@@ -60,6 +61,33 @@ export default function Home() {
             likes: "1.2k",
             comments: 56,
             time: "há 6h"
+        }
+    ];
+
+    const MOCK_REVIEWS = [
+        {
+            id: 1,
+            name: "Carlos T.",
+            role: "Day Trader",
+            stars: 5,
+            comment: "O mapa de calor com IA é sensacional. O RASTRO conseguiu unificar B3 e Cripto numa interface que parece terminal da Bloomberg. Parabéns pela fase Beta!",
+            date: "Há 2 dias"
+        },
+        {
+            id: 2,
+            name: "Mariana R.",
+            role: "Investidora",
+            stars: 5,
+            comment: "Muito rápido e a integração com o suporte via bot é excelente. Algumas pequenas lentidões ao carregar os gráficos na página do ativo, mas o design compensa tudo.",
+            date: "Há 4 dias"
+        },
+        {
+            id: 3,
+            name: "Felipe S.",
+            role: "Analista VIP",
+            stars: 4,
+            comment: "Os relatórios gerados pela IA são bem completos. Gostaria de ver mais opções de personalização no painel, mas o visual dark-first está impecável.",
+            date: "Há 1 semana"
         }
     ];
 
@@ -133,8 +161,13 @@ export default function Home() {
         return `há ${hours}h`;
     };
 
+    const fetchLock = useRef(false);
+    const isFetchingRef = useRef(false);
+
     // -- Handlers --
     const fetchTickers = React.useCallback(async (force = false) => {
+        if (isFetchingRef.current) return;
+
         if (!force) {
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
@@ -148,33 +181,44 @@ export default function Home() {
             }
         }
 
+        isFetchingRef.current = true;
         setIsRefreshing(true);
         const results: Record<string, { price: string; variation: string }> = {};
-        for (const item of tickerSymbols) {
-            try {
-                const res = await fetch(`/api/quote?ticker=${item.symbol}`);
-                const data = await res.json();
-                if (!data.error) {
-                    results[item.symbol] = {
-                        price: data.price !== "0.00" ? data.price : "N/D",
-                        variation: data.variation || "0.0"
-                    };
+        
+        try {
+            for (const item of tickerSymbols) {
+                try {
+                    const res = await fetch(`/api/quote?ticker=${item.symbol}`);
+                    const data = await res.json();
+                    if (!data.error) {
+                        results[item.symbol] = {
+                            price: data.price !== "0.00" ? data.price : "N/D",
+                            variation: data.variation || "0.0"
+                        };
+                    }
+                } catch (e) {
+                    console.error("Error fetching", item.symbol, e);
                 }
-            } catch (e) {
-                console.error("Error fetching", item.symbol, e);
             }
-        }
 
-        const now = Date.now();
-        setTickerData(results);
-        setCacheTime(now);
-        setIsRefreshing(false);
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: results, timestamp: now }));
+            const now = Date.now();
+            setTickerData(results);
+            setCacheTime(now);
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: results, timestamp: now }));
+        } finally {
+            setIsRefreshing(false);
+            isFetchingRef.current = false;
+        }
     }, []);
 
     useEffect(() => {
         setHasMounted(true);
-        fetchTickers();
+        
+        // Anti-loop lock for initial fetch
+        if (!fetchLock.current) {
+            fetchTickers();
+            fetchLock.current = true;
+        }
 
         // Close search dropdown on click outside
         const handleClickOutside = (event: MouseEvent) => {
@@ -185,6 +229,50 @@ export default function Home() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [fetchTickers]);
+
+    useEffect(() => {
+        const fetchReviews = async () => {
+            try {
+                const res = await fetch('/api/support/message');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const formattedReviews = data
+                    .filter((msg: any) => msg.subject && msg.subject.includes("Feedback do Usuário (Beta)"))
+                    .map((msg: any) => {
+                        const match = msg.subject.match(/(\d+)\sEstrela/);
+                        const stars = match ? parseInt(match[1], 10) : 5;
+                        
+                        let name = "Anônimo";
+                        if (msg.email && msg.email !== "usuario@anonimo.com") {
+                            name = msg.email.split('@')[0];
+                            name = name.charAt(0).toUpperCase() + name.slice(1);
+                        }
+
+                        const diffMs = Date.now() - new Date(msg.createdAt).getTime();
+                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                        const dateStr = diffDays === 0 ? "Hoje" : diffDays === 1 ? "Ontem" : `Há ${diffDays} dias`;
+
+                        return {
+                            id: msg.id,
+                            name: name,
+                            role: "Beta Tester",
+                            stars: stars,
+                            comment: msg.message,
+                            date: dateStr
+                        };
+                    });
+
+                setLiveReviews(formattedReviews);
+            } catch (error) {
+                console.error("Error fetching live reviews:", error);
+            }
+        };
+
+        if (hasMounted) {
+            fetchReviews();
+        }
+    }, [hasMounted]);
 
     // -- Derived Data --
     const searchResults = useMemo(() => {
@@ -342,6 +430,7 @@ export default function Home() {
                             <Link className="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm" href="/asset/PETR4">PETR4</Link>
                             <Link className="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm" href="/asset/VALE3">VALE3</Link>
                             <Link className="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm" href="/asset/AAPL">AAPL</Link>
+                            <Link className="px-3 py-1 rounded-full bg-neutral-dark-surface border border-neutral-dark-border text-slate-300 hover:border-primary hover:text-primary transition-all shadow-sm" href="/asset/NU">NU</Link>
                         </div>
                     </section>
 
@@ -535,6 +624,72 @@ export default function Home() {
                             })
                         )}
                     </div>
+
+                    {/* Beta Reviews Section */}
+                    <section className="py-12 border-t border-neutral-dark-border w-full">
+                        <div className="text-center mb-10">
+                            <h2 className="text-white text-3xl font-bold mb-2">O que nossos usuários <span className="text-primary">Beta</span> dizem</h2>
+                            <p className="text-slate-400">Feedback real dos primeiros testadores da plataforma RASTRO.</p>
+                        </div>
+                        
+                        <div className="relative group/carousel mb-10">
+                            {/* Setas de Navegação Desktop */}
+                            <button
+                                onClick={() => {
+                                    const carousel = document.getElementById('reviews-carousel');
+                                    if (carousel) carousel.scrollBy({ left: -350, behavior: 'smooth' });
+                                }}
+                                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 -ml-6 rounded-full bg-zinc-900/90 border border-zinc-700 text-white flex items-center justify-center hover:bg-primary hover:text-black transition-all shadow-2xl hidden md:flex opacity-0 group-hover/carousel:opacity-100"
+                            >
+                                <span className="material-symbols-outlined text-2xl">chevron_left</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const carousel = document.getElementById('reviews-carousel');
+                                    if (carousel) carousel.scrollBy({ left: 350, behavior: 'smooth' });
+                                }}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 -mr-6 rounded-full bg-zinc-900/90 border border-zinc-700 text-white flex items-center justify-center hover:bg-primary hover:text-black transition-all shadow-2xl hidden md:flex opacity-0 group-hover/carousel:opacity-100"
+                            >
+                                <span className="material-symbols-outlined text-2xl">chevron_right</span>
+                            </button>
+
+                            <div id="reviews-carousel" className="flex overflow-x-auto snap-x snap-mandatory gap-6 no-scrollbar pb-6 pt-2 px-1">
+                                {[...liveReviews, ...MOCK_REVIEWS].map((review, idx) => (
+                                    <div key={`${review.id}-${idx}`} className="min-w-[85vw] md:min-w-[350px] w-[85vw] md:w-[350px] snap-start bg-[#121212] border border-[#333] rounded-xl p-6 shadow-lg hover:border-primary/50 transition-all flex flex-col justify-between flex-none">
+                                        <div>
+                                            <div className="flex text-primary mb-4">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <span key={i} className={`material-symbols-outlined !text-[20px] ${i < review.stars ? 'text-primary' : 'text-slate-700'}`} style={i < review.stars ? { fontVariationSettings: "'FILL' 1" } : {}}>star</span>
+                                                ))}
+                                            </div>
+                                            <p className="text-slate-300 text-sm leading-relaxed mb-6 italic">"{review.comment}"</p>
+                                        </div>
+                                        <div className="flex items-center justify-between border-t border-[#333] pt-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-white font-bold text-sm">{review.name}</span>
+                                                <span className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">{review.role}</span>
+                                            </div>
+                                            <span className="text-slate-600 text-xs font-medium">{review.date}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="text-center md:text-left">
+                                <h3 className="text-white text-xl font-bold mb-1">Você já testou a plataforma?</h3>
+                                <p className="text-slate-400 text-sm">Sua opinião é fundamental para moldar o futuro do RASTRO.</p>
+                            </div>
+                            <button 
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-feedback-chat'))}
+                                className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:bg-[#d9a41e] hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 whitespace-nowrap"
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">rate_review</span>
+                                Deixe sua avaliação
+                            </button>
+                        </div>
+                    </section>
 
                 </div>
             </main>

@@ -2424,6 +2424,26 @@ export const b3Assets: Asset[] = [
         dividendYield: "--",
         lastUpdate: "31/03/2026"
     },
+    {
+        ticker: "ROXO34.SA",
+        type: "Ações",
+        name: "Nubank (Nu Holdings Ltd.)",
+        price: "0.00",
+        variation: "0.0",
+        sector: "Financeiro",
+        exchange: "B3",
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
+        logo: "https://www.google.com/s2/favicons?domain=nubank.com.br&sz=128",
+        size: 10,
+        cgId: "",
+        aiPulse: "Líder em tecnologia financeira e inovação bancária na América Latina.",
+        marketCap: "250B",
+        peRatio: "--",
+        dividendYield: "--",
+        lastUpdate: "22/04/2026"
+    },
 ];
 
 export const cryptoAssets: Asset[] = [
@@ -3086,6 +3106,7 @@ export const sp500Assets: Asset[] = [
     { ticker: "WMT", name: "Walmart Inc.", price: "0.00", variation: "0.0", sector: "Consumo", exchange: "NYSE", sentiment: 50, bullCase: [], bearCase: [], logo: "https://www.google.com/s2/favicons?domain=walmart.com&sz=128" },
     { ticker: "CVX", name: "Chevron Corp.", price: "0.00", variation: "0.0", sector: "Energia", exchange: "NYSE", sentiment: 50, bullCase: [], bearCase: [], logo: "https://www.google.com/s2/favicons?domain=chevron.com&sz=128" },
     { ticker: "NKE", name: "Nike Inc.", price: "0.00", variation: "0.0", sector: "Consumo", exchange: "NYSE", sentiment: 50, bullCase: [], bearCase: [], logo: "https://www.google.com/s2/favicons?domain=nike.com&sz=128" },
+    { ticker: "NU", name: "Nu Holdings Ltd.", price: "0.00", variation: "0.0", sector: "Financeiro", exchange: "NYSE", sentiment: 50, bullCase: [], bearCase: [], logo: "https://www.google.com/s2/favicons?domain=nubank.com.br&sz=128" },
 ];
 
 export const originalAssets: Asset[] = [];

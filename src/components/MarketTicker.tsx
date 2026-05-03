@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface TickerItem {
     label: string;
@@ -23,6 +23,7 @@ const MarketTicker: React.FC = () => {
         { label: "Soja", value: "A carregar...", icon: "🌱" },
     ]);
     const [isLoading, setIsLoading] = useState(true);
+    const isFetching = useRef(false);
 
     const formatCompact = (val: number, currency: string = "USD") => {
         return new Intl.NumberFormat('en-US', {
@@ -34,6 +35,9 @@ const MarketTicker: React.FC = () => {
     };
 
     const fetchMarketData = async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+
         const CACHE_KEY = 'market_ticker_cache_v1';
         const SIX_HOURS = 6 * 60 * 60 * 1000;
 
@@ -107,6 +111,8 @@ const MarketTicker: React.FC = () => {
             }));
         } catch (error) {
             console.error("Error fetching market ticker data:", error);
+        } finally {
+            isFetching.current = false;
         }
     };
 

@@ -75,7 +75,10 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
                         <div className="size-8 flex items-center justify-center text-primary">
                             <span className="material-symbols-outlined !text-[32px]">candlestick_chart</span>
                         </div>
-                        <h2 className="text-white text-xl font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-white text-xl font-bold leading-tight tracking-[-0.015em]">RASTRO</h2>
+                            <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[9px] font-black rounded uppercase tracking-wider border border-primary/20 mt-0.5">Beta</span>
+                        </div>
                     </Link>
 
                     {!hideNav && (

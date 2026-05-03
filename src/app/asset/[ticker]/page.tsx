@@ -63,6 +63,50 @@ const TerminalStatus = () => {
     );
 };
 
+const TerminalAdminLog = ({ logs }: { logs: Record<string, string> }) => {
+    const [isMinimized, setIsMinimized] = useState(false);
+    if (Object.keys(logs).length === 0) return null;
+    return (
+        <div className={`fixed bottom-6 left-6 z-[100] max-w-xs w-full transition-all duration-500 ease-in-out ${isMinimized ? 'h-[36px] overflow-hidden' : 'h-auto opacity-100'}`}>
+            <div className="bg-black/90 border border-white/10 rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl">
+                <div 
+                    className="bg-zinc-900 px-4 py-2 flex items-center justify-between border-b border-white/5 cursor-pointer hover:bg-zinc-800 transition-colors"
+                    onClick={() => setIsMinimized(!isMinimized)}
+                >
+                    <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                            <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
+                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/50"></div>
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/50"></div>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest ml-2">AI Engine Log</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black">ADMIN</span>
+                        <span className="material-symbols-outlined text-zinc-500 text-sm">{isMinimized ? 'expand_less' : 'expand_more'}</span>
+                    </div>
+                </div>
+                {!isMinimized && (
+                    <div className="p-4 font-mono text-[10px] space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-300">
+                        {Object.entries(logs).map(([section, source], i) => (
+                            <div key={i} className="flex justify-between items-center gap-4 group">
+                                <span className="text-zinc-400 group-hover:text-white transition-colors">{section}</span>
+                                <span className={`font-bold ${source.includes('CACHE') ? 'text-blue-400' : 'text-primary animate-pulse'}`}>
+                                    {source}
+                                </span>
+                            </div>
+                        ))}
+                        <div className="pt-2 border-t border-white/5 mt-2 flex items-center gap-2">
+                            <span className="w-1 h-1 bg-primary rounded-full animate-ping"></span>
+                            <span className="text-[9px] text-zinc-600 italic">Monitoring AI pipelines...</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 export default function AssetPage() {
     const params = useParams();
@@ -114,6 +158,8 @@ export default function AssetPage() {
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const prevMessagesLength = useRef(messages.length);
     const fetchLocks = useRef<Record<string, boolean>>({});
+    const initialFetchLock = useRef<string | null>(null);
+    const aiFetchLock = useRef<string | null>(null);
 
     // Auto-scroll do chat (Ancoragem por Contexto)
     useEffect(() => {
@@ -145,6 +191,10 @@ export default function AssetPage() {
     const [investorThesis, setInvestorThesis] = useState("");
     const [isRatingLoading, setIsRatingLoading] = useState(false);
     const [lastAnalyzedTicker, setLastAnalyzedTicker] = useState("");
+    
+    // --- ADMIN LOGS ---
+    const [adminLogs, setAdminLogs] = useState<Record<string, string>>({});
+    const isAdmin = user && ADMIN_EMAILS.includes(user.email);
 
     // Helper importado do Utils
     // const cleanAIText = ...
@@ -168,6 +218,87 @@ export default function AssetPage() {
     // --- FIM: ESTADOS DE TELA E INTERAÇÃO ---
 
     // --- INÍCIO: LÓGICA DE IA E FETCHING ---
+    
+    /**
+     * Utilitário unificado para chamadas de IA com retry e tratamento de erro.
+     * Resolve o erro 'Failed to fetch' ao capturar exceções de rede e aplicar retries.
+     */
+    const stableAiFetch = async (
+        type: string,
+        params: Record<string, any>,
+        callbacks: {
+            onStart?: () => void,
+            onSuccess: (data: any) => void,
+            onError?: (err: any) => void,
+            onFinally?: () => void
+        },
+        retryCount = 0
+    ): Promise<boolean> => {
+        if (callbacks.onStart && retryCount === 0) callbacks.onStart();
+
+        try {
+            const res = await fetch("/api/grok", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ticker: ticker,
+                    assetName: asset?.name || ticker,
+                    ...params
+                }),
+            });
+
+            // Tratamento de Rate Limit (429)
+            if (res.status === 429 && retryCount < 2) {
+                const delay = 2000 * Math.pow(2, retryCount);
+                console.warn(`[${type}] Rate Limit 429. Retrying in ${delay}ms...`);
+                await sleep(delay);
+                return stableAiFetch(type, params, callbacks, retryCount + 1);
+            }
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            
+            const data = await res.json();
+            
+            // Captura log de admin
+            if (data._admin_model) {
+                setAdminLogs(prev => ({ ...prev, [type]: data._admin_model }));
+            }
+            
+            // Auto-parse do data.reply se necessário (Heurística de robustez)
+            let finalData = data;
+            if (data.reply && typeof data.reply === "string") {
+                try {
+                    const jsonMatch = data.reply.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const parsed = JSON.parse(jsonMatch[0].replace(/```json/gi, '').replace(/```/g, '').trim());
+                        // Só mescla se o parse resultou em algo útil (ex: tem chaves específicas do tipo)
+                        if (Object.keys(parsed).length > 0) finalData = { ...data, ...parsed };
+                    }
+                } catch (e) {
+                    console.warn(`[${type}] Failed to auto-parse reply string.`, e);
+                }
+            }
+
+            callbacks.onSuccess(finalData);
+            return true;
+
+        } catch (error: any) {
+            console.error(`[${type}] Fetch Error:`, error.message);
+            
+            // Retry em caso de erro de rede (Failed to fetch)
+            if (error.message === "Failed to fetch" && retryCount < 2) {
+                const delay = 1000 * Math.pow(2, retryCount);
+                await sleep(delay);
+                return stableAiFetch(type, params, callbacks, retryCount + 1);
+            }
+
+            if (callbacks.onError) callbacks.onError(error);
+            return false;
+        } finally {
+            if (callbacks.onFinally) callbacks.onFinally();
+        }
+    };
+
     // Función para buscar a nota baseada no relatório e indicadores
     const fetchFundamentalRating = async (targetAsset = asset, isComparison = false, force = false): Promise<boolean> => {
         if (!targetAsset?.ticker) return false;
@@ -304,7 +435,13 @@ export default function AssetPage() {
                             fiiMetrics: data.fiiMetrics || null,
                             etfMetrics: data.etfMetrics || null,
                             cryptoMetrics: data.cryptoMetrics || null,
-                            extractedDY: data.extractedDY || null
+                            extractedDY: data.extractedDY || null,
+                            dcf: data.dcf || null,
+                            dcfUpside: data.dcfUpside || null,
+                            graham: data.graham || null,
+                            grahamUpside: data.grahamUpside || null,
+                            bazin: data.bazin || null,
+                            bazinUpside: data.bazinUpside || null
                         };
 
                         if (isComparison) {
@@ -314,6 +451,7 @@ export default function AssetPage() {
                             setInvestorThesis(cleanAIText(summary));
                             setLastAnalyzedTicker(targetAsset.ticker);
                         }
+                        setAdminLogs(prev => ({ ...prev, "RATING (FUNDAMENTAL)": "CACHE (Local)" }));
                         fetchLocks.current[lockKey] = false;
                         return false; // <-- RETORNA FALSE (Não houve fetch)
                     }
@@ -323,6 +461,8 @@ export default function AssetPage() {
             }
         }
         // ==========================================
+
+        
 
         // O texto já foi limpo no início da função (pré-hashing)
         const currentTextToAnalyze = cleanTextForAI;
@@ -335,6 +475,7 @@ export default function AssetPage() {
 
         if (!force && !isComparison && lastAnalyzedTicker === targetAsset?.ticker && aiRatingData && currentReportHash === lastReportHash) {
             console.log(`⏭️ Ignorando re-análise forçada para ${targetAsset.ticker} (relatório idêntico)`);
+            setAdminLogs(prev => ({ ...prev, "RATING (FUNDAMENTAL)": "CACHE (Local)" }));
             return false; // <-- RETORNA FALSE (Cache hit)
         }
         
@@ -444,6 +585,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 }
 
                 const data = await response.json();
+                if (data._admin_model) setAdminLogs(prev => ({ ...prev, 'RATING (FUNDAMENTAL)': data._admin_model }));
                 console.log("✅ Respuesta de la IA:", data);
 
             if (data && data.score !== undefined) {
@@ -503,6 +645,12 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                     stockMetrics: data.stockMetrics || null,
                     extractedDY: data.extractedDY || null,
                     extractedPrice: data.extractedPrice || null,
+                    dcf: data.dcf || null,
+                    dcfUpside: data.dcfUpside || null,
+                    graham: data.graham || null,
+                    grahamUpside: data.grahamUpside || null,
+                    bazin: data.bazin || null,
+                    bazinUpside: data.bazinUpside || null,
                     lastUpdate: Date.now()
                 };
 
@@ -527,6 +675,12 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                     stockMetrics: finalRatingData.stockMetrics,
                     extractedDY: finalRatingData.extractedDY,
                     extractedPrice: finalRatingData.extractedPrice,
+                    dcf: finalRatingData.dcf,
+                    dcfUpside: finalRatingData.dcfUpside,
+                    graham: finalRatingData.graham,
+                    grahamUpside: finalRatingData.grahamUpside,
+                    bazin: finalRatingData.bazin,
+                    bazinUpside: finalRatingData.bazinUpside,
                     reportHash: reportVersion,
                     lastUpdate: finalRatingData.lastUpdate
                 }));
@@ -598,6 +752,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 // Validação mínima de sanidade do cache
                 if (Array.isArray(parsed.data?.bullCase) && Array.isArray(parsed.data?.bearCase)) {
                     setAiAnalysis(parsed.data);
+                    setAdminLogs(prev => ({ ...prev, "RESUMO (IA)": "CACHE (Local)" }));
                     fetchLocks.current[lockKey] = false;
                     return false; // Imutável (Não houve fetch)
                 }
@@ -646,6 +801,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
             }
 
             const data = await res.json();
+            if (data._admin_model) setAdminLogs(prev => ({ ...prev, "RESUMO (IA)": data._admin_model }));
             
             let finalData = data;
             // Robustez: Se o server mandou o fallback de texto (porque falhou no parse do route.ts)
@@ -710,6 +866,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                     console.log(`🟢 [IA] Carregando Sentimento de ${targetAsset.ticker} do Cache Local (24h)`);
                     if (isComparison) setCompareAiSentiment(parsed.data);
                     else setAiSentiment(parsed.data);
+                    setAdminLogs(prev => ({ ...prev, "SENTIMENTO (IA)": "CACHE (Local)" }));
                     fetchLocks.current[lockKey] = false;
                     return false; // Cache hit
                 }
@@ -756,11 +913,21 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                     return fetchWithRetry(retryCount + 1);
                 }
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    console.error(`❌ [SENTIMENTO] Erro ${res.status}:`, errorData);
+                    throw new Error(errorData.details || errorData.error || `HTTP ${res.status}`);
+                }
                 
                 const data = await res.json();
                 if (isComparison) setCompareAiSentiment(data);
                 else setAiSentiment(data);
+                
+                if (data._admin_model) {
+                    setAdminLogs(prev => ({ ...prev, "SENTIMENTO (IA)": data._admin_model }));
+                } else {
+                    setAdminLogs(prev => ({ ...prev, "SENTIMENTO (IA)": "Grok / Gemini (IA)" }));
+                }
 
                 localStorage.setItem(cacheKey, JSON.stringify({
                     data: data,
@@ -805,6 +972,7 @@ INSTRUÇÃO IMPORTANTE: Baseie o seu Score de Solidez (0-100) e o Veredito MAIOR
                 const parsed = JSON.parse(cachedData);
                 console.log(`🟢 [IA] Carregando Saúde Financeira de ${asset.ticker} (Hash Match)`);
                 setAiHealth(parsed.data);
+                setAdminLogs(prev => ({ ...prev, "SAÚDE FINANCEIRA": "CACHE (Local)" }));
                 fetchLocks.current[lockKey] = false;
                 return false; // Imutável
             } catch (e) {
@@ -852,297 +1020,71 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     return fetchWithRetry(retryCount + 1);
                 }
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    console.error(`❌ [SAÚDE] Erro ${res.status}:`, errorData);
+                    throw new Error(errorData.details || errorData.error || `HTTP ${res.status}`);
+                }
 
                 const data = await res.json();
-                
-                let finalData = data;
-                if (data.reply && !data.score) {
+                if (data._admin_model) setAdminLogs(prev => ({ ...prev, 'SAÚDE FINANCEIRA': data._admin_model }));
+
+                let finalHealthData = data;
+                if (data.reply) {
                     try {
-                        const rawStr = data.reply;
+                        const rawStr = typeof data.reply === "string" ? data.reply : JSON.stringify(data.reply);
                         const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
                         const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
-                        const parsed = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-                        if (parsed.score) finalData = parsed;
+                        finalHealthData = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
                     } catch (pe) {
-                        console.error("Falha no parse forçado de Saúde:", pe);
+                        console.error("Erro ao dar parse no reply da Saúde:", pe);
+                        finalHealthData = { error: true };
                     }
                 }
 
-                setAiHealth(finalData);
-                if (finalData.score) {
-                    // 3. Guarda o resultado no localStorage com o timestamp atual
-                    localStorage.setItem(cacheKey, JSON.stringify({
-                        data: finalData,
-                        timestamp: Date.now()
-                    }));
-                }
+                setAiHealth(finalHealthData);
+                localStorage.setItem(cacheKey, JSON.stringify({ data: finalHealthData, timestamp: Date.now() }));
+
+            } catch (e) {
+                console.error("Erro na Saúde Financeira:", e);
+                setAiHealth({ error: true });
             } finally {
                 setIsLoadingHealth(false);
                 fetchLocks.current[lockKey] = false;
             }
-            return true; // Rede
-        };
-
-        return await fetchWithRetry();
-    };
-
-    // --- FUNÇÃO PARA ESTIMAR VALOR JUSTO DCF VIA GROK/LLAMA ---
-    const fetchFairPrice = async (): Promise<boolean> => {
-        if (!asset?.ticker || !asset?.price) return false;
-
-        const currentPrice = parseFloat(asset.price);
-        if (!currentPrice || currentPrice <= 0) return false;
-
-        const baseTicker = asset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `fair_price_cache_${baseTicker}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            try {
-                const parsed = JSON.parse(cached);
-                const now = Date.now();
-                const savedTime = parsed.timestamp || 0;
-                const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-                
-                if (parsed.fairPrice && parsed.fairPrice > 0 && (now - savedTime < ONE_DAY_MS)) {
-                    setFairPriceData(parsed);
-                    return false; // Cache hit
-                }
-            } catch (e) {}
-        }
-
-        setIsLoadingFairPrice(true);
-        const fetchWithRetry = async (retryCount = 0): Promise<boolean> => {
-            try {
-                const res = await fetch("/api/grok", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        ticker: asset.ticker,
-                        name: asset.name,
-                        report: asset.fullReport || `Análise de preço para ${asset.ticker}`,
-                        isFairPrice: true
-                    }),
-                });
-
-                if (res.status === 429 && retryCount < 2) {
-                    const currentDelay = 2000 * Math.pow(2, retryCount);
-                    await sleep(currentDelay);
-                    return fetchWithRetry(retryCount + 1);
-                }
-
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                let finalData = data;
-
-                if (data.reply && !data.fairPrice) {
-                    try {
-                        const rawStr = data.reply;
-                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
-                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
-                        const parsed = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-                        if (parsed.fairPrice) finalData = parsed;
-                    } catch (pe) {}
-                }
-
-                if (finalData?.fairPrice && finalData.fairPrice > 0) {
-                    const result = { fairPrice: finalData.fairPrice, upside: finalData.upside ?? 0 };
-                    setFairPriceData(result);
-                    localStorage.setItem(cacheKey, JSON.stringify({ ...result, timestamp: Date.now() }));
-                }
-            } catch (e) {
-                console.error("Erro no Valor Justo:", e);
-            } finally {
-                setIsLoadingFairPrice(false);
-            }
             return true;
         };
 
         return await fetchWithRetry();
     };
 
-    // --- FUNÇÃO PARA BUSCAR MÉTRICAS ON-CHAIN (GROK) ---
-    const fetchOnChainMetrics = async (): Promise<boolean> => {
-        // Só executa se o ativo for uma criptomoeda
-        if (!asset || !asset.ticker || !asset.isCrypto) return false;
-        
-        const baseTicker = asset.ticker.toUpperCase().replace('.SA', '');
-        const cacheKey = `onchain_cache_${baseTicker}`;
-        const now = new Date();
-        // 1. TENTA LER DO CACHE SEMANAL
-        try {
-            const cachedStr = localStorage.getItem(cacheKey);
-            if (cachedStr) {
-                const cachedData = JSON.parse(cachedStr);
-                const lastUpdate = new Date(cachedData.lastUpdate);
-                const diffDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-                
-                const isValidCache = cachedData.data && cachedData.data.tvl !== "--" && cachedData.data.wallets !== "Desconhecida" && cachedData.data.wallets !== "Erro na IA" && cachedData.data.s2f;
+    // 5. FUNÇÃO: PULSO DE IA
+    const fetchAiPulse = async (targetAsset = asset, isComparison = false, force = false): Promise<boolean> => {
+        if (!targetAsset || !targetAsset.ticker) return false;
 
-                if (diffDays < 7 && isValidCache) {
-                    console.log(`⚡ Usando cache SEMANAL de Métricas On-chain para ${asset.ticker}`);
-                    setOnChainMetrics(cachedData.data);
-                    return false; // Cache hit
-                }
-            }
-        } catch (e) {}
-        
-        // 2. SE NÃO HOUVER CACHE, FAZ O FETCH AO GROK
-        setIsLoadingOnChain(true);
-
-        const promptOnChain = `OBRIGATÓRIO: Com base em seu amplo conhecimento da criptomoeda ${asset.ticker} (${asset.name}), avalie seus fundamentos on-chain. Atue como um analista de dados on-chain. Retorne APENAS um JSON válido. O JSON deve ter EXATAMENTE estas 6 chaves e seus valores em formato de texto curto:
-"tvl": Total Value Locked atual (ex: "$5.2B" ou "Crescente").
-"wallets": nível de atividade da rede / endereços (ex: "Alta" ou "1.2M").
-"inflation": inflação anual do token estimada (ex: "< 5%" ou "2.5%").
-"revenue": taxas geradas pela rede na atualidade (ex: "Positivo" ou "$100k/dia").
-"s2f": Ratio do Modelo Stock-to-Flow atual (ex: "59.4" para BTC. Se não for aplicável à moeda, retorne "N/A").
-"score": nota de 0 a 100 avaliando a saúde geral on-chain.`;
-
-        const fetchWithRetry = async (retryCount = 0): Promise<boolean> => {
-            try {
-                console.log(`🚀 Buscando Métricas On-chain para ${asset.ticker} via Grok... (Tentativa ${retryCount + 1})`);
-                
-                const res = await fetch("/api/grok", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        ticker: asset.ticker,
-                        name: asset.name,
-                        report: promptOnChain,
-                        isOnChain: true
-                    }),
-                });
-
-                if (res.status === 429 && retryCount < 2) {
-                    const currentDelay = 2000 * Math.pow(2, retryCount);
-                    console.warn(`⚠️ [ON-CHAIN] Rate Limit (429). Aguardando ${currentDelay}ms...`);
-                    await sleep(currentDelay);
-                    return fetchWithRetry(retryCount + 1);
-                }
-
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                const data = await res.json();
-                
-                // Proteção contra fallback de erro do route.ts
-                if (data.error || data.label === "Erro") {
-                    throw new Error("A API retornou o bloco de fallback de erro.");
-                }
-
-                // Se a API falhou o parse nativo e mandou string no data.reply, fazemos o parse aqui
-                let parsedData = data;
-                if (data.reply && !data.tvl) {
-                    try {
-                        let rawStr = typeof data.reply === "string" ? data.reply : String(data.reply);
-                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) rawStr = jsonMatch[0];
-                        parsedData = JSON.parse(rawStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-                    } catch (pe) {
-                        console.error("Falha no parse forçado de On-chain:", pe);
-                    }
-                }
-
-                // Mapeia os dados finais (agora parsedData já é o objeto correto)
-                const finalMetrics = {
-                    tvl: parsedData.tvl || "--",
-                    wallets: parsedData.wallets || "Desconhecida",
-                    inflation: parsedData.inflation || "--",
-                    revenue: parsedData.revenue || "Desconhecido",
-                    s2f: parsedData.s2f || "--", // Nova chave mapeada
-                    score: typeof parsedData.score === 'number' ? parsedData.score : 50
-                };
-
-                setOnChainMetrics(finalMetrics);
-                
-                // Só salva no cache se não for o fallback cego, para não congelar o erro por 7 dias
-                if (finalMetrics.tvl !== "--" && finalMetrics.wallets !== "Desconhecida" && finalMetrics.wallets !== "Erro na IA") {
-                    localStorage.setItem(cacheKey, JSON.stringify({ data: finalMetrics, lastUpdate: now.toISOString() }));
-                }
-            } catch (error) {
-                console.error("❌ Falha nas Métricas On-chain:", error);
-                setOnChainMetrics({ tvl: "--", wallets: "Erro na IA", inflation: "--", revenue: "Erro na IA", score: 0 });
-            } finally {
-                setIsLoadingOnChain(false);
-            }
-            return true;
-        };
-
-        return await fetchWithRetry();
-    };
-
-    // 4. ÚNICO EFFECT PARA DISPARAR TUDO (STAGGERED PARA EVITAR 429)
-    useEffect(() => {
-        // Aguarda ter o ticker E o relatório qualitativo (ou confirmação de que não há relatório)
-        // Isso evita disparar análises baseadas em dados voláteis (preço) antes da hora
-        const isReportReady = htmlReport !== null || asset?.qualitativeReport;
-        if (!asset?.ticker || !isReportReady) return;
-
-        const loadAiData = async () => {
-            console.log("🚀 Iniciando carga SIMULTÂNEA de todos os módulos de IA...");
-
-            // Dispara tudo em paralelo para velocidade máxima
-            await Promise.allSettled([
-                fetchFundamentalRating(),
-                fetchAiAnalysis(),
-                fetchAiHealth(),
-                fetchMarketSentiment(),
-                fetchAiPulse(),
-                fetchFairPrice(),
-                fetchOnChainMetrics()
-            ]);
-
-            console.log("✅ Carga simultânea concluída.");
-        };
-
-        loadAiData();
-    }, [asset?.ticker, htmlReport, asset?.qualitativeReport]);
-
-
-
-    // Verifica se já existe um alerta para este ticker ao abrir a página
-    useEffect(() => {
-        const savedAlerts = JSON.parse(localStorage.getItem('user_alerts') || '{}');
-        if (savedAlerts[ticker]) {
-            setHasAlert(true);
-            setAlertPrice(savedAlerts[ticker].targetPrice);
-        }
-    }, [ticker]);
-
-    // Função para pedir permissão de notificações no navegador
-    const requestNotificationPermission = async () => {
-        if ("Notification" in window) {
-            const permission = await Notification.requestPermission();
-            return permission === "granted";
-        }
-        return false;
-    };
-
-    // --- SINCRONIZAÇÃO COMPONENT STATE ---
-
-    const fetchAiPulse = async (targetAsset = asset, isComparison = false) => {
-        if (!targetAsset || !targetAsset.ticker) return;
-
-        // --- LOCK DE CONCORRÊNCIA (SEMÁFORO) ---
         const lockKey = `pulse_${isComparison ? 'compare' : 'main'}_${targetAsset.ticker}`;
-        if (fetchLocks.current[lockKey]) return;
+        if (fetchLocks.current[lockKey] && !force) return false;
         fetchLocks.current[lockKey] = true;
 
-        const cacheKey = `grok_pulse_v1_${targetAsset.ticker}`;
+        const cleanT = normalizeTickerForCache(targetAsset.ticker);
+        const cacheKey = `grok_pulse_v4_${cleanT}`;
         const cachedData = localStorage.getItem(cacheKey);
 
-        // 1. Verifica se existe cache e se é válido (4 horas)
-        if (cachedData) {
+        if (cachedData && !force) {
             try {
                 const parsed = JSON.parse(cachedData);
-                const now = Date.now();
-                const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+                // OTIMIZAÇÃO: Se o mercado está fechado e não é cripto, o Pulso não muda.
+                // Estendemos a validade do cache para 48h (fim de semana) para poupar API.
+                const isMarketClosed = !marketStatus.isOpen && !targetAsset.isCrypto;
+                const cacheTTL = isMarketClosed ? 48 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
 
-                if (now - parsed.timestamp < EIGHT_HOURS) {
-                    console.log(`🟢 [IA] Carregando Pulso de ${targetAsset.ticker} do Cache Local (8h)`);
+                if (Date.now() - parsed.timestamp < cacheTTL) {
+                    console.log(`🟢 [IA] Carregando Pulso de ${targetAsset.ticker} (Cache${isMarketClosed ? ' - Mercado Fechado' : ''})`);
                     if (isComparison) setCompareAiPulse(parsed.data);
                     else setAiPulse(parsed.data);
+                    setAdminLogs(prev => ({ ...prev, "PULSO DE IA": "CACHE (Local)" }));
                     fetchLocks.current[lockKey] = false;
-                    return false; // <-- RETORNA FALSE (Cache hit)
+                    return false;
                 }
             } catch (e) {
                 console.error("Erro ao ler cache do Grok (Pulso)", e);
@@ -1151,10 +1093,9 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
 
         if (isComparison) setCompareAiPulse(null);
         else setAiPulse(null);
-
         setIsLoadingPulse(true);
 
-        const fetchWithRetry = async (retryCount = 0): Promise<boolean> => {
+        const fetchWithRetryPulse = async (retryCount = 0): Promise<boolean> => {
             try {
                 console.log(`🚀 A buscar novo Pulso de IA para ${targetAsset.ticker} (Tentativa ${retryCount + 1})`);
 
@@ -1174,13 +1115,18 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     const currentDelay = 2000 * Math.pow(2, retryCount);
                     console.warn(`⚠️ [PULSO] Rate Limit (429). Aguardando ${currentDelay}ms...`);
                     await sleep(currentDelay);
-                    return fetchWithRetry(retryCount + 1);
+                    return fetchWithRetryPulse(retryCount + 1);
                 }
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    console.error(`❌ [PULSO] Erro ${res.status}:`, errorData);
+                    throw new Error(errorData.details || errorData.error || `HTTP ${res.status}`);
+                }
 
                 const data = await res.json();
-                
+                if (data._admin_model) setAdminLogs(prev => ({ ...prev, 'PULSO DE IA': data._admin_model }));
+
                 let finalData = data;
                 if (data.reply) {
                     try {
@@ -1196,26 +1142,22 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
 
                 if (isComparison) setCompareAiPulse(finalData);
                 else setAiPulse(finalData);
-                
-                // 3. Guarda o resultado no localStorage com o timestamp atual
-                localStorage.setItem(cacheKey, JSON.stringify({
-                    data: finalData,
-                    timestamp: Date.now()
-                }));
 
-            } catch (e) {
+                localStorage.setItem(cacheKey, JSON.stringify({ data: finalData, timestamp: Date.now() }));
+
+            } catch (e: any) {
                 console.error("Erro no Pulso de IA:", e);
-                const fallback = { error: true };
+                const fallback = { error: true, message: e.message };
                 if (isComparison) setCompareAiPulse(fallback);
                 else setAiPulse(fallback);
             } finally {
                 setIsLoadingPulse(false);
                 fetchLocks.current[lockKey] = false;
             }
-            return true; // Houve tentativa de fetch (Network)
+            return true;
         };
 
-        return await fetchWithRetry();
+        return await fetchWithRetryPulse();
     };
 
     useEffect(() => {
@@ -1258,6 +1200,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     if (latestKey && latestKey.data && latestKey.data.score) {
                         setAiRatingData(latestKey.data);
                         setInvestorThesis(latestKey.data.summary || "");
+                        setAdminLogs(prev => ({ ...prev, "RATING (FUNDAMENTAL)": "CACHE (Local)" }));
                     }
                 }
             } catch (e) {
@@ -1269,7 +1212,10 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
             if (analysisKey) {
                 try {
                     const cached = JSON.parse(localStorage.getItem(analysisKey) || '{}');
-                    if (cached.data) setAiAnalysis(cached.data);
+                    if (cached.data) {
+                        setAiAnalysis(cached.data);
+                        setAdminLogs(prev => ({ ...prev, "RESUMO (IA)": "CACHE (Local)" }));
+                    }
                 } catch (e) {}
             }
 
@@ -1277,7 +1223,10 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
             if (healthKey) {
                 try {
                     const cached = JSON.parse(localStorage.getItem(healthKey) || '{}');
-                    if (cached.data) setAiHealth(cached.data);
+                    if (cached.data) {
+                        setAiHealth(cached.data);
+                        setAdminLogs(prev => ({ ...prev, "SAÚDE FINANCEIRA": "CACHE (Local)" }));
+                    }
                 } catch (e) {}
             }
         }
@@ -1389,6 +1338,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                 })
             });
             const data = await res.json();
+            if (data._admin_model) setAdminLogs(prev => ({ ...prev, 'CHATLIVE': data._admin_model }));
             const aiReply = data.reply || data.text || "Sem resposta da IA.";
             setMessages((prev) => [...prev, { role: "ia", text: aiReply }]);
         } catch (error) {
@@ -1824,10 +1774,32 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
     };
     // 4. Atualizar o useEffect para disparar esta nova função
     useEffect(() => {
-        if (ticker) {
+        if (ticker && initialFetchLock.current !== ticker) {
             fetchAssetData();
+            initialFetchLock.current = ticker;
+            // Reset AI lock when changing ticker
+            aiFetchLock.current = null;
         }
     }, [ticker]);
+
+    // GATILHO STAGGERED DE IA: Dispara analises apos asset + htmlReport estarem prontos
+    useEffect(() => {
+        if (!asset?.ticker) return;
+        const runAiFetches = async () => {
+            console.log('IA staggered para: ' + asset.ticker);
+            fetchFundamentalRating(asset, false, false);
+            await sleep(1500);
+            fetchAiAnalysis(false);
+            await sleep(1500);
+            fetchMarketSentiment(asset, false, false);
+            await sleep(1500);
+            fetchAiHealth(false);
+            await sleep(1500);
+            fetchAiPulse(asset, false, false);
+        };
+        runAiFetches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [asset?.ticker, htmlReport]);
 
     if (status === "loading") {
         return (
@@ -1890,6 +1862,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-background-dark text-slate-100 font-display overflow-x-hidden antialiased">
+            {isAdmin && <TerminalAdminLog logs={adminLogs} />}
             <Header currentPath="/mercado" />
 
             <div className="flex flex-1">
@@ -2836,10 +2809,10 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                             <span className="block text-base font-bold text-primary">
                                                                 {isFIIAsset
                                                                     ? formatValue(asset?.fundamentalData?.vpa || aiRatingData?.fiiMetrics?.vpa || 0)
-                                                                    : formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (fairPriceData?.fairPrice || 0))}
+                                                                    : formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (aiRatingData?.dcf && aiRatingData.dcf > 0 ? aiRatingData.dcf : (fairPriceData?.fairPrice || 0)))}
                                                             </span>
                                                             {(() => {
-                                                                const dcfUpside = aiHealth?.dcfUpside || fairPriceData?.upside || 0;
+                                                                const dcfUpside = aiHealth?.dcfUpside || aiRatingData?.dcfUpside || fairPriceData?.upside || 0;
                                                                 const vpaUpside = ((((asset?.fundamentalData?.vpa || 0) / (parseFloat(asset?.price || "1") || 1)) - 1) * 100);
                                                                 const displayUpside = isFIIAsset ? vpaUpside : dcfUpside;
                                                                 return (
@@ -2848,7 +2821,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                             ? `${displayUpside.toFixed(0)}% Margem`
                                                                             : `${dcfUpside >= 0 ? "+" : ""}${typeof dcfUpside === 'number' ? dcfUpside.toFixed(0) : 0}% Potencial`
                                                                         }
-                                                                        {!isFIIAsset && fairPriceData && !(aiHealth?.dcf > 0) && (
+                                                                        {!isFIIAsset && fairPriceData && !(aiHealth?.dcf > 0) && !(aiRatingData?.dcf > 0) && (
                                                                             <span className="ml-1 text-[10px] opacity-60">IA</span>
                                                                         )}
                                                                     </span>
@@ -2907,10 +2880,10 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                 </span>
                                                                 <div className="text-right">
                                                                     <span className="block text-base font-bold text-slate-200">
-                                                                        {formatValue(asset?.valuation?.graham || aiHealth?.graham || 0)}
+                                                                        {formatValue(asset?.valuation?.graham || aiHealth?.graham || aiRatingData?.graham || 0)}
                                                                     </span>
-                                                                    <span className={`text-xs font-bold ${(aiHealth?.grahamUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
-                                                                        {aiHealth?.grahamUpside > 0 ? "+" : ""}{aiHealth?.grahamUpside ? aiHealth.grahamUpside.toFixed(0) : 0}% Margem
+                                                                    <span className={`text-xs font-bold ${(aiHealth?.grahamUpside || aiRatingData?.grahamUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
+                                                                        {(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) > 0 ? "+" : ""}{(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) ? (aiHealth.grahamUpside || aiRatingData.grahamUpside).toFixed(0) : 0}% Margem
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -2926,10 +2899,10 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                 </div>
                                                                 <div className="text-right">
                                                                     <span className="block text-base font-bold text-amber-500">
-                                                                        {formatValue(asset?.valuation?.bazin || aiHealth?.bazin || 0)}
+                                                                        {formatValue(asset?.valuation?.bazin || aiHealth?.bazin || aiRatingData?.bazin || 0)}
                                                                     </span>
-                                                                    <span className={`text-xs font-bold ${(aiHealth?.bazinUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
-                                                                        {aiHealth?.bazinUpside > 0 ? "+" : ""}{aiHealth?.bazinUpside ? aiHealth.bazinUpside.toFixed(0) : 0}% Margem
+                                                                    <span className={`text-xs font-bold ${(aiHealth?.bazinUpside || aiRatingData?.bazinUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
+                                                                        {(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) > 0 ? "+" : ""}{(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) ? (aiHealth.bazinUpside || aiRatingData.bazinUpside).toFixed(0) : 0}% Margem
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -3884,7 +3857,6 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                     </div>
                 )}
 
-                {/* Botão Flutuante (Bubble) */}
                 <button
                     onClick={() => setIsChatLiveOpen(!isChatLiveOpen)}
                     className="w-14 h-14 bg-primary hover:bg-primary/90 text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all pointer-events-auto"
@@ -3900,6 +3872,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                     )}
                 </button>
             </div>
+
         </div>
     );
 }

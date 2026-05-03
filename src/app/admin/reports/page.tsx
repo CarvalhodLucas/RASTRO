@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, CheckCircle2, Clock, Search, ArrowUpDown, RefreshCw, Activity, Database, Percent, ShieldCheck, Zap, Home, Users } from 'lucide-react';
+import { Trash2, CheckCircle2, Clock, Search, ArrowUpDown, RefreshCw, Activity, Database, Percent, ShieldCheck, Zap, Home, Users, Bot, Save, ChevronDown } from 'lucide-react';
 import { assetsDatabase, Asset } from '@/lib/data';
 import { useAuth } from '@/lib/useAuth';
 import { useRouter } from 'next/navigation';
@@ -57,6 +57,66 @@ export default function AdminReportsPage() {
       Cripto: { total: 0, current: 0 }
     }
   });
+
+  // --- AI ENGINE CONFIG ---
+  const PROVIDERS = ['gemini', 'groq', 'groq2', 'openrouter'] as const;
+  type Provider = typeof PROVIDERS[number];
+  const MODELS_BY_PROVIDER: Record<Provider, string[]> = {
+    gemini:      ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
+    groq:        ['llama-3.3-70b-versatile', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
+    groq2:       ['llama-3.3-70b-versatile', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
+    openrouter:  ['nvidia/nemotron-3-super-120b-a12b:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemini-2.0-flash-exp:free'],
+  };
+  const SECTION_LABELS: Record<string, { label: string; page: string }> = {
+    resumo:         { label: '📝 Resumo Executivo (Bull/Bear)', page: 'ticker' },
+    pulso:          { label: '⚡ Pulso de IA', page: 'ticker' },
+    rating:         { label: '🏆 Score de IA', page: 'ticker' },
+    saude:          { label: '💊 Saúde Financeira', page: 'ticker' },
+    sentimento:     { label: '📊 Sentimento do Mercado', page: 'ticker' },
+    chat:           { label: '🤖 Analista RASTRO (Chat do Ativo)', page: 'ticker' },
+    portfolio_chat: { label: '🧠 RASTRO Sênior (Chat do Portfólio)', page: 'portfolio' },
+    support_chat:   { label: '💬 Chat de Suporte (Institucional)', page: 'admin' },
+  };
+  const [aiConfig, setAiConfig] = useState<Record<string, { provider: string; model: string }>>({});
+  const [aiConfigSaving, setAiConfigSaving] = useState(false);
+  const [aiConfigSaved, setAiConfigSaved] = useState(false);
+
+  const loadAiConfig = async () => {
+    try {
+      const res = await fetch('/api/admin/ai-config');
+      const data = await res.json();
+      if (data.sections) {
+        const simplified: Record<string, { provider: string; model: string }> = {};
+        for (const key of Object.keys(data.sections)) {
+          simplified[key] = { provider: data.sections[key].provider, model: data.sections[key].model };
+        }
+        setAiConfig(simplified);
+      }
+    } catch (e) { console.error('Erro ao carregar AI Config', e); }
+  };
+
+  const saveAiConfig = async () => {
+    setAiConfigSaving(true);
+    try {
+      await fetch('/api/admin/ai-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections: aiConfig }),
+      });
+      setAiConfigSaved(true);
+      setTimeout(() => setAiConfigSaved(false), 3000);
+    } catch (e) { console.error('Erro ao salvar AI Config', e); }
+    finally { setAiConfigSaving(false); }
+  };
+
+  const handleProviderChange = (sectionKey: string, provider: string) => {
+    const defaultModel = MODELS_BY_PROVIDER[provider as Provider]?.[0] || '';
+    setAiConfig(prev => ({ ...prev, [sectionKey]: { provider, model: defaultModel } }));
+  };
+
+  const handleModelChange = (sectionKey: string, model: string) => {
+    setAiConfig(prev => ({ ...prev, [sectionKey]: { ...prev[sectionKey], model } }));
+  };
 
   const addLog = (action: string) => {
     const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -196,6 +256,7 @@ export default function AdminReportsPage() {
     if (user?.email === 'carvalhodlucas@hotmail.com') {
       setIsAuthenticated(true);
       checkReports();
+      loadAiConfig();
       return;
     }
 
@@ -204,6 +265,7 @@ export default function AdminReportsPage() {
     if (adminPass === 'RASTRO_ADMIN_2026') {
       setIsAuthenticated(true);
       checkReports();
+      loadAiConfig();
     } else {
       alert("ACESSO NEGADO // REDIRECIONANDO...");
       router.push('/');
@@ -513,6 +575,174 @@ export default function AdminReportsPage() {
             <p className="text-zinc-600 text-[9px] mt-2 uppercase">Volume de cache ocupado</p>
           </div>
         </div>
+
+        {/* AI ENGINE CONFIG PANEL */}
+        <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Bot className="w-5 h-5 text-emerald-500" />
+              <h2 className="text-sm font-black text-white uppercase tracking-widest">AI Engine Config</h2>
+              <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">// Modelos por seção</span>
+            </div>
+            <button
+              onClick={saveAiConfig}
+              disabled={aiConfigSaving}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                aiConfigSaved
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                  : 'bg-zinc-900 border-zinc-700 hover:bg-emerald-500 hover:border-emerald-500 hover:text-black text-zinc-300'
+              } disabled:opacity-50`}
+            >
+              <Save className="w-3.5 h-3.5" />
+              {aiConfigSaved ? 'SALVO!' : aiConfigSaving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+
+          {/* GROUP: Página do Ativo */}
+          <div className="mb-6">
+            <p className="text-[9px] text-zinc-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
+              <span className="w-4 h-px bg-zinc-700 inline-block" />
+              Página do Ativo (Ticker)
+              <span className="flex-1 h-px bg-zinc-900 inline-block" />
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Object.keys(SECTION_LABELS).filter(k => SECTION_LABELS[k].page === 'ticker').map((sectionKey) => {
+                const section = aiConfig[sectionKey];
+                if (!section) return null;
+                const provider = section.provider as 'gemini' | 'groq' | 'groq2' | 'openrouter';
+                const providerColors: Record<string, string> = {
+                  gemini:     'border-blue-500/30 bg-blue-500/5',
+                  groq:       'border-orange-500/30 bg-orange-500/5',
+                  groq2:      'border-orange-500/30 bg-orange-500/5',
+                  openrouter: 'border-purple-500/30 bg-purple-500/5',
+                };
+                return (
+                  <div key={sectionKey} className={`border rounded-xl p-4 flex flex-col gap-3 ${providerColors[provider] || 'border-zinc-700 bg-zinc-900/30'}`}>
+                    <p className="text-[10px] font-black text-zinc-300 uppercase tracking-widest leading-none">
+                      {SECTION_LABELS[sectionKey].label}
+                    </p>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Provider</label>
+                      <select value={section.provider} onChange={(e) => handleProviderChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        <option value="gemini">🔵 Google Gemini</option>
+                        <option value="groq">🟠 Groq API (1)</option>
+                        <option value="groq2">🟠 Groq API (2)</option>
+                        <option value="openrouter">🟣 OpenRouter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Modelo</label>
+                      <select value={section.model} onChange={(e) => handleModelChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        {(MODELS_BY_PROVIDER[provider] || []).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* GROUP: Portfólio */}
+          <div>
+            <p className="text-[9px] text-emerald-600 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
+              <span className="w-4 h-px bg-emerald-900 inline-block" />
+              Página do Portfólio
+              <span className="flex-1 h-px bg-emerald-950 inline-block" />
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Object.keys(SECTION_LABELS).filter(k => SECTION_LABELS[k].page === 'portfolio').map((sectionKey) => {
+                const section = aiConfig[sectionKey];
+                if (!section) return null;
+                const provider = section.provider as 'gemini' | 'groq' | 'groq2' | 'openrouter';
+                const providerColors: Record<string, string> = {
+                  gemini:     'border-blue-500/30 bg-blue-500/5',
+                  groq:       'border-orange-500/30 bg-orange-500/5',
+                  groq2:      'border-orange-500/30 bg-orange-500/5',
+                  openrouter: 'border-emerald-500/30 bg-emerald-500/5',
+                };
+                return (
+                  <div key={sectionKey} className={`border rounded-xl p-4 flex flex-col gap-3 ${providerColors[provider] || 'border-zinc-700 bg-zinc-900/30'}`}>
+                    <p className="text-[10px] font-black text-emerald-300 uppercase tracking-widest leading-none">
+                      {SECTION_LABELS[sectionKey].label}
+                    </p>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Provider</label>
+                      <select value={section.provider} onChange={(e) => handleProviderChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        <option value="gemini">🔵 Google Gemini</option>
+                        <option value="groq">🟠 Groq API (1)</option>
+                        <option value="groq2">🟠 Groq API (2)</option>
+                        <option value="openrouter">🟣 OpenRouter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Modelo</label>
+                      <select value={section.model} onChange={(e) => handleModelChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        {(MODELS_BY_PROVIDER[provider] || []).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* GROUP: Institucional / Suporte */}
+          <div className="mt-6">
+            <p className="text-[9px] text-amber-600 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
+              <span className="w-4 h-px bg-amber-900 inline-block" />
+              Institucional / Suporte
+              <span className="flex-1 h-px bg-amber-950 inline-block" />
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Object.keys(SECTION_LABELS).filter(k => SECTION_LABELS[k].page === 'admin').map((sectionKey) => {
+                const section = aiConfig[sectionKey];
+                if (!section) return null;
+                const provider = section.provider as 'gemini' | 'groq' | 'groq2' | 'openrouter';
+                const providerColors: Record<string, string> = {
+                  gemini:     'border-blue-500/30 bg-blue-500/5',
+                  groq:       'border-orange-500/30 bg-orange-500/5',
+                  groq2:      'border-orange-500/30 bg-orange-500/5',
+                  openrouter: 'border-purple-500/30 bg-purple-500/5',
+                };
+                return (
+                  <div key={sectionKey} className={`border rounded-xl p-4 flex flex-col gap-3 ${providerColors[provider] || 'border-zinc-700 bg-zinc-900/30'}`}>
+                    <p className="text-[10px] font-black text-amber-300 uppercase tracking-widest leading-none">
+                      {SECTION_LABELS[sectionKey].label}
+                    </p>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Provider</label>
+                      <select value={section.provider} onChange={(e) => handleProviderChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        <option value="gemini">🔵 Google Gemini</option>
+                        <option value="groq">🟠 Groq API (1)</option>
+                        <option value="groq2">🟠 Groq API (2)</option>
+                        <option value="openrouter">🟣 OpenRouter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[8px] text-zinc-600 uppercase font-black tracking-widest block mb-1">Modelo</label>
+                      <select value={section.model} onChange={(e) => handleModelChange(sectionKey, e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
+                        {(MODELS_BY_PROVIDER[provider] || []).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
 
         {/* FILTERS AND TABLE */}
         <div className="space-y-6">

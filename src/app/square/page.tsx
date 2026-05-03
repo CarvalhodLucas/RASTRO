@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/useAuth";
+import { supabase } from "@/lib/supabase/client";
 import InsightCard, { SquarePost } from "@/components/InsightCard";
+
 import { SquareComment } from "@/components/CommentThread";
 import Link from "next/link";
 
@@ -13,89 +15,98 @@ export default function SquarePage() {
 
     useEffect(() => {
         setHasMounted(true);
-        // Load posts from localStorage on mount
-        const savedPosts = localStorage.getItem('square_posts');
-        if (savedPosts) {
-            try {
-                setPosts(JSON.parse(savedPosts));
-            } catch (err) {
-                console.error("Failed to parse saved posts:", err);
-            }
-        }
+        fetchMessages();
+
+        // Configura o Realtime
+        const channel = supabase
+            .channel('realtime_messages')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages' },
+                async (payload) => {
+                    console.log('Nova mensagem recebida via Realtime:', payload.new);
+                    
+                    // Busca o perfil do autor para ter o avatar atualizado
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('avatar_url, full_name')
+                        .eq('id', payload.new.user_id)
+                        .single();
+
+                    const newMessage = mapSupabaseToPost({
+                        ...payload.new,
+                        profiles: profileData
+                    });
+                    setPosts(prev => [newMessage, ...prev]);
+                }
+            )
+            .subscribe();
+
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
+
+    const fetchMessages = async () => {
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*, profiles(avatar_url, full_name)')
+            .order('created_at', { ascending: false });
+
+
+        if (error) {
+            console.error("Erro ao buscar mensagens:", error);
+            return;
+        }
+
+        if (data) {
+            const mappedPosts = data.map(mapSupabaseToPost);
+            setPosts(mappedPosts);
+        }
+    };
+
+    const mapSupabaseToPost = (msg: any): SquarePost => {
+        const email = msg.user_email || "usuario@exemplo.com";
+        const profile = msg.profiles;
+        const name = profile?.full_name || email.split('@')[0];
+        const avatarUrl = profile?.avatar_url;
+        
+        return {
+            id: msg.id,
+            author: name,
+            avatar: name.substring(0, 2).toUpperCase(),
+            avatarImage: avatarUrl || null,
+            verified: false,
+            role: "Investidor",
+            time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            sentiment: "Neutro",
+            sentimentIcon: "balance",
+            sentimentColor: "text-slate-400 bg-slate-400/10",
+            ticker: "",
+            content: msg.content,
+            likes: 0,
+            comments: 0,
+            reposts: 0,
+            viewsCount: 1,
+            views: "1",
+            hasChart: false,
+            isLiked: false,
+            replies: []
+        };
+    };
+
+
 
     const [activeTab, setActiveTab] = useState<'Recommended' | 'Following'>('Recommended');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [postText, setPostText] = useState("");
     const [showPaywall, setShowPaywall] = useState(false);
 
-    const [posts, setPosts] = useState<SquarePost[]>([
-        {
-            id: 1,
-            author: "Marcus Thorne",
-            avatar: "MT",
-            avatarImage: null,
-            verified: true,
-            role: "Analista Elite",
-            time: "2h",
-            sentiment: "Pessimista",
-            sentimentIcon: "trending_down",
-            sentimentColor: "text-[#ef4444] bg-[#ef4444]/10",
-            ticker: "$TSLA",
-            performanceData: -2.45,
-            title: "Crise na Tesla: Análise Técnica e de Fluxo",
-            content: "Breakout confirmado abaixo da EMA200 ($TSLA). Relação risco/recompensa desfavorável com compressão de margens e inventory buildup. Suporte crítico em $180 como zona de reteste técnica.",
-            likes: 156,
-            comments: 24,
-            reposts: 12,
-            viewsCount: 2400,
-            views: "2.4k",
-            hasChart: true,
-            isLiked: false,
-            replies: [
-                {
-                    id: 101,
-                    author: "Jean Pierre",
-                    avatar: "JP",
-                    content: "Concordo totalmente. O suporte de $180 parece inevitável agora.",
-                    time: "1h",
-                    likes: 12,
-                    isLiked: false,
-                    replies: []
-                }
-            ]
-        },
-        {
-            id: 2,
-            author: "Sarah Lin",
-            avatar: "SL",
-            avatarImage: null,
-            verified: true,
-            role: "Analista",
-            time: "4h",
-            sentiment: "Otimista",
-            sentimentIcon: "trending_up",
-            sentimentColor: "text-[#11d473] bg-[#11d473]/10",
-            ticker: "$NVDA",
-            performanceData: 3.10,
-            content: "Acúmulo institucional detectado em $NVDA. Projeção de Fibonacci atingida no curto prazo, mas demanda resiliente por H100 sugere upside remanescente. Manter viés de alta estrutural. 🚀",
-            likes: 86,
-            comments: 8,
-            reposts: 4,
-            viewsCount: 1100,
-            views: "1.1k",
-            hasChart: false,
-            isLiked: false,
-            replies: []
-        }
-    ]);
+    const [posts, setPosts] = useState<SquarePost[]>([]);
 
-    // Save posts to localStorage whenever they change
-    useEffect(() => {
-        if (hasMounted) {
-            localStorage.setItem('square_posts', JSON.stringify(posts));
-        }
-    }, [posts, hasMounted]);
+
+
 
     const [replyingTo, setReplyingTo] = useState<{ postId: number, commentId: number | null, author: string } | null>(null);
     const [replyText, setReplyText] = useState("");
@@ -154,45 +165,27 @@ export default function SquarePage() {
         return true;
     };
 
-    const handlePost = (customText?: string, isQuote?: boolean, originalPost?: any) => {
+    const handlePost = async (customText?: string, isQuote?: boolean, originalPost?: any) => {
         if (!checkAuth()) return;
         const text = customText || postText;
         if (!text.trim() && !selectedImage) return;
 
-        const userName = user?.name || "Trader Anônimo";
-        const userAvatar = user?.avatarImage ? null : (user?.name?.substring(0, 2).toUpperCase() || "TA");
+        // Grava no Supabase
+        const { error } = await supabase
+            .from('messages')
+            .insert([
+                {
+                    content: text,
+                    user_id: user?.id,
+                    user_email: user?.email
+                }
+            ]);
 
-        const newPostObj: SquarePost = {
-            id: Date.now(),
-            author: userName,
-            avatar: userAvatar as string | null,
-            avatarImage: user?.avatarImage || null,
-            verified: false,
-            role: "Trader",
-            time: "agora",
-            sentiment: selectedMood?.label || "Neutro",
-            sentimentIcon: selectedMood?.icon || "balance",
-            sentimentColor: selectedMood?.color || "text-slate-400 bg-slate-400/10",
-            ticker: "",
-            content: text,
-            likes: 0,
-            comments: 0,
-            reposts: 0,
-            viewsCount: 1,
-            views: "1",
-            hasChart: !!selectedImage,
-            isLiked: false,
-            replies: [],
-            isQuote,
-            quotedPost: originalPost,
-            postImage: selectedImage,
-            poll: showPollCreator && pollOptions.every((o: string) => o.trim()) ? {
-                question: "O que você acha?",
-                options: pollOptions.map((o: string) => ({ text: o, votes: 0 }))
-            } : null
-        };
+        if (error) {
+            console.error("Erro ao postar mensagem:", error);
+            return;
+        }
 
-        setPosts([newPostObj, ...posts]);
         if (!customText) setPostText("");
         if (isQuote) setReposting(null);
 
@@ -202,6 +195,7 @@ export default function SquarePage() {
         setPollOptions(["", ""]);
         setSelectedMood(null);
     };
+
 
     const handleReply = (postId: number, parentCommentId: number | null, image?: string | null) => {
         if (!checkAuth()) return;

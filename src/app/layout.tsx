@@ -10,8 +10,32 @@ import Analytics from "@/components/Analytics";
 
 
 export const metadata: Metadata = {
-    title: "Rastro - Análise de Ativos",
-    description: "Plataforma de análise com IA",
+    title: "RASTRO | Inteligência de Mercado e Análise de Ativos com IA",
+    description: "Acompanhe B3, S&P 500 e Cripto em tempo real. Insights profundos com IA, mapas de calor e análise de sentimento. O pulso do mercado na sua mão.",
+    keywords: ["investimentos", "análise de ativos", "inteligência artificial", "B3", "S&P 500", "criptomoedas", "market intelligence"],
+    authors: [{ name: "RASTRO Team" }],
+    openGraph: {
+        title: "RASTRO | Inteligência de Mercado e Análise de Ativos com IA",
+        description: "Acompanhe o pulso do mercado em tempo real com análises profundas de IA.",
+        url: "https://rastro.com.br", // Substitua pelo seu domínio real
+        siteName: "RASTRO",
+        images: [
+            {
+                url: "/og-image.png", // Coloque esta imagem na pasta /public
+                width: 1200,
+                height: 630,
+                alt: "RASTRO - Inteligência de Mercado",
+            },
+        ],
+        locale: "pt_BR",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "RASTRO | Inteligência de Mercado com IA",
+        description: "Monitoramento de B3, S&P 500 e Cripto com insights de IA.",
+        images: ["/og-image.png"], // Mesmo arquivo da pasta /public
+    },
     icons: {
         icon: "/icon.svg",
     },

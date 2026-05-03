@@ -170,7 +170,9 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
     const domainMap: { [key: string]: string } = {
         "PETR4": "petrobras.com.br",
         "AAPL": "apple.com",
-        "VALE3": "vale.com"
+        "VALE3": "vale.com",
+        "NU": "nubank.com.br",
+        "ROXO34": "nubank.com.br"
     };
 
     const cleanTicker = (asset.ticker || "").toUpperCase().replace('.SA', '').trim();
@@ -741,7 +743,9 @@ export default function MercadoPage() {
             "SBSP3.SA": "55B",
             "GGBR4.SA": "40B",
             "HAPV3.SA": "35B",
-            "RAIL3.SA": "45B"
+            "RAIL3.SA": "45B",
+            "NU": "50B",
+            "ROXO34.SA": "250B"
         };
 
         assetsDatabase.forEach(asset => {

@@ -83,7 +83,7 @@ const PortfolioPage: React.FC = () => {
     const [chatInput, setChatInput] = useState("");
     const WELCOME_MESSAGE = {
         role: "ia",
-        text: "Olá! Sou o RASTRO. Como posso ajudar com sua estratégia hoje?"
+        text: "Olá! Sou o RASTRO. Como posso ajudar com sua estratégia hoje?\n\n⚠️ Aviso: Este conteúdo tem caráter exclusivamente informativo e não constitui recomendação de investimento."
     };
 
     const [messages, setMessages] = useState<any[]>([WELCOME_MESSAGE]);
@@ -766,6 +766,7 @@ ESTRUTURA DE RESPOSTA:
                 body: JSON.stringify({
                     prompt: userMsg,
                     isChat: true,
+                    isPortfolioChat: true,
                     systemContext: seniorSystemPrompt,
                     ticker: "PORTFOLIO",
                     assetName: "Minha Carteira",
@@ -783,7 +784,17 @@ ESTRUTURA DE RESPOSTA:
         }
     };
 
-    const renderMessageText = (text: string) => {
+    const renderMessageText = (text: any) => {
+        if (!text) return "";
+        if (typeof text.split !== 'function') {
+            if (typeof text === 'object') {
+                text = text.reply || text.text || text.content || text.message || JSON.stringify(text);
+            } else {
+                text = String(text);
+            }
+        }
+        if (typeof text.split !== 'function') return String(text);
+        
         const parts = text.split(/(STATUS:\s*\[?(?:POSITIVO|NEUTRO|NEGATIVO|ALERTA)\]?|\[DISCLAIMER\])/g);
 
         return parts.map((part, i) => {
@@ -1094,7 +1105,7 @@ ESTRUTURA DE RESPOSTA:
                 )}
 
                 {isChatOpen && (
-                    <div className="w-[calc(100vw-32px)] md:w-[400px] h-[70vh] md:h-[600px] bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-2xl flex flex-col shadow-2xl shadow-black/60 relative z-20 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="w-[calc(100vw-32px)] md:w-[800px] h-[70vh] md:h-[600px] bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-2xl flex flex-col shadow-2xl shadow-black/60 relative z-20 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="p-4 border-b border-zinc-900 bg-black/40 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="relative">

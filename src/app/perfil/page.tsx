@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import Header from "@/components/Header";
+import { ADMIN_EMAILS } from "@/lib/constants";
+import { supabase } from "@/lib/supabase/client";
+
 
 type TabType = "geral" | "seguranca" | "aparencia";
 
@@ -45,6 +48,7 @@ export default function ProfilePage() {
 
     // Form states
     const [nickname, setNickname] = useState("");
+    const [investorType, setInvestorType] = useState<string>("");
     const [newEmail, setNewEmail] = useState("");
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const [emailCode, setEmailCode] = useState("");
@@ -71,6 +75,12 @@ export default function ProfilePage() {
     useEffect(() => {
         if (user) {
             setNickname(user.name || "");
+            const isUserAdmin = user.email && ADMIN_EMAILS.some(e => e.toLowerCase() === user.email.toLowerCase());
+            if (isUserAdmin && !user.investorType) {
+                setInvestorType("administrador");
+            } else {
+                setInvestorType(user.investorType || "");
+            }
             setTheme(user.theme || "dark");
             setSelectedAvatar(user.avatar || "person");
             setAvatarImage(user.avatarImage || "");
@@ -78,37 +88,64 @@ export default function ProfilePage() {
         }
     }, [user]);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            // Updated size limit to 5MB to accommodate modern images better
-            if (file.size > 5 * 1024 * 1024) {
-                alert("A imagem é muito grande. Por favor, escolha uma imagem com menos de 5MB.");
-                return;
-            }
-            setIsSaving(true);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result as string;
-                setAvatarImage(base64String);
-                setAvatarUrl("");
-                
-                // Formulate immediate update to user profile
-                if (user) {
-                    updateProfile({
-                        avatarImage: base64String
-                    });
-                }
-                
-                setTimeout(() => {
-                    setIsSaving(false);
-                    setSaveSuccess(true);
-                    setTimeout(() => setSaveSuccess(false), 3000);
-                }, 500);
-            };
-            reader.readAsDataURL(file);
+        if (!file || !user?.id) return;
+
+        // Limite de 2MB para avatars é mais que suficiente e evita custos altos
+        if (file.size > 2 * 1024 * 1024) {
+            alert("A imagem é muito grande. Por favor, escolha uma imagem com menos de 2MB.");
+            return;
+        }
+
+        setIsSaving(true);
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // 1. Upload para o Bucket 'avatars'
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, { 
+                    upsert: true,
+                    contentType: file.type
+                });
+
+            if (uploadError) throw uploadError;
+
+            // 2. Pegar URL Pública
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // 3. Update na tabela 'profiles'
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            // 4. Update no AuthContext local
+            setAvatarUrl(publicUrl);
+            setAvatarImage(""); // Limpa o base64 se houver
+            
+            updateProfile({
+                avatarImage: publicUrl
+            });
+
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error: any) {
+            console.error("Erro no upload:", error);
+            alert(`Erro ao carregar imagem: ${error.message || 'Verifique as permissões de RLS no bucket avatars'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
+
 
     const simulateEmailSend = (targetEmail: string, code: string) => {
         console.log(`[SIMULAÇÃO] Enviando e-mail para ${targetEmail}: Seu código é ${code}`);
@@ -126,7 +163,8 @@ export default function ProfilePage() {
             name: nickname,
             // We don't update email directly here anymore for security
             avatar: selectedAvatar,
-            avatarImage: finalAvatarImage
+            avatarImage: finalAvatarImage,
+            investorType: investorType
         });
 
         setIsSaving(false);
@@ -233,6 +271,18 @@ export default function ProfilePage() {
         { id: "market-blue", name: "Market Blue", color: "bg-[#0a192f]", border: "border-[#172a45]" }
     ];
 
+    const isAdmin = user?.email && ADMIN_EMAILS.some(email => email.toLowerCase() === user.email.toLowerCase());
+
+    const investorTypes = [
+        ...(isAdmin ? [{ id: 'administrador', label: 'Administrador', icon: 'verified_user', color: 'bg-red-500/10 text-red-400 border-red-500/20' }] : []),
+        { id: 'trader', label: 'Trader', icon: 'trending_up', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+        { id: 'buy-and-hold', label: 'Buy and Hold', icon: 'hourglass_empty', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+        { id: 'investidor', label: 'Investidor', icon: 'account_balance', color: 'bg-primary/10 text-primary border-primary/20' },
+        { id: 'curioso', label: 'Curioso', icon: 'search', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
+        { id: 'sardinha', label: 'Sardinha', icon: 'set_meal', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+        { id: 'tubarao', label: 'Tubarão', icon: 'water_drop', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
+    ];
+
     return (
         <div className="bg-[#0a0a0a] font-display text-slate-100 min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black">
             <Header currentPath="#" />
@@ -273,7 +323,15 @@ export default function ProfilePage() {
 
                     {/* Info do Usuário */}
                     <div className="text-center md:text-left flex-1 pb-2">
-                        <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-1">{nickname || user.name || 'Usuário RASTRO'}</h1>
+                        <div className="flex flex-col md:flex-row items-center md:items-center gap-3 mb-1">
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{nickname || user.name || 'Usuário RASTRO'}</h1>
+                            {investorType && (
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border flex items-center gap-1.5 ${investorTypes.find(t => t.id === investorType)?.color || 'bg-neutral-800 text-slate-400 border-neutral-700'}`}>
+                                    <span className="material-symbols-outlined !text-[12px]">{investorTypes.find(t => t.id === investorType)?.icon}</span>
+                                    {investorTypes.find(t => t.id === investorType)?.label}
+                                </span>
+                            )}
+                        </div>
                         <p className="text-slate-400 font-medium text-sm flex items-center justify-center md:justify-start gap-2">
                             <span className="material-symbols-outlined !text-[16px]">mail</span>
                             {user.email}
@@ -484,6 +542,24 @@ export default function ProfilePage() {
                                                 />
                                             </div>
                                             <p className="text-[10px] text-slate-500 italic">Para alterar seu e-mail, vá para a aba de Segurança.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Investor Type Selection */}
+                                    <div className="space-y-4">
+                                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">Como você se define?</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                                            {investorTypes.map((type) => (
+                                                <button
+                                                    key={type.id}
+                                                    type="button"
+                                                    onClick={() => setInvestorType(type.id)}
+                                                    className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border transition-all ${investorType === type.id ? "bg-primary/10 border-primary text-primary" : "bg-black border-neutral-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"}`}
+                                                >
+                                                    <span className="material-symbols-outlined !text-[20px]">{type.icon}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-tight">{type.label}</span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 
