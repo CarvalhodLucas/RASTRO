@@ -120,11 +120,11 @@ export default function ProfilePage() {
                 .from('avatars')
                 .getPublicUrl(filePath);
 
-            // 3. Update na tabela 'profiles'
+            // 3. Update na tabela 'profiles' (usando upsert para garantir que crie a linha se não existir)
             const { error: updateError } = await supabase
                 .from('profiles')
-                .update({ avatar_url: publicUrl })
-                .eq('id', user.id);
+                .upsert({ id: user.id, avatar_url: publicUrl }, { onConflict: 'id' });
+
 
             if (updateError) throw updateError;
 

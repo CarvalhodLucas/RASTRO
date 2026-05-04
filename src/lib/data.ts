@@ -2145,7 +2145,7 @@ export const b3Assets: Asset[] = [
         lastUpdate: "10/03/2026"
     },
     {
-        ticker: "ISAE3.SA",
+        ticker: "ISAE4.SA",
         type: "Ações",
         name: "ISA Energia Brasil SA",
         price: "0.00",
@@ -2443,6 +2443,26 @@ export const b3Assets: Asset[] = [
         peRatio: "--",
         dividendYield: "--",
         lastUpdate: "22/04/2026"
+    },
+    {
+        ticker: "KEPL3.SA",
+        type: "Ações",
+        name: "Kepler Weber SA",
+        price: "0.00",
+        variation: "0.0",
+        sector: "Bens Industriais / Agronegócio",
+        exchange: "B3",
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
+        logo: "https://www.google.com/s2/favicons?domain=kepler.com.br&sz=128",
+        size: 10,
+        cgId: "",
+        aiPulse: "Análise automatizada pendente.",
+        marketCap: "--",
+        peRatio: "--",
+        dividendYield: "--",
+        lastUpdate: "03/05/2026"
     },
 ];
 

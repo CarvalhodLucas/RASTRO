@@ -58,34 +58,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // 2. Supabase session listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log(`[Auth] Supabase Event: ${event}`);
+            console.log(`[Auth] 🟢 Evento detectado: ${event}`);
             
             if (session?.user) {
+                const userId = session.user.id;
                 const email = session.user.email || "";
                 const metadata = session.user.user_metadata;
                 
+                console.log(`[Auth] 🔍 Buscando perfil para ID: ${userId}`);
+
+                // Busca a versão mais recente do perfil no banco de dados
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                if (profileError) {
+                    console.warn(`[Auth] ⚠️ Aviso na busca de perfil:`, profileError.message);
+                } else if (!profileData) {
+                    console.log(`[Auth] ℹ️ Nenhum perfil encontrado para este usuário.`);
+                } else {
+                    console.log(`[Auth] ✅ Perfil encontrado no banco:`, profileData);
+                }
+
+                const finalAvatar = profileData?.avatar_url || metadata?.avatar_url || undefined;
+                console.log(`[Auth] 🖼️ URL da foto final definida como:`, finalAvatar);
+
                 const authUser: AuthUser = {
-                    id: session.user.id,
-                    name: metadata?.full_name || metadata?.name || email.split("@")[0],
+                    id: userId,
+                    name: profileData?.full_name || metadata?.full_name || metadata?.name || email.split("@")[0],
                     email: email,
                     isLoggedIn: true,
-                    avatarImage: metadata?.avatar_url || undefined,
-                    theme: localUser?.theme || "dark",
-                    joinedAt: localUser?.joinedAt || new Date().getFullYear().toString(),
-                    investorType: localUser?.investorType
+                    avatarImage: finalAvatar,
+                    theme: profileData?.theme || localUser?.theme || "dark",
+                    joinedAt: profileData?.created_at ? new Date(profileData.created_at).getFullYear().toString() : (localUser?.joinedAt || "2026"),
+                    investorType: profileData?.investor_type || localUser?.investorType
                 };
 
+                // Persiste e atualiza
                 localStorage.setItem("user_session", JSON.stringify(authUser));
                 setUser(authUser);
                 window.dispatchEvent(new Event("auth-update"));
-            } else if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
-                if (!session?.user) {
-                    localStorage.removeItem("user_session");
-                    setUser(null);
-                    window.dispatchEvent(new Event("auth-update"));
-                }
+
+                // Removido a auto-criação na inicialização que estava causando erro 400
+                // O perfil deve ser criado pelo trigger do Supabase ou via Upsert nas configurações.
+            } else if (event === "SIGNED_OUT") {
+                console.log("[Auth] 🔴 Usuário deslogado");
+                localStorage.removeItem("user_session");
+                setUser(null);
+                window.dispatchEvent(new Event("auth-update"));
             }
         });
+
+
+
 
         // 3. Sync updates across tabs
         const handleUpdates = () => {
@@ -140,17 +167,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(updatedSession);
                 window.dispatchEvent(new Event("auth-update"));
                 
-                // Optional: Sync metadata to Supabase
-                if (updates.name) {
-                    await supabase.auth.updateUser({
-                        data: { full_name: updates.name }
-                    });
+                // Sincroniza com o Supabase (Tabela Profiles e Auth Metadata)
+                if (session.id) {
+                    // 1. Atualiza a tabela profiles para persistência em refreshes
+                    const profileUpdates: any = {};
+                    if (updates.name) profileUpdates.full_name = updates.name;
+                    if (updates.avatarImage) profileUpdates.avatar_url = updates.avatarImage;
+                    if (updates.investorType) profileUpdates.investor_type = updates.investorType;
+
+                    if (Object.keys(profileUpdates).length > 0) {
+                        // Usar upsert garante que se a linha não existir (trigger falhou), ela será criada
+                        await supabase
+                            .from('profiles')
+                            .upsert({ id: session.id, ...profileUpdates }, { onConflict: 'id' });
+                    }
+
+                    // 2. Atualiza o metadata do Auth (opcional, mas bom para redundância)
+                    if (updates.name || updates.avatarImage) {
+                        await supabase.auth.updateUser({
+                            data: { 
+                                full_name: updates.name || session.name,
+                                avatar_url: updates.avatarImage || session.avatarImage
+                            }
+                        });
+                    }
                 }
             } catch (e) {
                 console.error("Error updating user_session", e);
             }
         }
     };
+
 
     return (
         <AuthContext.Provider value={{ user, hasMounted, logout, confirmLogout, updateProfile }}>
