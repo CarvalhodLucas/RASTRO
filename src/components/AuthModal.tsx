@@ -28,6 +28,7 @@ export default function AuthModal() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [showTerms, setShowTerms] = useState(false);
+    const [pendingSocialProvider, setPendingSocialProvider] = useState<'google' | null>(null);
 
 
     useEffect(() => {
@@ -43,6 +44,13 @@ export default function AuthModal() {
         const urlError = params.get('error');
         if (urlError) {
             setError(urlError);
+            setIsOpen(true);
+        }
+
+        // Check for require_terms in URL
+        if (params.get('require_terms') === 'true') {
+            console.log("[AuthModal] Require terms detected from URL");
+            setShowTerms(true);
             setIsOpen(true);
         }
 
@@ -133,7 +141,58 @@ export default function AuthModal() {
     const finalizeRegistration = async () => {
         setIsLoading(true);
         setError("");
-        console.log(`[Auth] 📝 Tentando registrar usuário: ${regEmail}`);
+        
+        // 1. Checar se é um usuário vindo do Google (já logado no Auth, mas sem perfil)
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user && !pendingSocialProvider) {
+            console.log(`[Auth] ✨ Finalizando perfil para usuário social logado: ${user.email}`);
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    email: user.email
+                });
+
+            if (profileError) {
+                console.error("[Auth] ❌ Erro ao criar perfil pós-google:", profileError.message);
+                setError("Erro ao finalizar seu perfil. Tente novamente.");
+                setIsLoading(false);
+                return;
+            }
+            
+            handleClose();
+            router.push("/");
+            setIsLoading(false);
+            return;
+        }
+
+        // 2. Se for login social pendente (OAuth ainda não iniciado)
+        if (pendingSocialProvider) {
+            const provider = pendingSocialProvider;
+            setPendingSocialProvider(null);
+            setShowTerms(false);
+            
+            console.log(`[Auth] 🚀 Iniciando login social com ${provider}...`);
+            
+            try {
+                const redirectTo = `${window.location.origin}/auth/callback`;
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider,
+                    options: { redirectTo }
+                });
+                if (error) setError(error.message);
+            } catch (err) {
+                console.error("[Auth] ❌ Erro no login social:", err);
+                setError("Falha ao iniciar login social.");
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
+
+        // 3. Registro manual (E-mail e Senha)
+        console.log(`[Auth] 📝 Tentando registrar usuário manual: ${regEmail}`);
         
         try {
             const { data, error: signUpError } = await supabase.auth.signUp({
@@ -151,7 +210,15 @@ export default function AuthModal() {
                 setError(signUpError.message);
                 setShowTerms(false);
             } else {
-                console.log("[Auth] ✅ Cadastro realizado com sucesso:", data.user?.id);
+                console.log("[Auth] ✅ Usuário criado no Auth:", data.user?.id);
+                
+                if (data.user) {
+                    await supabase.from('profiles').upsert({ 
+                        id: data.user.id,
+                        email: regEmail
+                    });
+                }
+
                 if (data.session) {
                     handleClose();
                 } else {
@@ -161,7 +228,7 @@ export default function AuthModal() {
             }
         } catch (err) {
             console.error("[Auth] ❌ Erro inesperado no cadastro:", err);
-            setError("Ocorreu um erro inesperado. Tente novamente.");
+            setError("Ocorreu um erro inesperado.");
         } finally {
             setIsLoading(false);
         }
@@ -174,22 +241,14 @@ export default function AuthModal() {
         
         try {
             const redirectTo = `${window.location.origin}/auth/callback`;
-            console.log(`[Auth] 🔗 Redirecionando para: ${redirectTo}`);
-            
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
-                options: {
-                    redirectTo
-                }
+                options: { redirectTo }
             });
-            
-            if (error) {
-                console.error("[Auth] ❌ Erro no signInWithOAuth:", error.message);
-                setError(`Erro ao conectar com Google: ${error.message}`);
-            }
+            if (error) setError(error.message);
         } catch (err) {
-            console.error("[Auth] ❌ Erro inesperado no login social:", err);
-            setError("Falha ao iniciar login social. Verifique sua conexão.");
+            console.error("[Auth] ❌ Erro no login social:", err);
+            setError("Falha ao iniciar login.");
         } finally {
             setIsLoading(false);
         }
@@ -557,7 +616,7 @@ export default function AuthModal() {
                                                 type="button"
                                                 onClick={finalizeRegistration}
                                                 disabled={isLoading}
-                                                className="w-full h-12 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                                                className="w-full h-12 bg-primary hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer"
                                             >
                                                 {isLoading ? (
                                                     <span className="material-symbols-outlined !text-[20px] animate-spin">progress_activity</span>
