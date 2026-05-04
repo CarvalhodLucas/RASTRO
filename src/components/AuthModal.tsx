@@ -133,41 +133,66 @@ export default function AuthModal() {
     const finalizeRegistration = async () => {
         setIsLoading(true);
         setError("");
+        console.log(`[Auth] 📝 Tentando registrar usuário: ${regEmail}`);
         
-        const { data, error: signUpError } = await supabase.auth.signUp({
-            email: regEmail,
-            password: regPassword,
-            options: {
-                data: {
-                    full_name: regName
+        try {
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email: regEmail,
+                password: regPassword,
+                options: {
+                    data: {
+                        full_name: regName
+                    }
+                }
+            });
+
+            if (signUpError) {
+                console.error("[Auth] ❌ Erro no signUp:", signUpError.message);
+                setError(signUpError.message);
+                setShowTerms(false);
+            } else {
+                console.log("[Auth] ✅ Cadastro realizado com sucesso:", data.user?.id);
+                if (data.session) {
+                    handleClose();
+                } else {
+                    setSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
+                    setShowTerms(false);
                 }
             }
-        });
-
-        if (signUpError) {
-            setError(signUpError.message);
-            setShowTerms(false);
-        } else {
-            if (data.session) {
-                handleClose();
-            } else {
-                setSuccess("Cadastro realizado! Verifique seu e-mail.");
-                setShowTerms(false);
-            }
+        } catch (err) {
+            console.error("[Auth] ❌ Erro inesperado no cadastro:", err);
+            setError("Ocorreu um erro inesperado. Tente novamente.");
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const handleSocialLogin = async (provider: 'google') => {
         setIsLoading(true);
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider,
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`
+        setError("");
+        console.log(`[Auth] 🚀 Iniciando login social com ${provider}...`);
+        
+        try {
+            const redirectTo = `${window.location.origin}/auth/callback`;
+            console.log(`[Auth] 🔗 Redirecionando para: ${redirectTo}`);
+            
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider,
+                options: {
+                    redirectTo
+                }
+            });
+            
+            if (error) {
+                console.error("[Auth] ❌ Erro no signInWithOAuth:", error.message);
+                setError(`Erro ao conectar com Google: ${error.message}`);
             }
-        });
-        if (error) setError(error.message);
-        setIsLoading(false);
+        } catch (err) {
+            console.error("[Auth] ❌ Erro inesperado no login social:", err);
+            setError("Falha ao iniciar login social. Verifique sua conexão.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
 

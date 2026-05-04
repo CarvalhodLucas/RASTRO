@@ -27,7 +27,7 @@ export default function AdminInboxPage() {
     useEffect(() => {
         if (hasMounted) {
             if (!user) {
-                router.push("/login");
+                router.push("/");
             } else if (!isAdmin) {
                 router.push("/");
             } else {

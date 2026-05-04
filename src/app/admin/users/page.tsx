@@ -20,7 +20,7 @@ export default function AdminUsersPage() {
         // Simple security check (client-side only for prototype)
         const sessionStr = localStorage.getItem("user_session");
         if (!sessionStr) {
-            router.push("/login");
+            router.push("/");
             return;
         }
 

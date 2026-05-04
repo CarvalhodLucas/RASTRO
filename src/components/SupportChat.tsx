@@ -125,7 +125,6 @@ export default function SupportChat() {
         if (path === '/square') return "Comunidade Square";
         if (path === '/portfolio') return "Meu Portfólio";
         if (path === '/profile') return "Meu Perfil";
-        if (path === '/login') return "Página de Login";
         return "Navegação do site";
     }, []);
 

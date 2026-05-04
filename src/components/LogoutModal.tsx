@@ -22,12 +22,14 @@ export default function LogoutModal() {
     const handleConfirm = async () => {
         setIsLoggingOut(true);
         try {
+            // Chamamos o logout. Como adicionamos timeout e redirecionamento interno no AuthContext,
+            // não precisamos necessariamente esperar ele resolver aqui se quisermos fechar o modal logo.
             await logout();
-            // O redirecionamento na função logout() cuidará do resto,
-            // mas fechamos o modal por precaução se o redirecionamento demorar
             setIsOpen(false);
         } catch (error) {
             console.error("Logout error:", error);
+            // Em caso de erro, fechamos o modal de qualquer forma para não travar o usuário
+            setIsOpen(false);
             setIsLoggingOut(false);
         }
     };

@@ -151,22 +151,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         window.dispatchEvent(new Event("auth-update"));
         
+        // 2. Executa o signOut do Supabase de forma "fire-and-forget" ou com timeout curto
+        // Isso evita que o processo de logout trave a UI se o Supabase demorar a responder.
         try {
-            // 2. Tenta deslogar do Supabase (com timeout implícito ou erro ignorado se falhar)
             console.log("[Auth] 📡 Solicitando signOut ao Supabase...");
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-                console.warn("[Auth] ⚠️ Erro ao deslogar do Supabase:", error.message);
-            } else {
-                console.log("[Auth] ✅ Supabase signOut concluído.");
-            }
+            
+            // Timeout de 2 segundos para o signOut
+            const signOutPromise = supabase.auth.signOut();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("Timeout")), 2000)
+            );
+
+            await Promise.race([signOutPromise, timeoutPromise])
+                .then(() => console.log("[Auth] ✅ Supabase signOut concluído."))
+                .catch(err => console.warn("[Auth] ⚠️ Supabase signOut ignorado (timeout ou erro):", err.message));
+
         } catch (err) {
-            console.error("[Auth] ❌ Erro inesperado no signOut:", err);
-        } finally {
-            // 3. Garante que o usuário seja redirecionado mesmo em caso de erro
-            console.log("[Auth] 🏠 Redirecionando para a home...");
-            router.push("/");
+            console.error("[Auth] ❌ Erro inesperado no fluxo de logout:", err);
         }
+
+        // 3. Redireciona e garante limpeza total
+        console.log("[Auth] 🏠 Redirecionando para a Home...");
+        router.push("/");
+        
+        // Pequeno delay seguido de reload forçado se ainda estivermos com estado preso
+        setTimeout(() => {
+            if (window.location.pathname !== "/") {
+                window.location.href = "/";
+            }
+        }, 1000);
     };
 
     const confirmLogout = () => {

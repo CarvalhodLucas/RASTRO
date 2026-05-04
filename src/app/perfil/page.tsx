@@ -68,7 +68,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         if (hasMounted && !user) {
-            router.push("/login");
+            router.push("/");
         }
     }, [hasMounted, user, router]);
 

@@ -32,12 +32,11 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
-    // If there's an error exchanging the code, redirect to login with error
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+    // If there's an error exchanging the code, redirect to home with error
+    return NextResponse.redirect(`${origin}/?error=${encodeURIComponent(error.message)}`);
   }
 
   // If no code is present, check if there's an error in the URL
   const error = searchParams.get('error_description') || searchParams.get('error') || 'Falha na autenticação';
-  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
+  return NextResponse.redirect(`${origin}/?error=${encodeURIComponent(error)}`);
 }
-
