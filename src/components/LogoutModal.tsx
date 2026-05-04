@@ -6,18 +6,30 @@ import { useAuth } from "@/lib/useAuth";
 export default function LogoutModal() {
     const { logout } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
-        const handleOpen = () => setIsOpen(true);
+        const handleOpen = () => {
+            setIsLoggingOut(false);
+            setIsOpen(true);
+        };
         window.addEventListener("open-logout-confirm", handleOpen);
         return () => window.removeEventListener("open-logout-confirm", handleOpen);
     }, []);
 
     if (!isOpen) return null;
 
-    const handleConfirm = () => {
-        logout();
-        setIsOpen(false);
+    const handleConfirm = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+            // O redirecionamento na função logout() cuidará do resto,
+            // mas fechamos o modal por precaução se o redirecionamento demorar
+            setIsOpen(false);
+        } catch (error) {
+            console.error("Logout error:", error);
+            setIsLoggingOut(false);
+        }
     };
 
     return (
@@ -52,9 +64,15 @@ export default function LogoutModal() {
                         </button>
                         <button
                             onClick={handleConfirm}
-                            className="h-12 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-500/20 text-xs uppercase tracking-widest"
+                            disabled={isLoggingOut}
+                            className="h-12 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-500/20 text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                         >
-                            Sim, Sair
+                            {isLoggingOut ? (
+                                <>
+                                    <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                    Saindo...
+                                </>
+                            ) : "Sim, Sair"}
                         </button>
                     </div>
                 </div>

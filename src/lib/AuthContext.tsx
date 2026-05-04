@@ -144,11 +144,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user?.theme, hasMounted]);
 
     const logout = async () => {
-        await supabase.auth.signOut();
+        console.log("[Auth] 🔴 Iniciando processo de logout...");
+        
+        // 1. Limpa o estado local imediatamente para feedback instantâneo na UI
         localStorage.removeItem("user_session");
         setUser(null);
         window.dispatchEvent(new Event("auth-update"));
-        router.push("/");
+        
+        try {
+            // 2. Tenta deslogar do Supabase (com timeout implícito ou erro ignorado se falhar)
+            console.log("[Auth] 📡 Solicitando signOut ao Supabase...");
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.warn("[Auth] ⚠️ Erro ao deslogar do Supabase:", error.message);
+            } else {
+                console.log("[Auth] ✅ Supabase signOut concluído.");
+            }
+        } catch (err) {
+            console.error("[Auth] ❌ Erro inesperado no signOut:", err);
+        } finally {
+            // 3. Garante que o usuário seja redirecionado mesmo em caso de erro
+            console.log("[Auth] 🏠 Redirecionando para a home...");
+            router.push("/");
+        }
     };
 
     const confirmLogout = () => {

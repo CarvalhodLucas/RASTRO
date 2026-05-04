@@ -12,16 +12,17 @@ import Analytics from "@/components/Analytics";
 export const metadata: Metadata = {
     title: "RASTRO | Inteligência de Mercado e Análise de Ativos com IA",
     description: "Acompanhe B3, S&P 500 e Cripto em tempo real. Insights profundos com IA, mapas de calor e análise de sentimento. O pulso do mercado na sua mão.",
-    keywords: ["investimentos", "análise de ativos", "inteligência artificial", "B3", "S&P 500", "criptomoedas", "market intelligence"],
+    keywords: ["investimentos", "análise de ativos", "inteligência artificial", "B3", "S&P 500", "criptomoedas", "market intelligence", "rastro ia"],
     authors: [{ name: "RASTRO Team" }],
+    metadataBase: new URL("https://www.rastroia.com"),
     openGraph: {
         title: "RASTRO | Inteligência de Mercado e Análise de Ativos com IA",
         description: "Acompanhe o pulso do mercado em tempo real com análises profundas de IA.",
-        url: "https://rastro.com.br", // Substitua pelo seu domínio real
+        url: "https://www.rastroia.com",
         siteName: "RASTRO",
         images: [
             {
-                url: "/og-image.png", // Coloque esta imagem na pasta /public
+                url: "/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "RASTRO - Inteligência de Mercado",
@@ -34,10 +35,11 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "RASTRO | Inteligência de Mercado com IA",
         description: "Monitoramento de B3, S&P 500 e Cripto com insights de IA.",
-        images: ["/og-image.png"], // Mesmo arquivo da pasta /public
+        images: ["/og-image.png"],
     },
     icons: {
         icon: "/icon.svg",
+        apple: "/og-image.png", // Usando a mesma imagem como ícone Apple por enquanto
     },
 };
 
