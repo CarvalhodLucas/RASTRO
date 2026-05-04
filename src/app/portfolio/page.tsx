@@ -797,7 +797,7 @@ ESTRUTURA DE RESPOSTA:
         
         const parts = text.split(/(STATUS:\s*\[?(?:POSITIVO|NEUTRO|NEGATIVO|ALERTA)\]?|\[DISCLAIMER\])/g);
 
-        return parts.map((part, i) => {
+        return parts.map((part: string, i: number) => {
             if (part === "[DISCLAIMER]") return null;
             if (part.startsWith("⚠️ Aviso:")) {
                 return (

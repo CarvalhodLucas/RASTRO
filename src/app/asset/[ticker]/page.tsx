@@ -12,6 +12,15 @@ import { ADMIN_EMAILS } from "@/lib/constants";
 const BRAPI_TOKEN = "";
 type Status = "loading" | "success" | "error";
 
+const requestNotificationPermission = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+            await Notification.requestPermission();
+        }
+    }
+};
+
+
 const InfoTooltip = ({ text }: { text: string }) => (
     <div className="relative group inline-block">
         <span className="material-symbols-outlined !text-[11px] ml-1 cursor-help text-slate-400">help_outline</span>
