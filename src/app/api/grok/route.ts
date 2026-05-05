@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         else if (isRatingRequest) sectionConfig = sections.rating;
         else if (isHealth)   sectionConfig = sections.saude;
         else if (isSentiment) sectionConfig = sections.sentimento;
+        else if (isOnChain)  sectionConfig = sections.saude;
         else if (isChat)     sectionConfig = sections.chat;
 
         const configProvider = sectionConfig.provider;  // "gemini" | "groq" | "openrouter"
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
             apiURL = "https://api.groq.com/openai/v1/chat/completions";
             headers["Authorization"] = `Bearer ${apiKey}`;
         } else if (useGroq2) {
-            apiKey = groq2Key || "";
+            apiKey = groq2Key || groqKey || "";
             apiURL = "https://api.groq.com/openai/v1/chat/completions";
             headers["Authorization"] = `Bearer ${apiKey}`;
         } else if (useGemini) {

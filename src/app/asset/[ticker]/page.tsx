@@ -1169,6 +1169,86 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
         return await fetchWithRetryPulse();
     };
 
+    // 6. FUNÇÃO: MÉTRICAS ON-CHAIN
+    const fetchOnChainMetrics = async (targetAsset = asset, force = false): Promise<boolean> => {
+        if (!targetAsset || !targetAsset.ticker || !targetAsset.isCrypto) return false;
+
+        const lockKey = `onchain_${targetAsset.ticker}`;
+        if (fetchLocks.current[lockKey] && !force) return false;
+        fetchLocks.current[lockKey] = true;
+
+        const cleanT = normalizeTickerForCache(targetAsset.ticker);
+        const cacheKey = `grok_onchain_v1_${cleanT}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        if (cachedData && !force) {
+            try {
+                const parsed = JSON.parse(cachedData);
+                if (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000) {
+                    console.log(`🟢 [IA] Carregando On-Chain de ${targetAsset.ticker} (Cache)`);
+                    setOnChainMetrics(parsed.data);
+                    setAdminLogs((prev: any) => ({ ...prev, "MÉTRICAS ON-CHAIN": "CACHE (Local)" }));
+                    fetchLocks.current[lockKey] = false;
+                    return false;
+                }
+            } catch (e) {}
+        }
+
+        setOnChainMetrics(null);
+        setIsLoadingOnChain(true);
+
+        const fetchWithRetryOnChain = async (retryCount = 0): Promise<boolean> => {
+            try {
+                const res = await fetch("/api/grok", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticker: targetAsset.ticker,
+                        assetName: targetAsset.name,
+                        report: targetAsset.fullReport || `Análise de criptomoeda ${targetAsset.ticker}`,
+                        isOnChain: true
+                    }),
+                });
+
+                if (res.status === 429 && retryCount < 2) {
+                    const currentDelay = 2000 * Math.pow(2, retryCount);
+                    await sleep(currentDelay);
+                    return fetchWithRetryOnChain(retryCount + 1);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                if (data._admin_model) setAdminLogs((prev: any) => ({ ...prev, 'MÉTRICAS ON-CHAIN': data._admin_model }));
+
+                let finalData = data;
+                if (data.reply) {
+                    try {
+                        const rawStr = typeof data.reply === "string" ? data.reply : JSON.stringify(data.reply);
+                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
+                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
+                        finalData = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
+                    } catch (pe) {
+                        finalData = { error: true };
+                    }
+                }
+
+                setOnChainMetrics(finalData);
+                localStorage.setItem(cacheKey, JSON.stringify({ data: finalData, timestamp: Date.now() }));
+
+            } catch (e: any) {
+                console.error("Erro On-Chain:", e);
+                setOnChainMetrics({ error: true });
+            } finally {
+                setIsLoadingOnChain(false);
+                fetchLocks.current[lockKey] = false;
+            }
+            return true;
+        };
+
+        return await fetchWithRetryOnChain();
+    };
+
     useEffect(() => {
         const savedWatchlist = JSON.parse(localStorage.getItem('user_watchlist') || '[]');
         const cleanTicker = ticker.toUpperCase().replace('.SA', '');
@@ -1805,6 +1885,10 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
             fetchAiHealth(false);
             await sleep(1500);
             fetchAiPulse(asset, false, false);
+            if (asset?.isCrypto) {
+                await sleep(1500);
+                fetchOnChainMetrics(asset, false);
+            }
         };
         runAiFetches();
     // eslint-disable-next-line react-hooks/exhaustive-deps
