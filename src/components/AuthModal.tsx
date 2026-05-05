@@ -114,17 +114,23 @@ export default function AuthModal() {
 
         setIsLoading(true);
 
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        try {
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
 
-        if (loginError) {
-            setError(loginError.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : loginError.message);
-        } else {
-            handleClose();
+            if (loginError) {
+                setError(loginError.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : loginError.message);
+            } else {
+                handleClose();
+            }
+        } catch (err: any) {
+            console.error("[Auth] Erro inesperado no login:", err);
+            setError(err.message || "Erro de conexão ao servidor.");
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
 
@@ -142,59 +148,50 @@ export default function AuthModal() {
         setIsLoading(true);
         setError("");
         
-        // 1. Checar se é um usuário vindo do Google (já logado no Auth, mas sem perfil)
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user && !pendingSocialProvider) {
-            console.log(`[Auth] ✨ Finalizando perfil para usuário social logado: ${user.email}`);
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: user.id,
-                    email: user.email
-                });
+        try {
+            // 1. Checar se é um usuário vindo do Google (já logado no Auth, mas sem perfil)
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user && !pendingSocialProvider) {
+                console.log(`[Auth] ✨ Finalizando perfil para usuário social logado: ${user.email}`);
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: user.id,
+                        email: user.email
+                    });
 
-            if (profileError) {
-                console.error("[Auth] ❌ Erro ao criar perfil pós-google:", profileError.message);
-                setError("Erro ao finalizar seu perfil. Tente novamente.");
-                setIsLoading(false);
+                if (profileError) {
+                    console.error("[Auth] ❌ Erro ao criar perfil pós-google:", profileError.message);
+                    setError("Erro ao finalizar seu perfil. Tente novamente.");
+                    return;
+                }
+                
+                handleClose();
+                router.push("/");
                 return;
             }
-            
-            handleClose();
-            router.push("/");
-            setIsLoading(false);
-            return;
-        }
 
-        // 2. Se for login social pendente (OAuth ainda não iniciado)
-        if (pendingSocialProvider) {
-            const provider = pendingSocialProvider;
-            setPendingSocialProvider(null);
-            setShowTerms(false);
-            
-            console.log(`[Auth] 🚀 Iniciando login social com ${provider}...`);
-            
-            try {
+            // 2. Se for login social pendente (OAuth ainda não iniciado)
+            if (pendingSocialProvider) {
+                const provider = pendingSocialProvider;
+                setPendingSocialProvider(null);
+                setShowTerms(false);
+                
+                console.log(`[Auth] 🚀 Iniciando login social com ${provider}...`);
+                
                 const redirectTo = `${window.location.origin}/auth/callback`;
                 const { error } = await supabase.auth.signInWithOAuth({
                     provider,
                     options: { redirectTo }
                 });
                 if (error) setError(error.message);
-            } catch (err) {
-                console.error("[Auth] ❌ Erro no login social:", err);
-                setError("Falha ao iniciar login social.");
-            } finally {
-                setIsLoading(false);
+                return;
             }
-            return;
-        }
 
-        // 3. Registro manual (E-mail e Senha)
-        console.log(`[Auth] 📝 Tentando registrar usuário manual: ${regEmail}`);
-        
-        try {
+            // 3. Registro manual (E-mail e Senha)
+            console.log(`[Auth] 📝 Tentando registrar usuário manual: ${regEmail}`);
+            
             const { data, error: signUpError } = await supabase.auth.signUp({
                 email: regEmail,
                 password: regPassword,
@@ -226,9 +223,9 @@ export default function AuthModal() {
                     setShowTerms(false);
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("[Auth] ❌ Erro inesperado no cadastro:", err);
-            setError("Ocorreu um erro inesperado.");
+            setError(err.message || "Ocorreu um erro inesperado. Verifique sua conexão.");
         } finally {
             setIsLoading(false);
         }
