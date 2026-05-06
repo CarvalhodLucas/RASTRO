@@ -25,6 +25,16 @@ interface AuthContextType {
     updateProfile: (updates: Partial<AuthUser>) => void;
 }
 
+const GUEST_USER: AuthUser = {
+    id: "guest-user",
+    name: "Visitante",
+    email: "guest@rastro.ia",
+    isLoggedIn: true,
+    theme: "dark",
+    joinedAt: "2026",
+    investorType: "curioso"
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -45,7 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.error("Error parsing user_session", e);
             }
         }
-        return null;
+        // Retorna o usuário convidado por padrão se não houver sessão (Desativação temporária de login)
+        return GUEST_USER;
     };
 
     useEffect(() => {
@@ -104,9 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Removido a auto-criação na inicialização que estava causando erro 400
                 // O perfil deve ser criado pelo trigger do Supabase ou via Upsert nas configurações.
             } else if (event === "SIGNED_OUT") {
-                console.log("[Auth] 🔴 Usuário deslogado");
+                console.log("[Auth] 🔴 Usuário deslogado - Retornando ao Modo Convidado");
                 localStorage.removeItem("user_session");
-                setUser(null);
+                setUser(GUEST_USER);
                 window.dispatchEvent(new Event("auth-update"));
             }
         });
@@ -148,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // 1. Limpa o estado local imediatamente para feedback instantâneo na UI
         localStorage.removeItem("user_session");
-        setUser(null);
+        setUser(GUEST_USER);
         window.dispatchEvent(new Event("auth-update"));
         
         // 2. Executa o signOut do Supabase de forma "fire-and-forget" ou com timeout curto
