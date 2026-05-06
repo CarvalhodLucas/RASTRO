@@ -376,8 +376,16 @@ export default function Home() {
                                 placeholder="Pesquisar Tickers (ex. AAPL, PETR4)..."
                                 type="text"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
                                 onFocus={() => setSearchFocused(true)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && searchTerm.trim()) {
+                                        const exists = assetsDatabase.find(a => a.ticker.toUpperCase() === searchTerm.trim().toUpperCase());
+                                        if (exists) {
+                                            router.push(`/asset/${searchTerm.trim().toUpperCase()}`);
+                                        }
+                                    }
+                                }}
                             />
                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-2">
                                 <button className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-neutral-dark-border transition-colors">

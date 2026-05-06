@@ -4,13 +4,14 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Removido runtime edge para evitar timeouts 504 em modelos lentos
 // export const runtime = "edge";
 
-async function fetchLatestNews(ticker: string) {
+async function fetchLatestNews(ticker: string, isMetricSearch: boolean = false) {
     try {
         let query = ticker;
         if (ticker.includes(".SA")) {
             query = ticker.replace(".SA", "") + " B3";
         } else if (ticker.includes("-USD") || ticker.endsWith("USD")) {
-            query = ticker.replace("-USD", "").replace("USD", "") + " crypto news";
+            const clean = ticker.replace("-USD", "").replace("USD", "");
+            query = isMetricSearch ? `${clean} on-chain data metrics tvl wallets inflation` : `${clean} crypto news`;
         }
         
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
@@ -23,7 +24,7 @@ async function fetchLatestNews(ticker: string) {
             while ((match = regex.exec(xml)) !== null) {
                 if (match[1]) titles.push(match[1]);
             }
-            const finalTitles = titles.slice(1, 6);
+            const finalTitles = titles.slice(1, 10); // Aumentado para 10 para mais contexto
             return finalTitles.join(" | ").replace(/ - Google Notícias/g, '');
         }
     } catch (e) {
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
         const useGemini      = configProvider === "gemini";
         const useGroqOnly    = configProvider === "groq";
         const useGroq2       = configProvider === "groq2";
+        const useGroq3       = configProvider === "groq3";
         const useOpenRouter  = configProvider === "openrouter";
 
         let apiURL = "";
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
 
         const groqKey = process.env.GROQ_API_KEY;
         const groq2Key = process.env.GROQ2_API_KEY;
+        const groq3Key = process.env.GROQ3_API_KEY;
 
         if (useGroqOnly) {
             apiKey = groqKey || "";
@@ -83,6 +86,10 @@ export async function POST(req: Request) {
             headers["Authorization"] = `Bearer ${apiKey}`;
         } else if (useGroq2) {
             apiKey = groq2Key || groqKey || "";
+            apiURL = "https://api.groq.com/openai/v1/chat/completions";
+            headers["Authorization"] = `Bearer ${apiKey}`;
+        } else if (useGroq3) {
+            apiKey = groq3Key || groq2Key || groqKey || "";
             apiURL = "https://api.groq.com/openai/v1/chat/completions";
             headers["Authorization"] = `Bearer ${apiKey}`;
         } else if (useGemini) {
@@ -100,8 +107,8 @@ export async function POST(req: Request) {
         }
 
         let recentNews = "";
-        if (isSentiment && ticker) {
-            recentNews = await fetchLatestNews(ticker);
+        if ((isSentiment || isOnChain || isPulse) && ticker) {
+            recentNews = await fetchLatestNews(ticker, isOnChain);
         }
 
         let systemInstruction = `Você é um analista sênior da RASTRO, uma plataforma premium de inteligência de mercado com estética Bloomberg/Terminal.
@@ -160,7 +167,15 @@ export async function POST(req: Request) {
             - "bazin": numero com o Preço-teto de Bazin estimado (apenas o numero).
             - "bazinUpside": numero com a margem de seguranca de Bazin em porcentagem.`;
         } else if (isOnChain) {
-            systemInstruction += `\nTAREFA: MÉTRICAS ON-CHAIN. Retorne EXCLUSIVAMENTE um JSON com: "tvl", "wallets", "inflation", "revenue", "s2f" e "score".`;
+            systemInstruction += `\nTAREFA: MÉTRICAS ON-CHAIN PARA CRIPTO. Retorne EXCLUSIVAMENTE um JSON com: "tvl", "wallets", "inflation", "revenue", "s2f", "score", "fairPrice" e "upside".
+            REGRAS CRÍTICAS DE DADOS (JAMAIS IGNORE):
+            1. JAMAIS use números sequenciais, genéricos ou de exemplo (ex: 123456, 85000000, 1.23, 1234567890). Isso é inaceitável.
+            2. Se você não tem acesso ao dado real nas notícias fornecidas ou no seu conhecimento treinado, use "N/D" para strings ou 0 para números.
+            3. Se for Bitcoin (BTC), o TVL costuma ser "N/D" ou relacionado à Lightning Network. Use valores realistas de mercado (Ex: Revenue diário do BTC é na casa de milhões de USD).
+            4. Se for Ethereum (ETH), use valores de TVL na casa de bilhões de USD.
+            5. O campo "s2f" (Stock-to-Flow) deve refletir a escassez atual (ex: ~55 para BTC).
+            6. "score" de 0 a 100 baseado na atividade e segurança da rede.
+            7. Estime "fairPrice" e "upside" baseando-se em modelos de escassez e adoção.`;
         } else if (isFairPrice) {
             systemInstruction += `\nTAREFA: VALOR JUSTO (VALUATION). Retorne EXCLUSIVAMENTE um JSON com:
             - "fairPrice": number representando o preço alvo / intrínseco.
@@ -180,7 +195,7 @@ export async function POST(req: Request) {
             2. NUNCA sugira "Compra" ou "Venda" diretamente.
             3. ADICIONE SEMPRE esta nota no final da resposta: "\n\n*Nota: Esta é uma análise automatizada para fins informativos. Não constitui recomendação de investimento.*"
             
-            Retorne EXCLUSIVAMENTE um JSON com a chave "reply" contendo sua resposta final em texto estruturado.`;
+            IMPORTANTE: NÃO use a estrutura de JSON de avaliação (score, pillars, etc.) para o chat. Use EXCLUSIVAMENTE um JSON com uma única chave "reply" contendo sua análise técnica e ácida em formato de texto.`;
         } else if (isChat) {
             systemInstruction += `\nTAREFA: ANALISTA DE CHAT. Sua missão é EXPLICAR e JUSTIFICAR tecnicamente os dados do ativo ${ticker} (${assetName || ticker}) e a nota atribuída.
             
@@ -188,7 +203,7 @@ export async function POST(req: Request) {
             
             DIRETRIZES DE TOM:
             - Tom: Bloomberg Terminal / Sênior Institutional. 
-            - Estilo: Curto, direto, focado em números e fatos. Zero "papo furado".
+            - Estilo: Curto, direto, focado em números e fatos. Zero "papo furado". Ácido e técnico.
             - Autonomia: Você É o autor da Nota de Solidez abaixo.
             
             REGRA DE OURO: Nunca contradiga o Score ou a Tese de Investimento que já estão na tela (${indicators?.investorThesis || 'N/A'}). Baseie suas respostas nesses números atuais e no relatório 360.
@@ -218,45 +233,69 @@ export async function POST(req: Request) {
             5. ADICIONE SEMPRE esta nota no final da resposta: "\n\n*Nota: Esta é uma análise automatizada para fins informativos. Não constitui recomendação de investimento.*"
             6. Evite disclaimers repetitivos além da nota obrigatória acima.
             
-            Retorne EXCLUSIVAMENTE um JSON com a chave "reply".`;
+            IMPORTANTE: NÃO use a estrutura de JSON de avaliação (score, pillars, etc.) para o chat. Use EXCLUSIVAMENTE um JSON com uma única chave "reply".`;
+        } else if (isSupportChat) {
+            systemInstruction = `${systemContext || 'Você é o Assistente Virtual Oficial da plataforma RASTRO.'}
+            
+            INSTRUÇÕES ADICIONAIS:
+            - Responda de forma direta, educada e amigável.
+            - Use markdown para estruturar a resposta se necessário (negrito, listas, etc).
+            - Mantenha o foco em ajudar o usuário com as funcionalidades da plataforma RASTRO.
+            - NUNCA forneça recomendações de investimento ou conselhos financeiros.
+            
+            IMPORTANTE: NÃO use a estrutura de JSON de avaliação (score, pillars, etc.) para o chat. Use EXCLUSIVAMENTE um JSON com uma única chave "reply".`;
         }
 
-        if (useOpenRouter) {
+
+        if (useOpenRouter && !isChat && !isPortfolioChat && !isSupportChat) {
             systemInstruction += `\nINSTRUÇÃO CRÍTICA: Responda APENAS com o objeto JSON. Não inclua nenhuma introdução, explicação, comentários ou blocos de código markdown (\`\`\`json). O retorno deve ser parseável diretamente por JSON.parse().`;
-        } else {
+        } else if (!isChat && !isPortfolioChat && !isSupportChat) {
             systemInstruction += `\nResponda EXCLUSIVAMENTE em formato JSON puro, sem markdown.`;
         }
 
         // --- CONSTRUÇÃO DAS MENSAGENS COM CONTEXTO ---
-        let finalMessages = messages;
-        if (!finalMessages) {
+        let finalMessages = messages || [];
+        
+        // Se não houver histórico, cria o primeiro bloco de conteúdo com o relatório
+        if (finalMessages.length === 0) {
             let userContent = prompt || report || "";
             if (prompt && report) {
                 userContent = `RELATÓRIO DE FUNDAMENTOS (${ticker}):\n${report}\n\nPERGUNTA DO USUÁRIO: ${prompt}`;
-            }
-            if (isSentiment) {
+            } else if (isSentiment || isPulse) {
                 userContent = `ATIVO: ${ticker} (${assetName || ticker})\nVARIAÇÃO DE PREÇO(24H): ${variation || '0'}%\nÚLTIMAS MANCHETES DE NOTÍCIAS: ${recentNews || 'Nenhuma manchete disponível hoje.'}\n\n${prompt || ''}`;
+            } else if (isOnChain) {
+                userContent = `DADOS DE MERCADO DO ATIVO:\n${report || `Ativo: ${ticker}`}\n\nVARIAÇÃO DE PREÇO(24H): ${variation || '0'}%\nNOTÍCIAS/CONTEXTO ADICIONAL: ${recentNews || 'Sem notícias recentes.'}\n\nAnalise os dados acima e retorne as métricas on-chain estimadas.`;
             }
             finalMessages = [{ role: "user", content: userContent }];
+        } else {
+            // Se houver histórico, o 'prompt' atual deve ser adicionado ao final se não estiver lá
+            // (O frontend envia 'prompt' separadamente para manter a lógica original)
+            const lastMsg = finalMessages[finalMessages.length - 1];
+            if (prompt && (!lastMsg || lastMsg.content !== prompt)) {
+                finalMessages.push({ role: "user", content: prompt });
+            }
         }
 
         let reply = "";
 
-        let modelNameUsed = "";
+        let modelNameUsed = model;
 
         if (useGemini && apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(apiKey);
                 // Modelo lido do ai-models.config.json
-                const modelName = model;
-                modelNameUsed = modelName;
-                const geminiModel = genAI.getGenerativeModel({ model: modelName });
+                modelNameUsed = model;
+                const geminiModel = genAI.getGenerativeModel({ model: model });
                 
                 const result = await geminiModel.generateContent({
-                    contents: [{ role: "user", parts: [{ text: systemInstruction + "\n\n" + (finalMessages?.[finalMessages.length - 1]?.content || prompt || report || "") }] }],
+                    systemInstruction: systemInstruction,
+                    contents: finalMessages.map(m => ({
+                        role: m.role === "assistant" ? "model" : "user",
+                        parts: [{ text: m.content }]
+                    })),
                     generationConfig: {
                         temperature: isRatingRequest ? 0.1 : 0.4,
-                        responseMimeType: "application/json",
+                        responseMimeType: (isRatingRequest || isPulse || isSentiment || isOnChain || isChat || isPortfolioChat || isSupportChat) ? "application/json" : "text/plain",
                     },
                 });
                 
@@ -317,15 +356,67 @@ export async function POST(req: Request) {
         if (!reply) return NextResponse.json({ error: "Resposta vazia da IA" }, { status: 500 });
 
         try {
-            const cleanReply = reply.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const startIdx = cleanReply.indexOf('{');
-            const endIdx = cleanReply.lastIndexOf('}');
-            const jsonContent = (startIdx !== -1 && endIdx !== -1) ? cleanReply.substring(startIdx, endIdx + 1) : cleanReply;
-            const parsed = JSON.parse(jsonContent);
-            return NextResponse.json({ ...parsed, _admin_model: modelNameUsed || model });
+            // Limpeza agressiva para garantir que temos apenas o JSON
+            let jsonContent = reply.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const startIdx = jsonContent.indexOf('{');
+            const endIdx = jsonContent.lastIndexOf('}');
+            
+            if (startIdx !== -1 && endIdx !== -1) {
+                jsonContent = jsonContent.substring(startIdx, endIdx + 1);
+            }
+
+            try {
+                let parsed = JSON.parse(jsonContent);
+                
+                // Se o resultado ainda for uma string, tenta parsar de novo (double stringified)
+                if (typeof parsed === 'string' && parsed.trim().startsWith('{')) {
+                    try {
+                        parsed = JSON.parse(parsed);
+                    } catch (e) {}
+                }
+
+                if (typeof parsed === 'object' && parsed !== null) {
+                    return NextResponse.json({ ...parsed, _admin_model: modelNameUsed || model });
+                } else {
+                    // Se o parse retornou algo que não é objeto, mas estamos em um chat, retornamos como reply
+                    if (isChat || isPortfolioChat || isSupportChat) {
+                        return NextResponse.json({ reply: String(parsed), _admin_model: modelNameUsed || model });
+                    }
+                    return NextResponse.json({ reply: String(parsed), _admin_model: modelNameUsed || model });
+                }
+            } catch (parseErr) {
+                // Fallback para CHAT: Se não for JSON, mas for um chat, retorna o texto bruto
+                if (isChat || isPortfolioChat || isSupportChat) {
+                    return NextResponse.json({ 
+                        reply: reply.trim(), 
+                        _admin_model: modelNameUsed || model,
+                        rawTextMode: true 
+                    });
+                }
+
+                // Fallback 1: Tentar extrair apenas o campo "reply" via Regex se o JSON estiver quebrado
+                const replyMatch = jsonContent.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+                if (replyMatch && replyMatch[1]) {
+                    // Limpa escapes de string
+                    const extractedReply = replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    return NextResponse.json({ 
+                        reply: extractedReply, 
+                        _admin_model: modelNameUsed || model,
+                        recoveredByRegex: true 
+                    });
+                }
+                throw parseErr; // Passa para o catch externo
+            }
         } catch (e) {
             console.warn(`[API] JSON Parse fail for ${ticker}:`, e);
-            return NextResponse.json({ reply, _admin_model: modelNameUsed || model, parseError: true });
+            // Fallback final: Retorna o texto bruto se nada mais funcionar, 
+            // mas tenta pelo menos remover as chaves externas se existirem
+            let finalReply = reply;
+            if (reply.includes('"reply":')) {
+                const match = reply.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+                if (match) finalReply = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            }
+            return NextResponse.json({ reply: finalReply, _admin_model: modelNameUsed || model, parseError: true });
         }
 
     } catch (error: any) {

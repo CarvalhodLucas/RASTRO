@@ -169,6 +169,8 @@ export default function AssetPage() {
     const fetchLocks = useRef<Record<string, boolean>>({});
     const initialFetchLock = useRef<string | null>(null);
     const aiFetchLock = useRef<string | null>(null);
+    const aiFastFetchLock = useRef<string | null>(null);
+    const aiDeepFetchLock = useRef<string | null>(null);
 
     // Auto-scroll do chat (Ancoragem por Contexto)
     useEffect(() => {
@@ -1169,7 +1171,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
         return await fetchWithRetryPulse();
     };
 
-    // 6. FUNÇÃO: MÉTRICAS ON-CHAIN
+    // 6. FUNÇÃO: MÉTRICAS ON-CHAIN (dados reais — DeFiLlama + CoinGecko)
     const fetchOnChainMetrics = async (targetAsset = asset, force = false): Promise<boolean> => {
         if (!targetAsset || !targetAsset.ticker || !targetAsset.isCrypto) return false;
 
@@ -1178,16 +1180,16 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
         fetchLocks.current[lockKey] = true;
 
         const cleanT = normalizeTickerForCache(targetAsset.ticker);
-        const cacheKey = `grok_onchain_v1_${cleanT}`;
+        const cacheKey = `real_onchain_v1_${cleanT}`;
         const cachedData = localStorage.getItem(cacheKey);
 
         if (cachedData && !force) {
             try {
                 const parsed = JSON.parse(cachedData);
-                if (Date.now() - parsed.timestamp < 12 * 60 * 60 * 1000) {
-                    console.log(`🟢 [IA] Carregando On-Chain de ${targetAsset.ticker} (Cache)`);
+                if (Date.now() - parsed.timestamp < 1 * 60 * 60 * 1000) { // Cache de 1h
+                    console.log(`🟢 [ON-CHAIN] Carregando de ${targetAsset.ticker} (Cache)`);
                     setOnChainMetrics(parsed.data);
-                    setAdminLogs((prev: any) => ({ ...prev, "MÉTRICAS ON-CHAIN": "CACHE (Local)" }));
+                    setAdminLogs((prev: any) => ({ ...prev, "MÉTRICAS ON-CHAIN": "CACHE (DeFiLlama)" }));
                     fetchLocks.current[lockKey] = false;
                     return false;
                 }
@@ -1197,56 +1199,27 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
         setOnChainMetrics(null);
         setIsLoadingOnChain(true);
 
-        const fetchWithRetryOnChain = async (retryCount = 0): Promise<boolean> => {
-            try {
-                const res = await fetch("/api/grok", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        ticker: targetAsset.ticker,
-                        assetName: targetAsset.name,
-                        report: targetAsset.fullReport || `Análise de criptomoeda ${targetAsset.ticker}`,
-                        isOnChain: true
-                    }),
-                });
+        try {
+            const res = await fetch(`/api/onchain?ticker=${encodeURIComponent(targetAsset.ticker)}`);
 
-                if (res.status === 429 && retryCount < 2) {
-                    const currentDelay = 2000 * Math.pow(2, retryCount);
-                    await sleep(currentDelay);
-                    return fetchWithRetryOnChain(retryCount + 1);
-                }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
 
-                const data = await res.json();
-                if (data._admin_model) setAdminLogs((prev: any) => ({ ...prev, 'MÉTRICAS ON-CHAIN': data._admin_model }));
+            setAdminLogs((prev: any) => ({ ...prev, "MÉTRICAS ON-CHAIN": data._source || "DeFiLlama + CoinGecko" }));
 
-                let finalData = data;
-                if (data.reply) {
-                    try {
-                        const rawStr = typeof data.reply === "string" ? data.reply : JSON.stringify(data.reply);
-                        const jsonMatch = rawStr.match(/\{[\s\S]*\}/);
-                        const cleanStr = jsonMatch ? jsonMatch[0] : rawStr;
-                        finalData = JSON.parse(cleanStr.replace(/```json/gi, '').replace(/```/g, '').trim());
-                    } catch (pe) {
-                        finalData = { error: true };
-                    }
-                }
+            setOnChainMetrics(data);
+            localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
 
-                setOnChainMetrics(finalData);
-                localStorage.setItem(cacheKey, JSON.stringify({ data: finalData, timestamp: Date.now() }));
-
-            } catch (e: any) {
-                console.error("Erro On-Chain:", e);
-                setOnChainMetrics({ error: true });
-            } finally {
-                setIsLoadingOnChain(false);
-                fetchLocks.current[lockKey] = false;
-            }
-            return true;
-        };
-
-        return await fetchWithRetryOnChain();
+        } catch (e: any) {
+            console.error("Erro On-Chain:", e);
+            setOnChainMetrics({ error: true });
+        } finally {
+            setIsLoadingOnChain(false);
+            fetchLocks.current[lockKey] = false;
+        }
+        return true;
     };
 
     useEffect(() => {
@@ -1385,18 +1358,53 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isLoadingChat) return;
         const userMsg = chatInput;
+        
+        // Mantém as mensagens atuais para o histórico (antes de adicionar a nova)
+        const history = [...messages];
+        
         setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
         setChatInput("");
         setIsLoadingChat(true);
 
-        const rawReport = htmlReport || asset?.fullReport || "";
-        let cleanReport = rawReport;
-        if (rawReport.includes("<div") || rawReport.includes("<p>")) {
-            const tmp = document.createElement("div");
-            tmp.innerHTML = rawReport;
-            cleanReport = tmp.innerText || tmp.textContent || "";
+        // --- OTIMIZAÇÃO 4: Histórico Compacto ---
+        // Mantém apenas as últimas 6 mensagens (3 interações completas)
+        const maxHistoryLength = 6;
+        const optimizedHistory = history.slice(-maxHistoryLength).map(m => ({
+            role: m.role === "ia" ? "assistant" : "user", 
+            content: m.text 
+        }));
+
+        // --- OTIMIZAÇÃO 2: Relatório Resumido ---
+        // Envia o relatório completo de 5000 chars APENAS na primeira mensagem.
+        // Nas seguintes, envia apenas o Resumo (Tese) para poupar tokens drásticamente.
+        const isFirstMessage = history.length === 0;
+        let finalReportToSend = "";
+
+        if (isFirstMessage) {
+            const rawReport = htmlReport || asset?.fullReport || "";
+            let cleanReport = rawReport;
+            if (rawReport.includes("<div") || rawReport.includes("<p>")) {
+                const tmp = document.createElement("div");
+                tmp.innerHTML = rawReport;
+                cleanReport = tmp.innerText || tmp.textContent || "";
+            }
+            finalReportToSend = cleanReport.substring(0, 5000);
+        } else {
+            // Em perguntas subsequentes, usamos o insight sumarizado que já está na memória
+            finalReportToSend = `[RESUMO / TESE ATUAL]: ${investorThesis || "Resumo indisponível no momento."}\n\n[SCORE]: ${aiRatingData?.score || 'N/D'}/10`;
         }
-        cleanReport = cleanReport.substring(0, 5000);
+
+        // --- OTIMIZAÇÃO 1: Contexto Seletivo (LUCAS_KNOWLEDGE) ---
+        let filteredKnowledge = LUCAS_KNOWLEDGE;
+        const isCryptoAsset = !!asset?.isCrypto || asset?.ticker?.includes("BTC") || asset?.ticker?.includes("ETH");
+        
+        if (isCryptoAsset) {
+            // Remove a seção de Ações para ativos cripto
+            filteredKnowledge = filteredKnowledge.replace(/## 3\. CHECKLIST FUNDAMENTALISTA \(AÇÕES\)[\s\S]*?(?=## 4\. CHECKLIST CRIPTO)/, '');
+        } else {
+            // Remove a seção de Cripto para ações tradicionais
+            filteredKnowledge = filteredKnowledge.replace(/## 4\. CHECKLIST CRIPTO & ON-CHAIN AVANÇADO[\s\S]*?(?=## 5\. TIMING)/, '');
+        }
 
         try {
             const res = await fetch("/api/grok", {
@@ -1404,12 +1412,13 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: userMsg,
+                    messages: optimizedHistory,
                     ticker: asset.ticker,
                     assetName: asset.name,
-                    report: cleanReport,
+                    report: finalReportToSend,
                     variation: asset.variation,
                     isChat: true,
-                    systemContext: `Você é o Assistente Rastro. Siga estritamente esta metodologia: ${LUCAS_KNOWLEDGE}`,
+                    systemContext: `Você é o Assistente Rastro. Siga estritamente esta metodologia: ${filteredKnowledge}`,
                     indicators: {
                         price: asset.price,
                         variation: asset.variation,
@@ -1426,12 +1435,20 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     }
                 })
             });
+
             const data = await res.json();
+            
+            if (!res.ok) {
+                const errorMsg = data.details || data.error || `Erro ${res.status}`;
+                setMessages((prev) => [...prev, { role: "ia", text: `⚠️ IA INDISPONÍVEL: ${errorMsg}` }]);
+                return;
+            }
+
             if (data._admin_model) setAdminLogs(prev => ({ ...prev, 'CHATLIVE': data._admin_model }));
             const aiReply = data.reply || data.text || "Sem resposta da IA.";
             setMessages((prev) => [...prev, { role: "ia", text: aiReply }]);
-        } catch (error) {
-            setMessages((prev) => [...prev, { role: "ia", text: "Erro ao conectar à IA (Grok)." }]);
+        } catch (error: any) {
+            setMessages((prev) => [...prev, { role: "ia", text: `Erro de conexão: ${error.message || "Falha ao contactar o servidor."}` }]);
             console.error("Chat Error:", error);
         } finally {
             setIsLoadingChat(false);
@@ -1592,6 +1609,17 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
         setIsComparing(true);
         console.log("🚀 Iniciando comparação para:", compareTicker);
+
+        // Validação contra banco de dados interno
+        const existsInDb = assetsDatabase.find(a => 
+            a.ticker.toUpperCase() === compareTicker.trim().toUpperCase()
+        );
+
+        if (!existsInDb) {
+            alert("Este ativo não está disponível para comparação no banco de dados do RASTRO.");
+            setIsComparing(false);
+            return;
+        }
 
         try {
             // 2. Formatação inteligente do Ticker
@@ -1866,32 +1894,50 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
         if (ticker && initialFetchLock.current !== ticker) {
             fetchAssetData();
             initialFetchLock.current = ticker;
-            // Reset AI lock when changing ticker
+            // Reset AI locks when changing ticker
             aiFetchLock.current = null;
+            aiFastFetchLock.current = null;
+            aiDeepFetchLock.current = null;
         }
     }, [ticker]);
 
-    // GATILHO STAGGERED DE IA: Dispara analises apos asset + htmlReport estarem prontos
+    // GATILHO PARALELO DE IA: Carga rápida de dados sociais e momento (Execução Imediata)
     useEffect(() => {
-        if (!asset?.ticker) return;
-        const runAiFetches = async () => {
-            console.log('IA staggered para: ' + asset.ticker);
-            fetchFundamentalRating(asset, false, false);
-            await sleep(1500);
-            fetchAiAnalysis(false);
-            await sleep(1500);
-            fetchMarketSentiment(asset, false, false);
-            await sleep(1500);
-            fetchAiHealth(false);
-            await sleep(1500);
-            fetchAiPulse(asset, false, false);
-            if (asset?.isCrypto) {
-                await sleep(1500);
-                fetchOnChainMetrics(asset, false);
-            }
+        if (!asset?.ticker || aiFastFetchLock.current === asset.ticker) return;
+        
+        const runFastAiFetches = async () => {
+            aiFastFetchLock.current = asset.ticker;
+            console.log('🚀 IA Fast-track iniciando para: ' + asset.ticker);
+            
+            // Estes não dependem do relatório HTML, apenas do ticker e variação
+            // Rodam em paralelo total
+            await Promise.all([
+                fetchMarketSentiment(asset, false, false),
+                fetchAiPulse(asset, false, false),
+                asset?.isCrypto ? fetchOnChainMetrics(asset, false) : Promise.resolve()
+            ]);
         };
-        runAiFetches();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        runFastAiFetches();
+    }, [asset?.ticker]);
+
+    // GATILHO PARALELO DE IA: Carga de análise profunda (Depende do Relatório HTML)
+    useEffect(() => {
+        // Só dispara se tivermos o ticker E o relatório (mesmo que seja o fallback de "não encontrado")
+        if (!asset?.ticker || !htmlReport || aiDeepFetchLock.current === asset.ticker) return;
+        
+        const runDeepAiFetches = async () => {
+            aiDeepFetchLock.current = asset.ticker;
+            console.log('🧠 IA Deep-analysis iniciando para: ' + asset.ticker);
+            
+            // Estes dependem do conteúdo do relatório HTML para precisão
+            // Rodam em paralelo total
+            await Promise.all([
+                fetchFundamentalRating(asset, false, false),
+                fetchAiAnalysis(false),
+                fetchAiHealth(false)
+            ]);
+        };
+        runDeepAiFetches();
     }, [asset?.ticker, htmlReport]);
 
     if (status === "loading") {
@@ -2404,6 +2450,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         fetchAiHealth(true);
+                                                        if (isCryptoAsset) fetchOnChainMetrics(asset, true);
                                                     }}
                                                     className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 border border-primary/20 rounded-lg text-[9px] font-black text-primary uppercase hover:bg-primary hover:text-black transition-all group"
                                                     title="Forçar Re-análise de Saúde"
@@ -2895,17 +2942,19 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                     {/* VALOR JUSTO DCF / VPA */}
                                                     <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
                                                         <span className="text-sm text-slate-300 flex items-center">
-                                                            {isFIIAsset ? 'Valor Patrimonial (VPA)' : 'Valor Justo DCF'}
-                                                            <InfoTooltip text={isFIIAsset ? "Valor contábil do fundo. Estimativa do valor real dos imóveis por cota." : "Discounted Cash Flow. Estima o valor intrínseco da empresa projetando seus fluxos de caixa futuros."} />
+                                                            {isFIIAsset ? 'Valor Patrimonial (VPA)' : (isCryptoAsset ? 'Valor Justo (IA)' : 'Valor Justo DCF')}
+                                                            <InfoTooltip text={isFIIAsset ? "Valor contábil do fundo. Estimativa do valor real dos imóveis por cota." : (isCryptoAsset ? "Estimativa do valor intrínseco baseada em modelos de escassez (S2F) e adoção de rede." : "Discounted Cash Flow. Estima o valor intrínseco da empresa projetando seus fluxos de caixa futuros.")} />
                                                         </span>
                                                         <div className="text-right">
                                                             <span className="block text-base font-bold text-primary">
                                                                 {isFIIAsset
                                                                     ? formatValue(asset?.fundamentalData?.vpa || aiRatingData?.fiiMetrics?.vpa || 0)
-                                                                    : formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (aiRatingData?.dcf && aiRatingData.dcf > 0 ? aiRatingData.dcf : (fairPriceData?.fairPrice || 0)))}
+                                                                    : (isCryptoAsset && onChainMetrics?.fairPrice)
+                                                                        ? formatValue(onChainMetrics.fairPrice)
+                                                                        : formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (aiRatingData?.dcf && aiRatingData.dcf > 0 ? aiRatingData.dcf : (fairPriceData?.fairPrice || 0)))}
                                                             </span>
                                                             {(() => {
-                                                                const dcfUpside = aiHealth?.dcfUpside || aiRatingData?.dcfUpside || fairPriceData?.upside || 0;
+                                                                const dcfUpside = isCryptoAsset ? (onChainMetrics?.upside || 0) : (aiHealth?.dcfUpside || aiRatingData?.dcfUpside || fairPriceData?.upside || 0);
                                                                 const vpaUpside = ((((asset?.fundamentalData?.vpa || 0) / (parseFloat(asset?.price || "1") || 1)) - 1) * 100);
                                                                 const displayUpside = isFIIAsset ? vpaUpside : dcfUpside;
                                                                 return (

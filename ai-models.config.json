@@ -4,6 +4,7 @@
         "gemini",
         "groq",
         "groq2",
+        "groq3",
         "openrouter"
     ],
     "sections": {
@@ -16,8 +17,8 @@
             "model": "llama-3.3-70b-versatile"
         },
         "rating": {
-            "provider": "openrouter",
-            "model": "nvidia/nemotron-3-super-120b-a12b:free"
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile"
         },
         "saude": {
             "provider": "groq2",
@@ -28,12 +29,12 @@
             "model": "llama-3.3-70b-versatile"
         },
         "chat": {
-            "provider": "openrouter",
-            "model": "nvidia/nemotron-3-super-120b-a12b:free"
+            "provider": "groq3",
+            "model": "llama-3.3-70b-versatile"
         },
         "portfolio_chat": {
-            "provider": "openrouter",
-            "model": "google/gemini-2.0-flash-exp:free"
+            "provider": "groq3",
+            "model": "llama-3.3-70b-versatile"
         },
         "support_chat": {
             "provider": "groq",
@@ -51,6 +52,11 @@
             "mixtral-8x7b-32768"
         ],
         "groq2": [
+            "llama-3.3-70b-versatile",
+            "llama3-70b-8192",
+            "mixtral-8x7b-32768"
+        ],
+        "groq3": [
             "llama-3.3-70b-versatile",
             "llama3-70b-8192",
             "mixtral-8x7b-32768"

@@ -5,6 +5,7 @@ import CommentThread, { SquareComment } from "./CommentThread";
 
 export interface SquarePost {
     id: number;
+    userId?: string;
     author: string;
     avatar: string | null;
     avatarImage: string | null;
@@ -114,7 +115,7 @@ const InsightCard: React.FC<InsightCardProps> = ({
                                 </button>
                             )}
 
-                            {user?.email === "carvalhodlucas@hotmail.com" && (
+                            {(user?.email === "carvalhodlucas@hotmail.com" || (user && post.userId && user.id === post.userId)) && (
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -123,7 +124,7 @@ const InsightCard: React.FC<InsightCardProps> = ({
                                         }
                                     }}
                                     className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-red-500/10 transition-colors ml-2"
-                                    title="Excluir Post (Admin)"
+                                    title={user?.email === "carvalhodlucas@hotmail.com" ? "Excluir Post (Admin)" : "Excluir Post"}
                                 >
                                     <span className="material-symbols-outlined text-[18px]">delete</span>
                                 </button>

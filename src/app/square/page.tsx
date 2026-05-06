@@ -37,7 +37,12 @@ export default function SquarePage() {
                         ...payload.new,
                         profiles: profileData
                     });
-                    setPosts(prev => [newMessage, ...prev]);
+                    
+                    setPosts(prev => {
+                        // Evita duplicatas se a mensagem já foi adicionada localmente pelo handlePost
+                        if (prev.some(p => p.id === newMessage.id)) return prev;
+                        return [newMessage, ...prev];
+                    });
                 }
             )
             .subscribe();
@@ -49,19 +54,51 @@ export default function SquarePage() {
     }, []);
 
     const fetchMessages = async () => {
-        const { data, error } = await supabase
+        // 1. Busca as mensagens primeiro
+        const { data: messages, error: messagesError } = await supabase
             .from('messages')
-            .select('*, profiles(avatar_url, full_name)')
+            .select('*')
             .order('created_at', { ascending: false });
 
-
-        if (error) {
-            console.error("Erro ao buscar mensagens:", error);
+        if (messagesError) {
+            console.error("Erro crítico ao buscar mensagens:", messagesError);
             return;
         }
 
-        if (data) {
-            const mappedPosts = data.map(mapSupabaseToPost);
+        if (!messages || messages.length === 0) {
+            setPosts([]);
+            return;
+        }
+
+        // 2. Coleta IDs únicos de usuários que postaram para buscar perfis
+        const userIds = Array.from(new Set(messages.map(m => m.user_id).filter(Boolean)));
+
+        if (userIds.length > 0) {
+            // 3. Busca perfis para esses usuários em uma única query (mais eficiente que join em alguns casos de RLS)
+            const { data: profiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, avatar_url, full_name')
+                .in('id', userIds);
+
+            if (profilesError) {
+                console.warn("Aviso: Falha ao buscar perfis vinculados:", profilesError);
+            }
+
+            // 4. Cria um mapa de perfis para merge rápido
+            const profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+                acc[p.id] = p;
+                return acc;
+            }, {});
+
+            // 5. Mapeia as mensagens injetando o perfil correspondente
+            const mappedPosts = messages.map(msg => mapSupabaseToPost({
+                ...msg,
+                profiles: profilesMap[msg.user_id]
+            }));
+            setPosts(mappedPosts);
+        } else {
+            // Caso não haja user_ids vinculados, apenas mapeia as mensagens puras
+            const mappedPosts = messages.map(mapSupabaseToPost);
             setPosts(mappedPosts);
         }
     };
@@ -74,6 +111,7 @@ export default function SquarePage() {
         
         return {
             id: msg.id,
+            userId: msg.user_id,
             author: name,
             avatar: name.substring(0, 2).toUpperCase(),
             avatarImage: avatarUrl || null,
@@ -104,6 +142,7 @@ export default function SquarePage() {
     const [showPaywall, setShowPaywall] = useState(false);
 
     const [posts, setPosts] = useState<SquarePost[]>([]);
+    const [isPosting, setIsPosting] = useState(false);
 
 
 
@@ -170,30 +209,64 @@ export default function SquarePage() {
         const text = customText || postText;
         if (!text.trim() && !selectedImage) return;
 
-        // Grava no Supabase
-        const { error } = await supabase
-            .from('messages')
-            .insert([
-                {
-                    content: text,
-                    user_id: user?.id,
-                    user_email: user?.email
-                }
-            ]);
+        setIsPosting(true);
 
-        if (error) {
-            console.error("Erro ao postar mensagem:", error);
-            return;
+        try {
+            // Grava no Supabase e solicita o retorno do dado inserido
+            const { data: insertedData, error } = await supabase
+                .from('messages')
+                .insert([
+                    {
+                        content: text,
+                        user_id: user?.id,
+                        user_email: user?.email
+                    }
+                ])
+                .select();
+
+            if (error) {
+                console.error("Erro ao postar mensagem:", error);
+                alert("Ocorreu um erro ao enviar sua tese. Por favor, tente novamente.");
+                return;
+            }
+
+            // Se o insert deu certo e temos o dado, atualizamos o estado local imediatamente
+            // Isso evita depender apenas do Realtime para feedback instantâneo
+            if (insertedData && insertedData[0]) {
+                const newMsg = insertedData[0];
+                
+                // Busca o perfil atual para o mapeamento (redundância do realtime)
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('avatar_url, full_name')
+                    .eq('id', newMsg.user_id)
+                    .single();
+
+                const newMessage = mapSupabaseToPost({
+                    ...newMsg,
+                    profiles: profileData
+                });
+
+                // Adiciona ao topo sem duplicar (o useEffect do Realtime deve tratar duplicatas por ID)
+                setPosts(prev => {
+                    if (prev.some(p => p.id === newMessage.id)) return prev;
+                    return [newMessage, ...prev];
+                });
+            }
+
+            if (!customText) setPostText("");
+            if (isQuote) setReposting(null);
+
+            // Reset rich features
+            setSelectedImage(null);
+            setShowPollCreator(false);
+            setPollOptions(["", ""]);
+            setSelectedMood(null);
+        } catch (err) {
+            console.error("Erro inesperado ao postar:", err);
+        } finally {
+            setIsPosting(false);
         }
-
-        if (!customText) setPostText("");
-        if (isQuote) setReposting(null);
-
-        // Reset rich features
-        setSelectedImage(null);
-        setShowPollCreator(false);
-        setPollOptions(["", ""]);
-        setSelectedMood(null);
     };
 
 
@@ -276,8 +349,26 @@ export default function SquarePage() {
         }));
     };
 
-    const handleDeletePost = (postId: number) => {
-        if (user?.email !== "carvalhodlucas@hotmail.com") return;
+    const handleDeletePost = async (postId: number) => {
+        const post = posts.find(p => p.id === postId);
+        const isOwner = user && post && user.id === post.userId;
+        const isAdmin = user?.email === "carvalhodlucas@hotmail.com";
+
+        if (!isOwner && !isAdmin) return;
+        
+        if (!confirm("Tem certeza que deseja excluir permanentemente este post?")) return;
+
+        const { error } = await supabase
+            .from('messages')
+            .delete()
+            .eq('id', postId);
+
+        if (error) {
+            console.error("Erro ao deletar post do banco:", error);
+            alert("Erro ao excluir do banco de dados.");
+            return;
+        }
+
         setPosts(prev => prev.filter(post => post.id !== postId));
     };
 
@@ -831,10 +922,21 @@ export default function SquarePage() {
                                 </div>
                                 <button
                                     onClick={() => handlePost()}
-                                    disabled={!postText.trim() && !selectedImage}
-                                    className={`bg-primary text-black px-6 py-1.5 rounded-full font-bold text-sm hover:bg-primary-hover transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    disabled={(!postText.trim() && !selectedImage) || isPosting}
+                                    className={`px-6 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-primary/20 
+                                        ${(!postText.trim() && !selectedImage) 
+                                            ? 'bg-zinc-800 text-slate-500 cursor-not-allowed opacity-50' 
+                                            : 'bg-primary text-black hover:bg-primary-hover active:scale-95 cursor-pointer'}
+                                        ${isPosting ? 'opacity-70 cursor-wait' : ''}`}
                                 >
-                                    Postar
+                                    {isPosting ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+                                            Postando...
+                                        </div>
+                                    ) : (
+                                        !user && postText.trim() ? "Entre para Postar" : "Postar"
+                                    )}
                                 </button>
                             </div>
                         </div>

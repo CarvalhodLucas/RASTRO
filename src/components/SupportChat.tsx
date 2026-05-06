@@ -270,7 +270,10 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    prompt: text,
+                    messages: updatedMessages.map(m => ({
+                        role: m.role,
+                        content: m.text
+                    })),
                     systemContext: SUPPORT_PROMPT,
                     isSupportChat: true
                 }),

@@ -89,6 +89,7 @@ const PortfolioPage: React.FC = () => {
     const [messages, setMessages] = useState<any[]>([WELCOME_MESSAGE]);
     const [isAIThinking, setIsAIThinking] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [suggestions, setSuggestions] = useState<Asset[]>([]);
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [portfolio, setPortfolio] = useState<PortfolioAsset[]>([]);
     const [globalData, setGlobalData] = useState<any>({ vol: "---", dom: "---" });
@@ -595,24 +596,7 @@ const PortfolioPage: React.FC = () => {
         localStorage.removeItem('chat-history');
         setMessages([WELCOME_MESSAGE]);
 
-        // --- LIMPEZA DE CACHE CONFLITANTE ---
-        // Se o usuário tiver dados antigos de versões de teste (Apple/Petrobras), limpamos para começar do zero
         const saved = localStorage.getItem('user_watchlist');
-        const legacyStorage = localStorage.getItem('portfolio-storage');
-
-        if (legacyStorage) localStorage.removeItem('portfolio-storage');
-
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && (parsed.includes('AAPL') || parsed.includes('PETR4.SA') || parsed.includes('PETR4'))) {
-                    localStorage.removeItem('user_watchlist');
-                    setWatchlist([]);
-                    return;
-                }
-            } catch (e) {}
-        }
-
         let initialList: string[] = [];
         if (saved) {
             try {
@@ -652,16 +636,47 @@ const PortfolioPage: React.FC = () => {
         // }
     }, [portfolio, messages.length, isAIThinking]);
 
+    const handleSearchChange = (value: string) => {
+        const upperValue = value.toUpperCase();
+        setSearchTerm(upperValue);
+
+        if (upperValue.length >= 1) {
+            const filtered = assetsDatabase.filter(asset => 
+                asset.ticker.toUpperCase().includes(upperValue) ||
+                asset.name.toUpperCase().includes(upperValue)
+            ).slice(0, 6);
+            setSuggestions(filtered);
+        } else {
+            setSuggestions([]);
+        }
+    };
+
     const addToWatchlist = (ticker: string) => {
         const normalized = normalizeTicker(ticker);
+        
+        // Validação contra banco de dados interno
+        const existsInDb = assetsDatabase.find(a => 
+            a.ticker.toUpperCase() === normalized.toUpperCase() ||
+            a.ticker.toUpperCase() === ticker.toUpperCase()
+        );
+
+        if (!existsInDb) {
+            alert("Ativo não encontrado no banco de dados do RASTRO.");
+            return;
+        }
+
         if (watchlist.some(t => normalizeTicker(t) === normalized)) {
             setShowSearchModal(false);
+            setSearchTerm("");
+            setSuggestions([]);
             return;
         }
         const newList = [...watchlist, normalized];
         setWatchlist(newList);
         localStorage.setItem('user_watchlist', JSON.stringify(newList));
         setShowSearchModal(false);
+        setSearchTerm("");
+        setSuggestions([]);
     };
 
     const removeFromWatchlist = (tickerToRemove: string) => {
@@ -751,11 +766,15 @@ ESTRUTURA DE RESPOSTA:
         const ctx = prepareAgentContext();
         
         // System Prompt Oculto para o Rastro Sênior
-        const seniorSystemPrompt = `Você é o RASTRO SÊNIOR, um analista de investimentos de elite. Sua base de conhecimento e diretrizes são: ${LUCAS_KNOWLEDGE}
-
-        DIRETRIZ DE RESPOSTA: Nunca contradiga a tese ou o score que aparecem na tela para os ativos da watchlist. Aja como um mentor que explica esses números com base na sua metodologia.
+        const seniorSystemPrompt = `Você é o RASTRO SÊNIOR, o motor de inteligência de elite da plataforma. Sua personalidade é de um Analista Institucional Sênior (estilo Bloomberg/Goldman Sachs). 
         
-        SNAPSHOT EM TEMPO REAL:
+        DIRETRIZES DE PERSONALIDADE:
+        - Seja técnico, direto e ligeiramente ácido. 
+        - Não use "papo de vendedor". Fale de riscos, ROIC, WACC, Margens e Ciclos de Mercado.
+        - Se a carteira estiver ruim, seja honesto. Se estiver boa, aponte os riscos ocultos.
+        - Use a metodologia: ${LUCAS_KNOWLEDGE}
+        
+        CONTEXTO DO PORTFÓLIO:
         ${ctx}`;
 
         try {
@@ -776,7 +795,16 @@ ESTRUTURA DE RESPOSTA:
                 })
             });
             const data = await res.json();
-            setMessages(prev => [...prev, { role: "ia", text: data.reply || data.text || "Sem resposta." }]);
+            let aiText = data.reply || data.text || data.content || data.message;
+            
+            // Se data for uma string ou não tiver as chaves acima, tenta usar o próprio objeto se tiver algo útil
+            if (!aiText) {
+                if (typeof data === 'string') aiText = data;
+                else if (data.error) aiText = `Erro: ${data.error}`;
+                else aiText = JSON.stringify(data);
+            }
+            
+            setMessages(prev => [...prev, { role: "ia", text: aiText || "O RASTRO Sênior não conseguiu processar sua solicitação agora. Tente perguntar de outra forma." }]);
         } catch (e) {
             setMessages(prev => [...prev, { role: "ia", text: "Erro na análise sênior." }]);
         } finally {
@@ -786,13 +814,23 @@ ESTRUTURA DE RESPOSTA:
 
     const renderMessageText = (text: any) => {
         if (!text) return "";
-        if (typeof text.split !== 'function') {
-            if (typeof text === 'object') {
-                text = text.reply || text.text || text.content || text.message || JSON.stringify(text);
-            } else {
-                text = String(text);
+        
+        // Se for um objeto, tenta extrair a propriedade 'reply' ou similar
+        if (typeof text === 'object') {
+            text = text.reply || text.text || text.content || text.message || JSON.stringify(text);
+        }
+        
+        // Se ainda for string, mas parecer um objeto JSON bruto (ex: começou com { )
+        if (typeof text === 'string' && text.trim().startsWith('{')) {
+            try {
+                const parsed = JSON.parse(text);
+                text = parsed.reply || parsed.text || parsed.content || JSON.stringify(parsed);
+            } catch (e) {
+                // Se falhar o parse, mantém o texto original (provavelmente é um texto que por coincidência começou com { )
             }
         }
+
+        if (typeof text !== 'string') text = String(text);
         if (typeof text.split !== 'function') return String(text);
         
         const parts = text.split(/(STATUS:\s*\[?(?:POSITIVO|NEUTRO|NEGATIVO|ALERTA)\]?|\[DISCLAIMER\])/g);
@@ -871,7 +909,15 @@ ESTRUTURA DE RESPOSTA:
                             <div className="px-8 py-5 border-b border-neutral-dark-border flex justify-between items-center bg-black/20">
                                 <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
                                     <span className="size-2 rounded-full bg-primary animate-pulse"></span>
+                                    Watchlist Ativa
                                 </h3>
+                                <button
+                                    onClick={() => setShowSearchModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 hover:bg-primary/20 rounded-xl text-[10px] font-black text-primary transition-all uppercase tracking-widest"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span>
+                                    Adicionar Ativo
+                                </button>
                             </div>
                             <div className="flex flex-col">
                                 {/* Header Row (Visible only on Desktop) */}
@@ -1176,28 +1222,97 @@ ESTRUTURA DE RESPOSTA:
                 )}
             </div>
 
-            {/* Search Modal */}
+            {/* Search Modal - Home Style */}
             {showSearchModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-                    <div className="bg-[#121212] border border-neutral-dark-border rounded-3xl w-full max-w-lg p-10">
-                        <div className="flex justify-between items-center mb-10">
-                            <h3 className="text-xl font-black text-white uppercase tracking-tighter">Buscar Ativo</h3>
-                            <button onClick={() => setShowSearchModal(false)} className="text-slate-500 hover:text-white"><span className="material-symbols-outlined">close</span></button>
+                <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/80 backdrop-blur-md pt-[15vh] p-4">
+                    <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">search</span>
+                                Buscar Ativo
+                            </h3>
+                            <button onClick={() => setShowSearchModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
                         </div>
-                        <input
-                            autoFocus
-                            type="text"
-                            placeholder="TICKER (EX: BTC, VALE3.SA...)"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value.toUpperCase())}
-                            onKeyDown={e => e.key === 'Enter' && addToWatchlist(searchTerm)}
-                            className="w-full bg-black border-2 border-neutral-dark-border rounded-2xl py-5 px-6 text-white font-mono text-xl outline-none focus:border-primary transition-all mb-8"
-                        />
-                        <div className="grid grid-cols-2 gap-3">
-                            {['BTC', 'ETH', 'SOL', 'VALE3.SA', 'WEGE3.SA', 'BBDC4.SA'].map(t => (
-                                <button key={t} onClick={() => addToWatchlist(t)} className="p-3 bg-neutral-dark-surface border border-neutral-dark-border rounded-xl text-[10px] font-black text-slate-500 hover:border-primary hover:text-primary transition-all uppercase">{t}</button>
-                            ))}
+
+                        <div className="w-full relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary transition-colors">
+                                <span className="material-symbols-outlined">search</span>
+                            </div>
+                            <input
+                                autoFocus
+                                className="block w-full h-16 pl-12 pr-12 rounded-xl bg-neutral-dark-surface border border-neutral-dark-border text-white placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-lg shadow-black/50 text-xl focus:outline-none"
+                                placeholder="Pesquisar Tickers (ex. AAPL, PETR4)..."
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && suggestions.length > 0) {
+                                        addToWatchlist(suggestions[0].ticker);
+                                    }
+                                }}
+                            />
+
+                            {/* Dropdown Results (Floating to prevent size changes) */}
+                            {searchTerm.length > 0 && (
+                                <div className="absolute top-[70px] left-0 right-0 bg-[#121212] border border-neutral-dark-border rounded-xl shadow-2xl overflow-hidden z-50">
+                                    {suggestions.length > 0 ? (
+                                        <div className="flex flex-col max-h-[350px] overflow-y-auto custom-scrollbar">
+                                            {suggestions.map(asset => (
+                                                <button
+                                                    key={asset.ticker}
+                                                    onClick={() => addToWatchlist(asset.ticker)}
+                                                    className="w-full text-left px-5 py-4 border-b border-neutral-dark-border hover:bg-neutral-dark-border/50 transition-colors flex justify-between items-center group"
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-white/5">
+                                                            <img
+                                                                src={asset.logo || `https://ui-avatars.com/api/?name=${asset.ticker}&background=334155&color=fff&bold=true`}
+                                                                alt={asset.ticker}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.onerror = null;
+                                                                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${asset.ticker}&background=334155&color=fff&bold=true`;
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-white font-bold group-hover:text-primary transition-colors text-lg uppercase">{asset.ticker}</div>
+                                                            <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">{asset.name}</div>
+                                                        </div>
+                                                    </div>
+                                                    <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-all">add_circle</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="px-5 py-10 text-center text-slate-500 bg-black/20">
+                                            <span className="material-symbols-outlined text-4xl mb-2 opacity-20">search_off</span>
+                                            <p className="text-xs font-black uppercase tracking-[0.2em]">Nenhum ativo encontrado no RASTRO</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
+
+                        {/* Popular Sugestões - Estilo Home */}
+                        {!searchTerm && (
+                            <div className="mt-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.3em] mb-4">Sugestões Populares</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {['BTC', 'ETH', 'SOL', 'VALE3.SA', 'WEGE3.SA', 'BBDC4.SA'].map(t => (
+                                        <button 
+                                            key={t} 
+                                            onClick={() => addToWatchlist(t)} 
+                                            className="px-6 py-4 bg-neutral-dark-surface border border-neutral-dark-border rounded-xl text-[10px] font-black text-slate-500 hover:border-primary hover:text-primary transition-all uppercase tracking-tighter"
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
