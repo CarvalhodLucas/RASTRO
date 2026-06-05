@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -17,21 +17,11 @@ export default function AdminUsersPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Simple security check (client-side only for prototype)
-        const sessionStr = localStorage.getItem("user_session");
-        if (!sessionStr) {
-            router.push("/");
-            return;
-        }
-
-        const session: UserSession = JSON.parse(sessionStr);
-        // Any logic needed to verify admin status could go here
-
         // Load emails from localStorage
         const emails = JSON.parse(localStorage.getItem("registered_emails") || "[]");
         setRegisteredEmails(emails);
         setIsLoading(false);
-    }, [router]);
+    }, []);
 
     const handleRemoveEmail = (emailToRemove: string) => {
         if (confirm(`Tem certeza que deseja remover o e-mail ${emailToRemove}?`)) {

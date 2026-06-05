@@ -1,6 +1,6 @@
 
 const fs = require('fs');
-const content = fs.readFileSync('c:/Users/Lucas de Carvalho/Documents/Sites/RASTRO/src/app/api/onchain/route.ts', 'utf8');
+const content = fs.readFileSync('c:/Users/Lucas de Carvalho/Documents/Sites/RASTRO/src/app/square/page.tsx', 'utf8');
 
 let open = 0;
 let inString = false;

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import Header from "@/components/Header";
@@ -67,9 +66,7 @@ export default function ProfilePage() {
 
 
     useEffect(() => {
-        if (hasMounted && !user) {
-            router.push("/");
-        }
+        // Redirect removido para permitir acesso de visitantes (Modo Convidado)
     }, [hasMounted, user, router]);
 
     useEffect(() => {

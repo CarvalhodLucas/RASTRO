@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { GoogleTagManager } from "@next/third-parties/google";
 
 export default function Analytics() {

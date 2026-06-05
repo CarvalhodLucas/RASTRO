@@ -3601,46 +3601,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                             </div>
                         </div>
 
-                        {/* OVERLAY DO PAYWALL (Aparece apenas para não logados) */}
-                        {hasMounted && !user && (
-                            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-6 text-center">
-                                <div className="bg-zinc-900/80 backdrop-blur-xl border border-primary/30 p-10 rounded-[3rem] shadow-[0_0_100px_-20px_rgba(234,179,8,0.4)] max-w-xl animate-in zoom-in-95 duration-500">
-                                    <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-                                        <span className="material-symbols-outlined text-primary text-4xl">lock</span>
-                                    </div>
-                                    <h2 className="text-3xl font-black text-white mb-4 tracking-tight uppercase">
-                                        Conteúdo Exclusivo <br /> <span className="text-primary italic">RASTRO Analítica</span>
-                                    </h2>
-                                    <p className="text-slate-300 mb-8 text-lg leading-relaxed">
-                                        Teses de IA, Preço Justo e Métricas Avançadas estão disponíveis apenas para membros. Crie sua conta gratuita em segundos.
-                                    </p>
-                                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-                                        <button
-                                            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'register' } }))}
-                                            className="w-full sm:w-auto px-10 py-4 bg-primary hover:bg-primary/90 text-black font-black rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_-5px_rgba(234,179,8,0.5)] uppercase tracking-wider"
-                                        >
-                                            Liberar Acesso Grátis
-                                        </button>
-                                        <button
-                                            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }))}
-                                            className="w-full sm:w-auto px-10 py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-2xl transition-all border border-zinc-700"
-                                        >
-                                            Já tenho conta
-                                        </button>
-                                    </div>
-                                    <p className="mt-8 text-xs text-slate-500 font-medium uppercase tracking-[0.2em]">
-                                        Fique um passo à frente do mercado com IA
-                                    </p>
-
-                                    <div className="mt-6 pt-6 border-t border-white/5">
-                                        <Link href="/" className="text-slate-500 hover:text-primary transition-colors text-sm flex items-center justify-center gap-1">
-                                            <span className="material-symbols-outlined !text-[16px]">arrow_back</span>
-                                            Voltar para o Dashboard
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* PAYWALL TEMPORARIAMENTE DESATIVADO - Acesso livre para todos os visitantes */}
                     </div>
                 </main>
             </div>

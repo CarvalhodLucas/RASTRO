@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, MouseEvent } from "react";
 import Header from "@/components/Header";
 
 // Removed all mock news data to ensure real-time dynamic content
@@ -209,7 +209,7 @@ export default function NoticiasPage() {
 }
 
 function NewsCard({ item }: { item: NewsItem }) {
-    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const handleLinkClick = (e: MouseEvent<HTMLAnchorElement>) => {
         if (!item.url || item.url === "#" || item.url.length < 15) {
             e.preventDefault();
             alert("Link temporariamente indisponível ou incompleto.");

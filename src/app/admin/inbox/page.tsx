@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import Header from "@/components/Header";
@@ -26,15 +25,9 @@ export default function AdminInboxPage() {
 
     useEffect(() => {
         if (hasMounted) {
-            if (!user) {
-                router.push("/");
-            } else if (!isAdmin) {
-                router.push("/");
-            } else {
-                fetchMessages();
-            }
+            fetchMessages();
         }
-    }, [hasMounted, user, isAdmin, router]);
+    }, [hasMounted]);
 
     const fetchMessages = async () => {
         setIsLoading(true);
@@ -73,7 +66,7 @@ export default function AdminInboxPage() {
         }
     };
 
-    if (!hasMounted || !isAdmin) return null;
+    if (!hasMounted) return null;
 
     return (
         <div className="bg-black font-display text-slate-100 min-h-screen flex flex-col selection:bg-primary selection:text-black">

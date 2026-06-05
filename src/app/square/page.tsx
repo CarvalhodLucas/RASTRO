@@ -178,7 +178,7 @@ export default function SquarePage() {
     const [showMoodSelector, setShowMoodSelector] = useState(false);
     
     // User Stats Calculations
-    const isLogged = !!user;
+    const isLogged = user && user.isLoggedIn && user.id !== "guest-user";
     const myPosts = posts.filter(p => p.author === (user?.name || 'User'));
     const likesReceived = myPosts.reduce((acc, post) => acc + (post.likes || 0), 0);
     const followingCount = following.length;
@@ -197,8 +197,8 @@ export default function SquarePage() {
     };
 
     const checkAuth = () => {
-        if (!user) {
-            setShowPaywall(true);
+        if (!user || !user.isLoggedIn || user.id === "guest-user") {
+            window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
             return false;
         }
         return true;
@@ -935,7 +935,7 @@ export default function SquarePage() {
                                             Postando...
                                         </div>
                                     ) : (
-                                        !user && postText.trim() ? "Entre para Postar" : "Postar"
+                                        "Postar"
                                     )}
                                 </button>
                             </div>
@@ -1209,8 +1209,8 @@ export default function SquarePage() {
                     </div>
                 </div>
             )}
-            {/* OVERLAY DO PAYWALL SQUARE */}
-            {showPaywall && !user && (
+            {/* PAYWALL SQUARE DESATIVADO */}
+            {false && showPaywall && !user && (
                 <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 text-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-zinc-900/90 backdrop-blur-2xl border border-primary/30 p-10 rounded-[3rem] shadow-[0_0_150px_-20px_rgba(234,179,8,0.5)] max-w-xl animate-in zoom-in-95 duration-500 relative">
                         {/* Botão de fechar discreto */}

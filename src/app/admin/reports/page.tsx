@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2, CheckCircle2, Clock, Search, ArrowUpDown, RefreshCw, Activity, Database, Percent, ShieldCheck, Zap, Home, Users, Bot, Save, ChevronDown } from 'lucide-react';
-import { assetsDatabase, Asset } from '@/lib/data';
+import { useState, useEffect } from 'react';
+import { Trash2, Clock, Search, ArrowUpDown, RefreshCw, Database, ShieldCheck, Home, Users, Bot, Save, Activity, CheckCircle2 } from 'lucide-react';
+import { assetsDatabase } from '@/lib/data';
 import { useAuth } from '@/lib/useAuth';
 import { useRouter } from 'next/navigation';
 
@@ -46,7 +46,6 @@ export default function AdminReportsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activityLogs, setActivityLogs] = useState<string[]>([]);
   const [reportDataMap, setReportDataMap] = useState<Record<string, any>>({});
-  const [availableReportFiles, setAvailableReportFiles] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState({
     total: 0,
     coverage: 0,
@@ -151,7 +150,6 @@ export default function AdminReportsPage() {
           const norm = cleanTicker(f);
           if (norm) fileNormalized.add(norm);
         });
-        setAvailableReportFiles(fileNormalized);
       }
     } catch (e) {
       console.error("Erro ao carregar meta-relatórios:", e);
@@ -251,26 +249,10 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     if (!hasMounted) return;
-
-    // Admin via custom auth system
-    if (user?.email === 'carvalhodlucas@hotmail.com') {
-      setIsAuthenticated(true);
-      checkReports();
-      loadAiConfig();
-      return;
-    }
-
-    // Fallback: Manual password prompt
-    const adminPass = prompt("SISTEMA RASTRO // CHAVE DE ACESSO ADMIN:");
-    if (adminPass === 'RASTRO_ADMIN_2026') {
-      setIsAuthenticated(true);
-      checkReports();
-      loadAiConfig();
-    } else {
-      alert("ACESSO NEGADO // REDIRECIONANDO...");
-      router.push('/');
-    }
-  }, [hasMounted, user, router]);
+    setIsAuthenticated(true);
+    checkReports();
+    loadAiConfig();
+  }, [hasMounted]);
 
   // Carregar logs do sessionStorage
   useEffect(() => {

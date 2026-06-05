@@ -111,7 +111,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (!user) {
+                                if (!user || !user.isLoggedIn || user.id === "guest-user") {
                                     window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
                                     return;
                                 }
@@ -124,7 +124,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({
                         </button>
                         <button 
                             className="flex items-center gap-1.5 transition-colors hover:text-[#11d473] hover:scale-105"
-                            onClick={() => { if (!user) window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } })); }}
+                            onClick={() => { if (!user || !user.isLoggedIn || user.id === "guest-user") window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } })); }}
                         >
                             <span className="material-symbols-outlined text-[16px]">repeat</span>
                         </button>

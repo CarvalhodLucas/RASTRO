@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { usePathname } from "next/navigation";
 
@@ -108,7 +108,6 @@ export default function SupportChat() {
     const [randomSuggestions, setRandomSuggestions] = useState<typeof suggestionPool>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [showBadge, setShowBadge] = useState(true);
     const [hasTriggeredIdle, setHasTriggeredIdle] = useState(false);
     const [isFeedbackFlow, setIsFeedbackFlow] = useState(false);
     const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
@@ -133,7 +132,6 @@ export default function SupportChat() {
         
         const pageName = getPageName(pathname);
         setIsOpen(true);
-        setShowBadge(false);
         setHasTriggeredIdle(true);
         
         const idleMessage: Message = {
@@ -169,7 +167,6 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         const handleOpenChatEvent = () => {
             setIsOpen(true);
             setIsMinimized(false);
-            setShowBadge(false);
         };
 
         window.addEventListener('open-support-chat', handleOpenChatEvent);
@@ -177,7 +174,6 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         const handleFeedbackChatEvent = () => {
             setIsOpen(true);
             setIsMinimized(false);
-            setShowBadge(false);
             setIsFeedbackFlow(true);
             setFeedbackRating(null);
             setMessages([{
@@ -214,10 +210,7 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
         }
     }, [messages]);
 
-    const handleOpen = () => {
-        setIsOpen(true);
-        setShowBadge(false);
-    };
+
 
     const sendMessage = async (text: string) => {
         if (!text.trim() || isLoading) return;
@@ -369,7 +362,7 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                         )}
 
                         {messages.map((msg, idx) => (
-                            <React.Fragment key={idx}>
+                            <Fragment key={idx}>
                                 <div className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                                     <div className={`w-7 h-7 rounded-full flex-none flex items-center justify-center text-[10px] font-bold ${msg.role === "user" ? "bg-slate-700 text-white" : "bg-primary/20 text-primary border border-primary/20"}`}>
                                         {msg.role === "user" ? "EU" : "S"}
@@ -397,7 +390,7 @@ Posso te ajudar com alguma dúvida sobre como usar as ferramentas desta página?
                                         </button>
                                     </div>
                                 )}
-                            </React.Fragment>
+                            </Fragment>
                         ))}
 
                         {/* Interactive Stars for Feedback Flow */}

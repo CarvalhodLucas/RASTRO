@@ -1,8 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { ADMIN_EMAILS } from "./constants";
 import { useRouter } from "next/navigation";
 
 export interface AuthUser {
@@ -29,7 +28,7 @@ const GUEST_USER: AuthUser = {
     id: "guest-user",
     name: "Visitante",
     email: "guest@rastro.ia",
-    isLoggedIn: true,
+    isLoggedIn: false,
     theme: "dark",
     joinedAt: "2026",
     investorType: "curioso"

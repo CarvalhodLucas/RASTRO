@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         const body = await req.json().catch(() => ({}));
         const { 
             messages, ticker, assetName, isPulse, isHealth, 
-            isRatingRequest, isSentiment, isComparison, 
+            isRatingRequest, isSentiment, 
             isOnChain, isSummary, isFairPrice, isChat, isPortfolioChat, isSupportChat,
             prompt, report, variation, indicators, systemContext 
         } = body;
@@ -289,7 +289,7 @@ export async function POST(req: Request) {
                 
                 const result = await geminiModel.generateContent({
                     systemInstruction: systemInstruction,
-                    contents: finalMessages.map(m => ({
+                    contents: finalMessages.map((m: any) => ({
                         role: m.role === "assistant" ? "model" : "user",
                         parts: [{ text: m.content }]
                     })),
