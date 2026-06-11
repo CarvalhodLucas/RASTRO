@@ -7,6 +7,37 @@ import { supabase } from "@/lib/supabase/client";
 import { ADMIN_EMAILS } from "@/lib/constants";
 
 
+const formatAuthError = (err: any): string => {
+    if (!err) return "";
+    let rawMsg = "";
+    if (typeof err === "string") {
+        rawMsg = err;
+    } else if (err.message && typeof err.message === "string") {
+        rawMsg = err.message;
+    } else if (err.error_description && typeof err.error_description === "string") {
+        rawMsg = err.error_description;
+    } else if (err.error && typeof err.error === "string") {
+        rawMsg = err.error;
+    } else {
+        try {
+            rawMsg = JSON.stringify(err);
+        } catch {
+            rawMsg = String(err);
+        }
+    }
+
+    const trimmed = rawMsg.trim();
+    if (!trimmed || trimmed === "" || trimmed === "{}" || trimmed === "null" || trimmed === "undefined" || trimmed.includes("Failed to fetch")) {
+        return "Erro de conexão com o banco de dados (Supabase indisponível).";
+    }
+
+    if (rawMsg === "Invalid login credentials") {
+        return "E-mail ou senha incorretos.";
+    }
+
+    return rawMsg;
+};
+
 export default function AuthModal() {
     const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
@@ -121,13 +152,13 @@ export default function AuthModal() {
             });
 
             if (loginError) {
-                setError(loginError.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : loginError.message);
+                setError(formatAuthError(loginError));
             } else {
                 handleClose();
             }
         } catch (err: any) {
             console.error("[Auth] Erro inesperado no login:", err);
-            setError(err.message || "Erro de conexão ao servidor.");
+            setError(formatAuthError(err));
         } finally {
             setIsLoading(false);
         }
@@ -185,7 +216,7 @@ export default function AuthModal() {
                     provider,
                     options: { redirectTo }
                 });
-                if (error) setError(error.message);
+                if (error) setError(formatAuthError(error));
                 return;
             }
 
@@ -204,7 +235,7 @@ export default function AuthModal() {
 
             if (signUpError) {
                 console.error("[Auth] ❌ Erro no signUp:", signUpError.message);
-                setError(signUpError.message);
+                setError(formatAuthError(signUpError));
                 setShowTerms(false);
             } else {
                 console.log("[Auth] ✅ Usuário criado no Auth:", data.user?.id);
@@ -225,7 +256,7 @@ export default function AuthModal() {
             }
         } catch (err: any) {
             console.error("[Auth] ❌ Erro inesperado no cadastro:", err);
-            setError(err.message || "Ocorreu um erro inesperado. Verifique sua conexão.");
+            setError(formatAuthError(err));
         } finally {
             setIsLoading(false);
         }
@@ -242,10 +273,10 @@ export default function AuthModal() {
                 provider,
                 options: { redirectTo }
             });
-            if (error) setError(error.message);
+            if (error) setError(formatAuthError(error));
         } catch (err) {
             console.error("[Auth] ❌ Erro no login social:", err);
-            setError("Falha ao iniciar login.");
+            setError(formatAuthError(err));
         } finally {
             setIsLoading(false);
         }
@@ -453,6 +484,33 @@ export default function AuthModal() {
                                                     </>
                                                 )}
                                             </button>
+
+                                            {process.env.NODE_ENV === "development" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const mockAdmin = {
+                                                            id: "mock-admin-id",
+                                                            name: "Lucas (Admin Dev)",
+                                                            email: "carvalhodlucas@hotmail.com",
+                                                            isLoggedIn: true,
+                                                            theme: "dark",
+                                                            avatar: "verified_user",
+                                                            avatarImage: "",
+                                                            joinedAt: "2026",
+                                                            investorType: "administrador"
+                                                        };
+                                                        localStorage.setItem("user_session", JSON.stringify(mockAdmin));
+                                                        window.dispatchEvent(new Event("auth-update"));
+                                                        handleClose();
+                                                        router.push("/");
+                                                    }}
+                                                    className="w-full mt-3 h-10 border border-primary/20 hover:border-primary/50 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+                                                >
+                                                    <span className="material-symbols-outlined !text-[16px]">verified_user</span>
+                                                    Entrar como Admin (Desvio Local)
+                                                </button>
+                                            )}
                                         </form>
                                     </div>
                                 )}

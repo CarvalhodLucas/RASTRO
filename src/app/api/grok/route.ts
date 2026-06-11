@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Removido runtime edge para evitar timeouts 504 em modelos lentos
 // export const runtime = "edge";
-
+export const maxDuration = 60; // Configuração para aumentar timeout da API no Vercel
 async function fetchLatestNews(ticker: string, isMetricSearch: boolean = false) {
     try {
         let query = ticker;

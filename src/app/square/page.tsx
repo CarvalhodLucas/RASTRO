@@ -61,7 +61,12 @@ export default function SquarePage() {
             .order('created_at', { ascending: false });
 
         if (messagesError) {
-            console.error("Erro crítico ao buscar mensagens:", messagesError);
+            const isNetworkMsg = messagesError.message?.includes("unreachable") || messagesError.message?.includes("Failed to fetch") || messagesError.message?.includes("paused project");
+            if (isNetworkMsg) {
+                console.warn("Aviso: Supabase indisponível/offline. Detalhes:", messagesError.message);
+            } else {
+                console.error("Erro crítico ao buscar mensagens:", messagesError.message || JSON.stringify(messagesError));
+            }
             return;
         }
 
@@ -225,7 +230,7 @@ export default function SquarePage() {
                 .select();
 
             if (error) {
-                console.error("Erro ao postar mensagem:", error);
+                console.error("Erro ao postar mensagem:", error.message || JSON.stringify(error));
                 alert("Ocorreu um erro ao enviar sua tese. Por favor, tente novamente.");
                 return;
             }
@@ -364,7 +369,7 @@ export default function SquarePage() {
             .eq('id', postId);
 
         if (error) {
-            console.error("Erro ao deletar post do banco:", error);
+            console.error("Erro ao deletar post do banco:", error.message || JSON.stringify(error));
             alert("Erro ao excluir do banco de dados.");
             return;
         }

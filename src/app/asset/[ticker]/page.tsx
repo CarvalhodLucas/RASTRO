@@ -1223,10 +1223,16 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     };
 
     useEffect(() => {
-        const savedWatchlist = JSON.parse(localStorage.getItem('user_watchlist') || '[]');
-        const cleanTicker = ticker.toUpperCase().replace('.SA', '');
-        setIsInWatchlist(savedWatchlist.includes(cleanTicker));
-    }, [ticker]);
+        if (!hasMounted) return;
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (isLoggedIn && user?.email) {
+            const savedWatchlist = JSON.parse(localStorage.getItem(`user_watchlist_${user.email}`) || '[]');
+            const cleanTicker = ticker.toUpperCase().replace('.SA', '');
+            setIsInWatchlist(savedWatchlist.includes(cleanTicker));
+        } else {
+            setIsInWatchlist(false);
+        }
+    }, [ticker, user, hasMounted]);
 
     // Resetar estados ao trocar de ativo para evitar vazamento de dados antigos (hallucinations)
     useEffect(() => {
@@ -1357,6 +1363,23 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     // 4. FUNÇÃO DO CHAT (GROK)
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isLoadingChat) return;
+
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (!isLoggedIn) {
+            setMessages((prev) => [...prev, { role: "ia", text: "Você precisa estar logado para falar com o Analista RASTRO." }]);
+            return;
+        }
+
+        if (user?.email) {
+            const limitKey = `chat_limit_analista_${user.email}`;
+            const limitCount = parseInt(localStorage.getItem(limitKey) || "0");
+            if (limitCount >= 4) {
+                setMessages((prev) => [...prev, { role: "ia", text: "Você atingiu o limite máximo de 4 perguntas para o Analista RASTRO nesta conta." }]);
+                return;
+            }
+            localStorage.setItem(limitKey, (limitCount + 1).toString());
+        }
+
         const userMsg = chatInput;
         
         // Mantém as mensagens atuais para o histórico (antes de adicionar a nova)
@@ -1456,7 +1479,15 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     };
 
     const handleToggleWatchlist = () => {
-        const savedWatchlist = JSON.parse(localStorage.getItem('user_watchlist') || '[]');
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (!isLoggedIn) {
+            alert("Por favor, faça login para adicionar ativos à sua watchlist.");
+            window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
+            return;
+        }
+
+        const key = `user_watchlist_${user.email}`;
+        const savedWatchlist = JSON.parse(localStorage.getItem(key) || '[]');
         const cleanTicker = ticker.toUpperCase().replace('.SA', '');
         let newList;
 
@@ -1480,7 +1511,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
             });
         }
 
-        localStorage.setItem('user_watchlist', JSON.stringify(newList));
+        localStorage.setItem(key, JSON.stringify(newList));
 
         // Exibe o modal e fecha após 2 segundos
         setShowModal(true);
@@ -2192,7 +2223,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 {/* MOBILIDADE: SENTIMENTO E PULSO ABAIXO DO RESUMO EM MOBILE */}
                                 <div className="lg:hidden space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
-                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6">
+                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
+                                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                            <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
+                                                <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                                <h3 className="text-white font-bold">Acesso Restrito</h3>
+                                                <p className="text-slate-400 text-xs mt-1 px-4 text-center">Faça login para ver o Sentimento.</p>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-slate-400">speed</span>
@@ -3025,7 +3063,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                         {formatValue(asset?.valuation?.graham || aiHealth?.graham || aiRatingData?.graham || 0)}
                                                                     </span>
                                                                     <span className={`text-xs font-bold ${(aiHealth?.grahamUpside || aiRatingData?.grahamUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
-                                                                        {(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) > 0 ? "+" : ""}{(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) ? (aiHealth.grahamUpside || aiRatingData.grahamUpside).toFixed(0) : 0}% Margem
+                                                                        {(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) > 0 ? "+" : ""}{(aiHealth?.grahamUpside || aiRatingData?.grahamUpside) ? (aiHealth?.grahamUpside || aiRatingData?.grahamUpside)?.toFixed(0) : 0}% Margem
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -3044,7 +3082,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                                         {formatValue(asset?.valuation?.bazin || aiHealth?.bazin || aiRatingData?.bazin || 0)}
                                                                     </span>
                                                                     <span className={`text-xs font-bold ${(aiHealth?.bazinUpside || aiRatingData?.bazinUpside || 0) >= 0 ? "text-primary" : "text-accent-red"}`}>
-                                                                        {(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) > 0 ? "+" : ""}{(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) ? (aiHealth.bazinUpside || aiRatingData.bazinUpside).toFixed(0) : 0}% Margem
+                                                                        {(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) > 0 ? "+" : ""}{(aiHealth?.bazinUpside || aiRatingData?.bazinUpside) ? (aiHealth?.bazinUpside || aiRatingData?.bazinUpside)?.toFixed(0) : 0}% Margem
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -3204,7 +3242,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 </div>
 
                                 {/* SEÇÃO DE DEEP RESEARCH / RELATÓRIO */}
-                                <section className="rounded-xl border border-border-dark bg-card-dark p-6 transition-none">
+                                <section className="rounded-xl border border-border-dark bg-card-dark p-6 transition-none relative overflow-hidden">
+                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                        <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
+                                            <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                            <h3 className="text-white font-bold">Relatório Exclusivo</h3>
+                                            <p className="text-slate-400 text-xs mt-1 px-4 text-center">Faça login para acessar a Visão 360º.</p>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex items-center gap-2">
                                             <span className="material-symbols-outlined text-primary">analytics</span>
@@ -3272,7 +3317,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 <div className="hidden lg:block space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
-                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6">
+                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
+                                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                            <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
+                                                <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                                <h3 className="text-white font-bold">Acesso Restrito</h3>
+                                                <p className="text-slate-400 text-xs mt-1 px-4 text-center">Faça login para ver o Sentimento.</p>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-start mb-2">
                                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-slate-400">speed</span>
@@ -3512,7 +3564,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 </div>
 
                                 {/* CHAT IA DINÂMICO */}
-                                <section className="hidden md:flex rounded-xl border border-border-dark bg-card-dark flex-col h-[500px]">
+                                <section className="hidden md:flex rounded-xl border border-border-dark bg-card-dark flex-col h-[500px] relative overflow-hidden">
+                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                        <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
+                                            <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                            <h3 className="text-white font-bold">Chat Restrito</h3>
+                                            <p className="text-slate-400 text-xs mt-1 px-4 text-center">Faça login para falar com o Analista.</p>
+                                        </div>
+                                    )}
                                     {/* Header do Chat */}
                                     <div className="p-4 border-b border-border-dark flex justify-between items-center bg-zinc-900/50">
                                         <div className="flex items-center gap-3">

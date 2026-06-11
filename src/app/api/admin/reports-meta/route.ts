@@ -17,7 +17,15 @@ export async function GET() {
             f.toLowerCase().endsWith('.html') || 
             f.toLowerCase().endsWith('.htm') || 
             f.toLowerCase().endsWith('.pdf')
-        );
+        ).map(f => {
+            const filePath = path.join(reportsDir, f);
+            const stats = fs.statSync(filePath);
+            return {
+                name: f,
+                mtime: stats.mtime,
+                size: stats.size // Size in bytes
+            };
+        });
 
         return NextResponse.json({ 
             files: reportFiles,
@@ -28,3 +36,34 @@ export async function GET() {
         return NextResponse.json({ error: "Failed to read reports", files: [] }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const fileName = searchParams.get('fileName');
+        
+        if (!fileName) {
+            return NextResponse.json({ error: "Filename is required" }, { status: 400 });
+        }
+
+        // Security: Prevent path traversal by extracting only the filename
+        const cleanName = path.basename(fileName);
+        const filePath = path.join(process.cwd(), 'public', 'reports', cleanName);
+
+        if (!fs.existsSync(filePath)) {
+            return NextResponse.json({ error: "File not found" }, { status: 404 });
+        }
+
+        // Delete file
+        fs.unlinkSync(filePath);
+
+        return NextResponse.json({ 
+            success: true, 
+            message: `File ${cleanName} deleted successfully` 
+        });
+    } catch (error) {
+        console.error("Error deleting report file:", error);
+        return NextResponse.json({ error: "Failed to delete file" }, { status: 500 });
+    }
+}
+

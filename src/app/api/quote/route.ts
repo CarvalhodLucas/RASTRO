@@ -4,6 +4,16 @@ import yahooFinance from 'yahoo-finance2';
 // Isso diz ao Next.js para manter os dados em cache por 24 horas (86.400 segundos)
 export const revalidate = 86400;
 
+// Simple in-memory cache for Yahoo Finance API responses
+interface CacheEntry {
+    data: any;
+    timestamp: number;
+}
+
+const memoryCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes of cache for successful requests
+const ERROR_CACHE_TTL_MS = 10 * 1000; // 10 seconds of cache for errors to avoid hammering in loop
+
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -30,12 +40,21 @@ export async function GET(req: Request) {
 
         // Função interna para processar um único ticker
         const processTicker = async (symbol: string) => {
+            const cacheKey = `${symbol}_${mode || 'full'}`;
+            const cached = memoryCache.get(cacheKey);
+            const isError = cached?.data && 'error' in cached.data;
+            const ttl = isError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS;
+            
+            if (cached && Date.now() - cached.timestamp < ttl) {
+                return cached.data;
+            }
+
             try {
                 // 1. Busca do Preço e Fundamentos Básicos
                 const quote: any = await yf.quote(symbol);
 
                 if (mode === 'compact') {
-                    return {
+                    const resCompact = {
                         symbol,
                         price: quote?.regularMarketPrice || quote?.price || 0,
                         name: quote?.longName || quote?.shortName || symbol,
@@ -43,6 +62,8 @@ export async function GET(req: Request) {
                         marketCap: quote?.marketCap ? formatCap(quote.marketCap) : "--",
                         currency: quote?.currency || "BRL",
                     };
+                    memoryCache.set(cacheKey, { data: resCompact, timestamp: Date.now() });
+                    return resCompact;
                 }
 
                 // 2. Busca dos Fundamentos Detalhados
@@ -66,7 +87,7 @@ export async function GET(req: Request) {
                 let roe = roeRaw * 100;
                 if (roe === 0 && lpa !== 0 && vpa !== 0) roe = (lpa / vpa) * 100;
 
-                return {
+                const resFull = {
                     price: quote?.regularMarketPrice || quote?.price || 0,
                     name: quote?.longName || quote?.shortName || symbol,
                     currency: quote?.currency || "BRL",
@@ -80,9 +101,13 @@ export async function GET(req: Request) {
                     summaryDetail: summary?.summaryDetail || {},
                     financialData: summary?.financialData || {},
                 };
+                memoryCache.set(cacheKey, { data: resFull, timestamp: Date.now() });
+                return resFull;
             } catch (err: any) {
                 console.error(`❌ Erro no ticker ${symbol}:`, err.message);
-                return { symbol, error: err.message, price: 0.01 };
+                const resError = { symbol, error: err.message, price: 0.01 };
+                memoryCache.set(cacheKey, { data: resError, timestamp: Date.now() });
+                return resError;
             }
         };
 

@@ -595,21 +595,31 @@ const PortfolioPage: React.FC = () => {
         // Clear chat history on fresh load
         localStorage.removeItem('chat-history');
         setMessages([WELCOME_MESSAGE]);
-
-        const saved = localStorage.getItem('user_watchlist');
-        let initialList: string[] = [];
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) initialList = parsed;
-            } catch (e) { console.error("Error parsing watchlist", e); }
-        }
-
-        // Deduplicate and Normalize
-        const uniqueNormalized = Array.from(new Set(initialList.map(normalizeTicker)));
-        setWatchlist(uniqueNormalized);
-        localStorage.setItem('user_watchlist', JSON.stringify(uniqueNormalized));
     }, []);
+
+    useEffect(() => {
+        if (!authMounted) return;
+
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (isLoggedIn && user?.email) {
+            const key = `user_watchlist_${user.email}`;
+            const saved = localStorage.getItem(key);
+            let initialList: string[] = [];
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) initialList = parsed;
+                } catch (e) { console.error("Error parsing watchlist", e); }
+            }
+
+            // Deduplicate and Normalize
+            const uniqueNormalized = Array.from(new Set(initialList.map(normalizeTicker)));
+            setWatchlist(uniqueNormalized);
+            localStorage.setItem(key, JSON.stringify(uniqueNormalized));
+        } else {
+            setWatchlist([]);
+        }
+    }, [authMounted, user]);
 
     useEffect(() => {
         if (!hasMounted) return;
@@ -665,6 +675,13 @@ const PortfolioPage: React.FC = () => {
             return;
         }
 
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (!isLoggedIn) {
+            alert("Por favor, faça login para adicionar ativos à sua watchlist.");
+            window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
+            return;
+        }
+
         if (watchlist.some(t => normalizeTicker(t) === normalized)) {
             setShowSearchModal(false);
             setSearchTerm("");
@@ -673,7 +690,9 @@ const PortfolioPage: React.FC = () => {
         }
         const newList = [...watchlist, normalized];
         setWatchlist(newList);
-        localStorage.setItem('user_watchlist', JSON.stringify(newList));
+        if (user?.email) {
+            localStorage.setItem(`user_watchlist_${user.email}`, JSON.stringify(newList));
+        }
         setShowSearchModal(false);
         setSearchTerm("");
         setSuggestions([]);
@@ -683,7 +702,10 @@ const PortfolioPage: React.FC = () => {
         const normalizedTarget = normalizeTicker(tickerToRemove);
         const newList = watchlist.filter(t => normalizeTicker(t) !== normalizedTarget);
         setWatchlist(newList);
-        localStorage.setItem('user_watchlist', JSON.stringify(newList));
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (isLoggedIn && user?.email) {
+            localStorage.setItem(`user_watchlist_${user.email}`, JSON.stringify(newList));
+        }
     };
 
     const SENIOR_AGENT_PROMPT = `Você é o RASTRO, um Analista IA prático e objetivo. Seu papel é ajudar o investidor de retalho a tomar decisões rápidas e fundamentadas.
@@ -758,6 +780,23 @@ ESTRUTURA DE RESPOSTA:
 
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || isAIThinking) return;
+
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        if (!isLoggedIn) {
+            setMessages((prev) => [...prev, { role: "ia", text: "Você precisa estar logado para falar com o RASTRO SÊNIOR." }]);
+            return;
+        }
+
+        if (user?.email) {
+            const limitKey = `chat_limit_senior_${user.email}`;
+            const limitCount = parseInt(localStorage.getItem(limitKey) || "0");
+            if (limitCount >= 2) {
+                setMessages((prev) => [...prev, { role: "ia", text: "Você atingiu o limite máximo de 2 perguntas para o RASTRO SÊNIOR nesta conta." }]);
+                return;
+            }
+            localStorage.setItem(limitKey, (limitCount + 1).toString());
+        }
+
         const userMsg = text.trim();
         setMessages(prev => [...prev, { role: "user", text: userMsg }]);
         setChatInput("");

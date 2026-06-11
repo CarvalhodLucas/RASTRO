@@ -23,27 +23,30 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const checkStats = () => {
-            const saved = localStorage.getItem('user_watchlist');
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed)) {
-                        setAssetCount(parsed.length);
-                    }
-                } catch (e) {}
+            const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+            if (isLoggedIn && user?.email) {
+                const saved = localStorage.getItem(`user_watchlist_${user.email}`);
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed)) {
+                            setAssetCount(parsed.length);
+                            return;
+                        }
+                    } catch (e) {}
+                }
             }
+            setAssetCount(0);
         };
 
         checkStats();
         window.addEventListener("storage", checkStats);
-        // Dispatching a custom event when watchlist changes would be ideal, 
-        // but for now we listen to storage and auth-update
         window.addEventListener("auth-update", checkStats);
         return () => {
             window.removeEventListener("storage", checkStats);
             window.removeEventListener("auth-update", checkStats);
         };
-    }, []);
+    }, [user]);
 
     // Form states
     const [nickname, setNickname] = useState("");
@@ -226,12 +229,15 @@ export default function ProfilePage() {
     };
 
     const handleAnalyzeProfile = async () => {
-        const saved = localStorage.getItem('user_watchlist');
+        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
         let portfolio = [];
-        if (saved) {
-            try {
-                portfolio = JSON.parse(saved);
-            } catch (e) {}
+        if (isLoggedIn && user?.email) {
+            const saved = localStorage.getItem(`user_watchlist_${user.email}`);
+            if (saved) {
+                try {
+                    portfolio = JSON.parse(saved);
+                } catch (e) {}
+            }
         }
 
         if (!portfolio || portfolio.length === 0) {

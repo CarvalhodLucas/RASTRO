@@ -29,12 +29,12 @@
             "model": "llama-3.3-70b-versatile"
         },
         "chat": {
-            "provider": "groq3",
-            "model": "llama-3.3-70b-versatile"
+            "provider": "openrouter",
+            "model": "deepseek/deepseek-v4-flash"
         },
         "portfolio_chat": {
-            "provider": "groq3",
-            "model": "llama-3.3-70b-versatile"
+            "provider": "openrouter",
+            "model": "deepseek/deepseek-v4-flash"
         },
         "support_chat": {
             "provider": "groq",
