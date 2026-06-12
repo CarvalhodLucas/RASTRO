@@ -411,6 +411,7 @@ export default function MercadoPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
     const [marketData, setMarketData] = useState<Record<string, number>>({});
+    const [apiMetrics, setApiMetrics] = useState<Record<string, any>>({});
     const itemsPerPage = 8;
 
     // Estados de Ordenação (FORÇADOS: Valor de Mercado Descendente)
@@ -453,6 +454,7 @@ export default function MercadoPage() {
 
     const loadMarketData = () => {
         const mData: Record<string, number> = {};
+        const metrics: Record<string, any> = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key?.startsWith('api_data_')) {
@@ -465,11 +467,13 @@ export default function MercadoPage() {
                         if (val && val !== "--" && val !== "N/D") {
                             mData[ticker] = parseMarketValue(val);
                         }
+                        metrics[ticker] = parsed.data;
                     }
                 } catch (e) {}
             }
         }
         setMarketData(mData);
+        setApiMetrics(metrics);
     };
 
     // Helper para converter "100B" etc em número real para o mapa
@@ -801,14 +805,18 @@ export default function MercadoPage() {
 
             let matchesQuickFilter = true;
             if (activeQuickFilter) {
-                const pl = getNumericValue(asset.peRatio);
-                const pvp = getNumericValue((asset as any).pvp || (asset as any).priceToBook);
-                const dy = getNumericValue(asset.dividendYield);
+                const baseT = asset.ticker.replace('.SA', '').toUpperCase();
+                const metrics = apiMetrics[baseT] || apiMetrics[asset.ticker.toUpperCase()] || {};
+                const pl = getNumericValue(metrics.peRatio || asset.peRatio);
+                const pvp = getNumericValue(metrics.priceToBook || metrics.pvp || (asset as any).pvp || (asset as any).priceToBook);
+                const dy = getNumericValue(metrics.dividendYield || asset.dividendYield);
                 
                 if (activeQuickFilter === 'crescimento') {
-                    matchesQuickFilter = pl > 20 && dy > 15;
+                    // Alto Crescimento: Empresas de maior PL (mercado paga prêmio pelo futuro) e menor dividendo (reinvestem lucro)
+                    matchesQuickFilter = pl > 15 && pl < 150 && dy < 5;
                 } else if (activeQuickFilter === 'valor') {
-                    matchesQuickFilter = pl > 0 && pl < 12 && pvp > 0 && pvp < 1.5;
+                    // Ações de Valor: PL atrativo e PVP atrativo
+                    matchesQuickFilter = pl > 0 && pl < 15 && pvp > 0 && pvp <= 2.0;
                 } else if (activeQuickFilter === 'dividendos') {
                     matchesQuickFilter = dy > 6;
                 } else if (activeQuickFilter === 'otimistas') {
