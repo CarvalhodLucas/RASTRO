@@ -199,7 +199,7 @@ export default function AuthModal() {
                 }
                 
                 handleClose();
-                router.push("/");
+                window.location.href = "/";
                 return;
             }
 

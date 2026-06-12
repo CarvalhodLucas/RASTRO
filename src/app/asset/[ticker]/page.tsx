@@ -3123,8 +3123,15 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 </div>
                                 {/* --- AI RATING COMPONENT --- */}
-                                <div className={`relative bg-zinc-900 border rounded-[2.5rem] p-8 transition-all duration-700 mb-6 ${aiRatingData ? 'border-primary/40 shadow-[0_0_50px_-20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'
+                                <div className={`relative overflow-hidden bg-zinc-900 border rounded-[2.5rem] p-8 transition-all duration-700 mb-6 ${aiRatingData ? 'border-primary/40 shadow-[0_0_50px_-20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'
                                     }`}>
+                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                        <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-[2.5rem]">
+                                            <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                            <h3 className="text-white font-bold">Acesso Restrito</h3>
+                                            <p className="text-slate-400 text-xs mt-1 px-4 text-center">Faça login para ver o Score de IA.</p>
+                                        </div>
+                                    )}
 
                                     {(isRatingLoading && !aiRatingData) ? (
                                         /* ESTADO DE CARREGAMENTO SÓ SE NÃO HOUVER CACHE */
@@ -3962,7 +3969,14 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
             <div className="md:hidden fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 pointer-events-none">
                 {/* Janela do ChatLive */}
                 {isChatLiveOpen && (
-                    <div className="w-[calc(100vw-48px)] max-w-[360px] h-[500px] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
+                    <div className="w-[calc(100vw-32px)] sm:max-w-[360px] h-[60svh] min-h-[350px] max-h-[500px] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto relative">
+                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                            <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-3xl p-4">
+                                <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
+                                <h3 className="text-white font-bold text-center">Chat Restrito</h3>
+                                <p className="text-slate-400 text-xs mt-1 text-center">Faça login para falar com o Analista.</p>
+                            </div>
+                        )}
                         {/* Header */}
                         <div className="p-4 border-b border-border-dark flex justify-between items-center bg-zinc-900/50">
                             <div className="flex items-center gap-3">

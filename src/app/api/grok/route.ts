@@ -277,16 +277,12 @@ export async function POST(req: Request) {
         }
 
         let reply = "";
-
         let modelNameUsed = model;
 
-        if (useGemini && apiKey) {
-            try {
+        try {
+            if (useGemini && apiKey) {
                 const genAI = new GoogleGenerativeAI(apiKey);
-                // Modelo lido do ai-models.config.json
-                modelNameUsed = model;
                 const geminiModel = genAI.getGenerativeModel({ model: model });
-                
                 const result = await geminiModel.generateContent({
                     systemInstruction: systemInstruction,
                     contents: finalMessages.map((m: any) => ({
@@ -298,62 +294,74 @@ export async function POST(req: Request) {
                         responseMimeType: (isRatingRequest || isPulse || isSentiment || isOnChain || isChat || isPortfolioChat || isSupportChat) ? "application/json" : "text/plain",
                     },
                 });
-                
                 reply = result.response.text() || "";
-            } catch (geminiError: any) {
-                console.error("❌ [GEMINI ERROR]:", geminiError.message);
-                // Usuário solicitou NÃO usar fallback Groq para as seções se Gemini falhar.
-                return NextResponse.json({ 
-                    error: "Erro na análise Gemini", 
-                    details: geminiError.message,
-                    isGeminiError: true 
-                }, { status: 502 });
-            }
-        }
+            } else if (apiURL) {
+                const payload = {
+                    model: model,
+                    messages: [
+                        { role: "system", content: systemInstruction },
+                        ...finalMessages
+                    ],
+                    temperature: useOpenRouter ? 0.1 : 0.2,
+                };
 
-        if (!reply) {
-            const fallbackModel = "llama-3.3-70b-versatile";
-            const payload = {
-                model: (useOpenRouter || useGroqOnly || useGroq2) ? model : fallbackModel,
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    ...finalMessages
-                ],
-                temperature: useOpenRouter ? 0.1 : 0.2,
-            };
-
-            let res: Response | null = null;
-            try {
-                res = await fetch(apiURL, {
+                const res = await fetch(apiURL, {
                     method: "POST",
                     headers,
                     body: JSON.stringify(payload)
                 });
 
-                if ((!res || !res.ok) && useOpenRouter) {
-                    console.warn(`🔄 [FALLBACK IA] OpenRouter falhou. Acionando Groq...`);
-                    const fallbackKey = process.env.GROQ_API_KEY || "";
-                    if (fallbackKey) {
-                        headers["Authorization"] = `Bearer ${fallbackKey}`;
-                        res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                            method: "POST",
-                            headers,
-                            body: JSON.stringify({ ...payload, model: "llama-3.3-70b-versatile" })
-                        });
-                    }
+                if (res.ok) {
+                    const data = await res.json();
+                    reply = data.choices[0]?.message?.content || "";
+                } else {
+                    throw new Error(`API Error: ${res.status}`);
                 }
+            }
+        } catch (error: any) {
+            console.error(`❌ [PRIMARY AI ERROR]: ${model}`, error.message);
+        }
 
-                if (!res || !res.ok) throw new Error(`AI API Error: ${res?.status || 500}`);
-                const data = await res.json();
-                reply = data.choices[0]?.message?.content || "";
-                if (!modelNameUsed) modelNameUsed = model;
-            } catch (e: any) {
-                console.error("❌ [FALLBACK ERROR]:", e.message);
-                return NextResponse.json({ error: "Erro na IA (Fallback)", details: e.message }, { status: 504 });
+        // ÚLTIMO RECURSO: FALLBACK GLOBAL PARA DEEPSEEK
+        if (!reply) {
+            console.warn(`🔄 [ULTIMATE FALLBACK] Tentando modelo DeepSeek-v4-Flash via OpenRouter...`);
+            const openRouterKey = process.env.OPENROUTER_API_KEY || "";
+            if (openRouterKey) {
+                try {
+                    const fallbackPayload = {
+                        model: "deepseek/deepseek-v4-flash",
+                        messages: [
+                            { role: "system", content: systemInstruction },
+                            ...finalMessages
+                        ],
+                        temperature: 0.1,
+                    };
+
+                    const fallbackRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${openRouterKey}`,
+                            "HTTP-Referer": "https://rastro-sooty.vercel.app"
+                        },
+                        body: JSON.stringify(fallbackPayload)
+                    });
+
+                    if (fallbackRes.ok) {
+                        const fbData = await fallbackRes.json();
+                        reply = fbData.choices[0]?.message?.content || "";
+                        modelNameUsed = "deepseek/deepseek-v4-flash (Fallback)";
+                    } else {
+                        const errText = await fallbackRes.text();
+                        console.error(`❌ [ULTIMATE FALLBACK FAILED] Status: ${fallbackRes.status} - ${errText}`);
+                    }
+                } catch (fbError: any) {
+                    console.error("❌ [ULTIMATE FALLBACK FAILED]:", fbError.message);
+                }
             }
         }
 
-        if (!reply) return NextResponse.json({ error: "Resposta vazia da IA" }, { status: 500 });
+        if (!reply) return NextResponse.json({ error: "Resposta vazia da IA ou limite de tokens atingido em todos os provedores." }, { status: 504 });
 
         try {
             // Limpeza agressiva para garantir que temos apenas o JSON
