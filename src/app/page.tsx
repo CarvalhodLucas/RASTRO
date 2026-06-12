@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { assetsDatabase } from "@/lib/data";
 import Header from "@/components/Header";
+import SEO from "@/components/SEO";
 
 export default function Home() {
     const router = useRouter();
@@ -353,6 +354,27 @@ export default function Home() {
 
     return (
         <div className="bg-black font-display text-slate-100 min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black">
+            <SEO
+                canonicalPath="/"
+                schemaMarkup={[
+                    {
+                        "@context": "https://schema.org",
+                        "@type": "WebApplication",
+                        "name": "RASTRO",
+                        "url": "https://www.rastroia.com",
+                        "description": "Acompanhe B3, S&P 500 e Cripto em tempo real. Insights profundos com IA, mapas de calor e análise de sentimento.",
+                        "applicationCategory": "FinanceApplication",
+                        "operatingSystem": "All"
+                    },
+                    {
+                        "@context": "https://schema.org",
+                        "@type": "Organization",
+                        "name": "RASTRO",
+                        "url": "https://www.rastroia.com",
+                        "logo": "https://www.rastroia.com/icon.svg"
+                    }
+                ]}
+            />
             <Header currentPath="/" />
 
             <main className="flex-1 w-full bg-black">
@@ -447,10 +469,12 @@ export default function Home() {
                         {/* Heatmap */}
                         <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-4">
                             <div className="flex flex-col sm:flex-row items-center justify-between px-1 gap-4">
-                                <h2 className="text-white text-xl font-bold flex items-center gap-2 text-center sm:text-left">
-                                    <span className="material-symbols-outlined text-primary">grid_view</span>
-                                    Mapa de Calor do Mercado
-                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary" aria-hidden="true">grid_view</span>
+                                    <h2 className="text-white text-xl font-bold text-center sm:text-left">
+                                        Mapa de Calor do Mercado
+                                    </h2>
+                                </div>
                                 <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 w-full sm:w-auto">
                                     {cacheTime && (
                                         <div className="flex items-center gap-1.5 text-slate-500 text-[10px] md:text-[11px] font-medium bg-neutral-dark-surface/50 px-2 py-1 rounded-md border border-neutral-dark-border/50 whitespace-nowrap">
@@ -583,10 +607,12 @@ export default function Home() {
                         {/* Forum Insights (Hardcoded as requested) */}
                         <div className="lg:col-span-4 xl:col-span-3 flex flex-col h-full max-h-[800px]">
                             <div className="flex items-center justify-between px-1 mb-4">
-                                <h2 className="text-white text-xl font-bold flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary">forum</span>
-                                    Square Insights
-                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary" aria-hidden="true">forum</span>
+                                    <h2 className="text-white text-xl font-bold">
+                                        Square Insights
+                                    </h2>
+                                </div>
                                 <a className="text-primary text-sm font-medium hover:text-white transition-colors" href="#">Ver Todos</a>
                             </div>
                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">

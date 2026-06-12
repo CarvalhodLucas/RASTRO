@@ -623,10 +623,12 @@ export default function SquarePage() {
                     )}
 
                     <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
-                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] mb-4 flex items-center gap-2 opacity-50">
-                            <span className="material-symbols-outlined text-primary text-[16px]">group</span>
-                            SEGUINDO
-                        </h2>
+                        <div className="flex items-center gap-2 mb-4 opacity-50">
+                            <span className="material-symbols-outlined text-primary text-[16px]" aria-hidden="true">group</span>
+                            <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em]">
+                                SEGUINDO
+                            </h2>
+                        </div>
                         
                         {following.length === 0 ? (
                             <div className="py-2 text-center text-balance overflow-hidden">
@@ -1001,10 +1003,12 @@ export default function SquarePage() {
                 {/* Right Sidebar - Trending */}
                 <aside className="shrink-0 hidden lg:flex flex-col gap-6 lg:overflow-y-auto no-scrollbar pb-10">
                     <div className="flex flex-col gap-4">
-                        <h2 className="text-white font-bold text-sm flex items-center gap-2 uppercase tracking-wider">
-                            <span className="material-symbols-outlined text-primary text-[20px]">local_fire_department</span>
-                            HOT TICKERS GLOBAIS (24H)
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">local_fire_department</span>
+                            <h2 className="text-white font-bold text-sm uppercase tracking-wider">
+                                HOT TICKERS GLOBAIS (24H)
+                            </h2>
+                        </div>
                         <div className="flex flex-col gap-1">
                             {[
                                 { rank: 1, ticker: "NVDA", name: "Nvidia Corp.", change: "+3.10%", color: "text-[#11d473]" },
@@ -1045,10 +1049,12 @@ export default function SquarePage() {
 
                     {/* Triple Sentiment Gauges */}
                     <div className="flex flex-col gap-3">
-                        <h2 className="text-white font-bold text-sm flex items-center gap-2 uppercase tracking-wider px-1">
-                            <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
-                            SENTIMENTO DO MERCADO
-                        </h2>
+                        <div className="flex items-center gap-2 px-1">
+                            <span className="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">psychology</span>
+                            <h2 className="text-white font-bold text-sm uppercase tracking-wider">
+                                SENTIMENTO DO MERCADO
+                            </h2>
+                        </div>
                         <SentimentGauge label="B3 (BRASIL)" value={sentiments.b3.value} type="b3" />
                         <SentimentGauge label="EUA (S&P 500)" value={sentiments.eua.value} type="eua" />
                         <SentimentGauge label="CRIPTO (BTC)" value={sentiments.crypto.value} type="crypto" />
@@ -1087,10 +1093,12 @@ export default function SquarePage() {
 
                     {/* Following Section */}
                     <div className="bg-zinc-900 border border-white/5 rounded-2xl p-5 shadow-sm">
-                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] mb-4 flex items-center gap-2 opacity-50">
-                            <span className="material-symbols-outlined text-primary text-[16px]">group</span>
-                            SEGUINDO
-                        </h2>
+                        <div className="flex items-center gap-2 mb-4 opacity-50">
+                            <span className="material-symbols-outlined text-primary text-[16px]" aria-hidden="true">group</span>
+                            <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em]">
+                                SEGUINDO
+                            </h2>
+                        </div>
                         
                         {following.length === 0 ? (
                             <div className="py-2 text-center text-balance overflow-hidden">
@@ -1127,10 +1135,12 @@ export default function SquarePage() {
 
                     {/* Hot Tickers (Mobile) */}
                     <div className="flex flex-col gap-4">
-                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] opacity-50 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary text-[20px]">local_fire_department</span>
-                            HOT TICKERS (24H)
-                        </h2>
+                        <div className="flex items-center gap-2 opacity-50">
+                            <span className="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">local_fire_department</span>
+                            <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em]">
+                                HOT TICKERS (24H)
+                            </h2>
+                        </div>
                         <div className="flex flex-col gap-1">
                             {[
                                 { rank: 1, ticker: "NVDA", name: "Nvidia Corp.", change: "+3.10%", color: "text-[#11d473]" },
@@ -1159,10 +1169,12 @@ export default function SquarePage() {
 
                     {/* Sentiment (Mobile) */}
                     <div className="flex flex-col gap-6 pb-12">
-                        <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em] opacity-50 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
-                            SENTIMENTO
-                        </h2>
+                        <div className="flex items-center gap-2 opacity-50">
+                            <span className="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">psychology</span>
+                            <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.2em]">
+                                SENTIMENTO
+                            </h2>
+                        </div>
                         <SentimentGauge label="B3" value={sentiments.b3.value} type="b3" />
                         <SentimentGauge label="EUA" value={sentiments.eua.value} type="eua" />
                         <SentimentGauge label="CRIPTO" value={sentiments.crypto.value} type="crypto" />

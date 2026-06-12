@@ -50,10 +50,9 @@ export async function GET(req: Request) {
             }
 
             try {
-                // 1. Busca do Preço e Fundamentos Básicos
-                const quote: any = await yf.quote(symbol);
-
+                // Se for modo compacto, faz apenas a busca simplificada
                 if (mode === 'compact') {
+                    const quote: any = await yf.quote(symbol);
                     const resCompact = {
                         symbol,
                         price: quote?.regularMarketPrice || quote?.price || 0,
@@ -66,15 +65,16 @@ export async function GET(req: Request) {
                     return resCompact;
                 }
 
-                // 2. Busca dos Fundamentos Detalhados
-                let summary: any = {};
-                try {
-                    summary = await yf.quoteSummary(symbol, {
+                // Para o modo completo, executa quote e quoteSummary em paralelo para otimizar o tempo de resposta
+                const [quote, summary] = await Promise.all([
+                    yf.quote(symbol),
+                    yf.quoteSummary(symbol, {
                         modules: ["defaultKeyStatistics", "summaryDetail", "financialData"]
-                    });
-                } catch (summaryError: any) {
-                    console.log(`⚠️ Aviso nos fundamentos para ${symbol}:`, summaryError.message);
-                }
+                    }).catch((summaryError: any) => {
+                        console.log(`⚠️ Aviso nos fundamentos para ${symbol}:`, summaryError.message);
+                        return {};
+                    })
+                ]);
 
                 const lpa = summary?.defaultKeyStatistics?.trailingEps || quote?.epsTrailingTwelveMonths || quote?.epsCurrentYear || 0;
                 let vpa = summary?.defaultKeyStatistics?.bookValue || quote?.bookValue || 0;

@@ -47,7 +47,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
         { name: "Rastreamento", href: "/mercado" },
         { name: "Notícias", href: "/noticias" },
         { name: "Square", href: "/square" },
-        { name: "Portifolio", href: "/portfolio" },
+        { name: "Portfólio", href: "/portfolio" },
         { name: "Suporte", href: "#suporte" },
         ...(isAdmin ? [
             { name: "Admin", href: "/admin/reports" },

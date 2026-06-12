@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     keywords: ["investimentos", "análise de ativos", "inteligência artificial", "B3", "S&P 500", "criptomoedas", "market intelligence", "rastro ia"],
     authors: [{ name: "RASTRO Team" }],
     metadataBase: new URL("https://www.rastroia.com"),
+    alternates: {
+        canonical: "/",
+    },
     openGraph: {
         title: "RASTRO | Inteligência de Mercado e Análise de Ativos com IA",
         description: "Acompanhe o pulso do mercado em tempo real com análises profundas de IA.",

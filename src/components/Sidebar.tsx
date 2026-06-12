@@ -12,7 +12,7 @@ const Sidebar: React.FC = () => {
     const menuItems = [
         { name: "Painel Principal", icon: "dashboard", href: "/" },
         { name: "Sinais de Mercado", icon: "trending_up", href: "/mercado" },
-        { name: "Portifolio", icon: "account_balance_wallet", href: "/portfolio" },
+        { name: "Portfólio", icon: "account_balance_wallet", href: "/portfolio" },
         { name: "Square", icon: "forum", href: "/square" },
         { name: "Análise IA", icon: "psychology", href: "#" },
     ];

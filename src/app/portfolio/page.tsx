@@ -903,8 +903,10 @@ ESTRUTURA DE RESPOSTA:
                     <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-w-0 overflow-y-auto custom-scrollbar pr-2">
                         <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between mb-8 pb-8 border-b border-neutral-dark-border/30">
                             <div>
-                                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase mb-2 flex items-center gap-3">
+                                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase mb-2">
                                     Dashboard de Inteligência
+                                </h2>
+                                <div className="flex items-center gap-3">
                                     <DashboardHelp />
                                     <button
                                         onClick={() => loadAllData(true)}
@@ -913,7 +915,7 @@ ESTRUTURA DE RESPOSTA:
                                     >
                                         <span className={`material-symbols-outlined text-slate-500 group-hover:text-primary transition-all text-xl ${loading ? 'animate-spin text-primary' : ''}`}>sync</span>
                                     </button>
-                                </h2>
+                                </div>
                                 <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">
                                     Monitor de Risco em Tempo Real • Terminal Alpha
                                 </p>
