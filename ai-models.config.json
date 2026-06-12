@@ -17,8 +17,8 @@
             "model": "llama-3.3-70b-versatile"
         },
         "rating": {
-            "provider": "groq",
-            "model": "llama-3.3-70b-versatile"
+            "provider": "openrouter",
+            "model": "nvidia/nemotron-3-super-120b-a12b:free"
         },
         "saude": {
             "provider": "groq2",

@@ -157,7 +157,7 @@ export async function POST(req: Request) {
             - "verdict": "Oportunidade", "Risco Alto", "Neutro" ou "Alerta".
             - "summary": tese de investimento resumida.
             - "pillars": array de 4-5 objetos com { "label": "...", "score": 9.5, "status": "pos", "neg" ou "neu", "desc": "..." }.
-            - "fiiMetrics": objeto contendo OBRIGATORIAMENTE (se for FII) { "pvp", "vacancia", "dy", "patrimonio" } encontrados no texto. Use "N/D" se não achar.
+            - "fiiMetrics": objeto contendo OBRIGATORIAMENTE (se for FII) { "vpa", "pvp", "vacancia", "dy", "patrimonio" } encontrados no texto. Use "N/D" se não achar.
             - "etfMetrics": objeto contendo OBRIGATORIAMENTE (se for ETF) { "taxa", "benchmark", "patrimonio", "liquidez" } encontrados no texto. Use "N/D" se não achar.
             - "stockMetrics": objeto contendo OBRIGATORIAMENTE (se for ação tradicional/stock) { "roe", "pvp", "pl", "dy" }. INSTRUÇÃO PARA O DY: Procure o valor verdadeiro e atualizado do Dividend Yield (DY) EXCLUSIVAMENTE dentro do 'RELATÓRIO DE FUNDAMENTOS' (texto 360). Se não encontrar de forma alguma no texto, use o valor fornecido nos 'DADOS NUMÉRICOS COMPLEMENTARES'. Use "N/D" se não existir em nenhum dos dois.
             - "dcf": numero com o Valor Justo DCF estimado (apenas o numero).

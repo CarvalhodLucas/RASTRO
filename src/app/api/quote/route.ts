@@ -77,11 +77,16 @@ export async function GET(req: Request) {
                 }
 
                 const lpa = summary?.defaultKeyStatistics?.trailingEps || quote?.epsTrailingTwelveMonths || quote?.epsCurrentYear || 0;
-                const vpa = summary?.defaultKeyStatistics?.bookValue || quote?.bookValue || 0;
+                let vpa = summary?.defaultKeyStatistics?.bookValue || quote?.bookValue || 0;
                 const dyRaw = summary?.summaryDetail?.dividendYield || summary?.summaryDetail?.trailingAnnualDividendYield || quote?.trailingAnnualDividendYield || quote?.dividendYield || 0;
                 const dy = dyRaw * 100;
                 const p_l = summary?.summaryDetail?.trailingPE || quote?.trailingPE || summary?.summaryDetail?.forwardPE || quote?.forwardPE || 0;
                 const priceToBook = summary?.defaultKeyStatistics?.priceToBook || quote?.priceToBook || 0;
+
+                const priceValue = quote?.regularMarketPrice || quote?.price || 0;
+                if (vpa === 0 && priceToBook > 0 && priceValue > 0) {
+                    vpa = priceValue / priceToBook;
+                }
 
                 let roeRaw = summary?.financialData?.returnOnEquity || 0;
                 let roe = roeRaw * 100;

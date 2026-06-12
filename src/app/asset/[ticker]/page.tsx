@@ -75,6 +75,38 @@ const TerminalStatus = () => {
 const TerminalAdminLog = ({ logs }: { logs: Record<string, string> }) => {
     const [isMinimized, setIsMinimized] = useState(false);
     if (Object.keys(logs).length === 0) return null;
+
+    const idMap: Record<string, string> = {
+        "PULSO DE IA": "section-pulso",
+        "SENTIMENTO (IA)": "section-sentimento",
+        "SAÚDE FINANCEIRA": "section-saude",
+        "RESUMO (IA)": "section-resumo",
+        "RATING (FUNDAMENTAL)": "section-rating",
+    };
+
+    const handleLogClick = (section: string) => {
+        const baseId = idMap[section];
+        if (!baseId) return;
+
+        // Tenta encontrar a versão desktop primeiro se a tela for grande, senão mobile, senão o ID base
+        const isDesktop = window.innerWidth >= 1024;
+        let element = document.getElementById(baseId + (isDesktop ? "-desktop" : "-mobile")) 
+                   || document.getElementById(baseId + (!isDesktop ? "-desktop" : "-mobile"))
+                   || document.getElementById(baseId);
+
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Highlight effect
+            const originalShadow = element.style.boxShadow;
+            element.style.transition = 'box-shadow 0.5s ease-in-out';
+            element.style.boxShadow = '0 0 30px rgba(251, 191, 36, 0.4)';
+            setTimeout(() => {
+                element.style.boxShadow = originalShadow;
+            }, 2000);
+        }
+    };
+
     return (
         <div className={`fixed bottom-6 left-6 z-[100] max-w-xs w-full transition-all duration-500 ease-in-out ${isMinimized ? 'h-[36px] overflow-hidden' : 'h-auto opacity-100'}`}>
             <div className="bg-black/90 border border-white/10 rounded-xl overflow-hidden shadow-2xl backdrop-blur-xl">
@@ -98,7 +130,12 @@ const TerminalAdminLog = ({ logs }: { logs: Record<string, string> }) => {
                 {!isMinimized && (
                     <div className="p-4 font-mono text-[10px] space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-300">
                         {Object.entries(logs).map(([section, source], i) => (
-                            <div key={i} className="flex justify-between items-center gap-4 group">
+                            <div 
+                                key={i} 
+                                className="flex justify-between items-center gap-4 group cursor-pointer hover:bg-white/5 p-1 rounded -mx-1 px-1 transition-colors"
+                                onClick={() => handleLogClick(section)}
+                                title={`Ir para ${section}`}
+                            >
                                 <span className="text-zinc-400 group-hover:text-white transition-colors">{section}</span>
                                 <span className={`font-bold ${source.includes('CACHE') ? 'text-blue-400' : 'text-primary animate-pulse'}`}>
                                     {source}
@@ -544,13 +581,14 @@ export default function AssetPage() {
         const extractionInstruction = isETFLocal 
             ? `\nINSTRUÇÃO DE EXTRAÇÃO ETF: O ativo atual é explicitamente um Fundo de Índice (ETF). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: Taxa de Administração, Índice de Referência (Benchmark), Patrimônio Líquido e Liquidez Diária. Retorne-os no objeto "etfMetrics" (ex: { "taxa": "0.30%", "benchmark": "S&P 500", "patrimonio": "R$ 1.5B", "liquidez": "R$ 5.0M" }). Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
             : isFIILocal
-            ? `\nINSTRUÇÃO DE EXTRAÇÃO FII: O ativo atual é explicitamente um Fundo Imobiliário (FII). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: P/VP, Vacância Física, Dividend Yield e Patrimônio Líquido. Retorne-os no objeto "fiiMetrics". Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
+            ? `\nINSTRUÇÃO DE EXTRAÇÃO FII: O ativo atual é explicitamente um Fundo Imobiliário (FII). Procure OBRIGATORIAMENTE no "RELATÓRIO DE FUNDAMENTOS" abaixo os valores atualizados de: P/VP, Valor Patrimonial (VPA ou Valor Patrimonial da Cota), Vacância Física, Dividend Yield e Patrimônio Líquido. Retorne-os no objeto "fiiMetrics". Caso não ache um dado no texto, preencha com "N/D" e não omita a chave.`
             : `\nINSTRUÇÃO DE EXTRAÇÃO AÇÕES: O ativo atual é uma Ação Tradicional. Para ROE, P/VP e P/L, use a seção "DADOS NUMÉRICOS COMPLEMENTARES" como fonte prioritária se estiverem corretos. ATENÇÃO MÁXIMA PARA O DIVIDEND YIELD (DY): Procure o valor real do Dividend Yield PRIMEIRAMENTE DENTRO DO "RELATÓRIO DE FUNDAMENTOS" (no corpo do texto). Apenas se não houver citação de DY no texto do relatório, você deve usar o valor fornecido nos "DADOS NUMÉRICOS COMPLEMENTARES" (API). Retorne-os no objeto "stockMetrics". Use "N/D" se não achar nada. NUNCA alucine valores acima de 100% sem evidência extrema no texto.`;
 
         const reportWithNumbers = `Você é um analista sênior. Use a seguinte base de conhecimento metodológica para basear sua análise: \n\n${LUCAS_KNOWLEDGE}\n\nAgora, aplique essa metodologia para interpretar o seguinte Relatório 360 do ativo e me dê o Score:\n\nDADOS NUMÉRICOS COMPLEMENTARES (USE ESTA SEÇÃO PARA VALIDAR OS NÚMEROS):
 ROE: ${safeFormatNumber(indicators.roe, true)}%
 P/L: ${safeFormatNumber(indicators.pl)}x
 P/VP: ${safeFormatNumber(indicators.pvp)}x
+Valor Patrimonial (VPA): ${safeFormatNumber((targetAsset as any)?.fundamentalData?.vpa || (targetAsset as any)?.vpa)}
 Dividend Yield (DY): ${safeFormatNumber(indicators.dy, true)}%
 Vacância Física: ${(targetAsset as any)?.vacancia || 'N/A'}
 Patrimônio Líquido: ${targetAsset?.marketCap ? 'R$ ' + targetAsset.marketCap : 'N/A'}
@@ -1329,12 +1367,33 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                     };
                     const response = await Promise.any(variants.map(fetchVariant));
 
-                    const lastModified = response.headers.get('Last-Modified');
-                    if (lastModified) {
-                        const date = new Date(lastModified);
-                        const formattedDate = date.toLocaleDateString('pt-BR');
-                        setReportDate(formattedDate);
+                    let reportDateToSet = "";
+                    try {
+                        const datesRes = await fetch('/reports-dates.json');
+                        if (datesRes.ok) {
+                            const datesMap = await datesRes.json();
+                            const filename = response.url.split('/').pop();
+                            if (filename && datesMap[filename]) {
+                                const date = new Date(datesMap[filename]);
+                                reportDateToSet = date.toLocaleDateString('pt-BR');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to load reports-dates.json', e);
                     }
+
+                    if (!reportDateToSet) {
+                        const lastModified = response.headers.get('Last-Modified');
+                        if (lastModified) {
+                            const date = new Date(lastModified);
+                            reportDateToSet = date.toLocaleDateString('pt-BR');
+                        }
+                    }
+                    
+                    if (reportDateToSet) {
+                        setReportDate(reportDateToSet);
+                    }
+
                     const htmlText = await response.text();
 
                     // Parser para limpar o CSS indesejado (que fizemos na etapa anterior)
@@ -2135,7 +2194,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                             <div className="col-span-12 lg:col-span-8 space-y-6">
 
                                 {/* RESUMO IA */}
-                                <section className="rounded-xl border border-border-dark bg-card-dark overflow-hidden">
+                                <section id="section-resumo" className="rounded-xl border border-border-dark bg-card-dark overflow-hidden">
                                     <div className="border-b border-border-dark bg-zinc-900/50 px-6 py-4 flex justify-between items-center">
                                         <h3 className="flex items-center gap-2 text-lg font-bold text-white">
                                             <span className="material-symbols-outlined text-primary">psychology</span> Resumo Executivo RASTRO
@@ -2223,7 +2282,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 {/* MOBILIDADE: SENTIMENTO E PULSO ABAIXO DO RESUMO EM MOBILE */}
                                 <div className="lg:hidden space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
-                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
+                                    <section id="section-sentimento-mobile" className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
                                         {!(user && user.isLoggedIn && user.id !== "guest-user") && (
                                             <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                                 <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
@@ -2326,7 +2385,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                     </section>
 
                                     {/* --- PULSO DE IA --- */}
-                                    <div className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
+                                    <div id="section-pulso-mobile" className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
 
                                         {/* Overlay de Standby: Só aparece se NÃO for cripto E o mercado estiver fechado */}
                                         {!marketStatus.isOpen && !asset?.isCrypto && (
@@ -2473,7 +2532,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 <div className="grid md:grid-cols-2 gap-6">
 
                                     {/* SAÚDE FUNDAMENTAL / MÉTRICAS ON-CHAIN */}
-                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6">
+                                    <section id="section-saude" className="rounded-xl border border-border-dark bg-card-dark p-6">
                                         <div className="flex justify-between items-start mb-6">
                                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-slate-400">
@@ -2985,15 +3044,19 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                         </span>
                                                         <div className="text-right">
                                                             <span className="block text-base font-bold text-primary">
-                                                                {isFIIAsset
-                                                                    ? formatValue(asset?.fundamentalData?.vpa || aiRatingData?.fiiMetrics?.vpa || 0)
-                                                                    : (isCryptoAsset && onChainMetrics?.fairPrice)
-                                                                        ? formatValue(onChainMetrics.fairPrice)
-                                                                        : formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (aiRatingData?.dcf && aiRatingData.dcf > 0 ? aiRatingData.dcf : (fairPriceData?.fairPrice || 0)))}
+                                                                {(() => {
+                                                                    if (isFIIAsset) {
+                                                                        const aiVPA = parseFloat(String(aiRatingData?.fiiMetrics?.vpa || "0").replace(/[^0-9.,-]/g, "").replace(",", "."));
+                                                                        const finalVPA = (aiVPA > 0) ? aiVPA : (asset?.fundamentalData?.vpa || 0);
+                                                                        return formatValue(finalVPA);
+                                                                    }
+                                                                    if (isCryptoAsset && onChainMetrics?.fairPrice) return formatValue(onChainMetrics.fairPrice);
+                                                                    return formatValue(aiHealth?.dcf && aiHealth.dcf > 0 ? aiHealth.dcf : (aiRatingData?.dcf && aiRatingData.dcf > 0 ? aiRatingData.dcf : (fairPriceData?.fairPrice || 0)));
+                                                                })()}
                                                             </span>
                                                             {(() => {
                                                                 const dcfUpside = isCryptoAsset ? (onChainMetrics?.upside || 0) : (aiHealth?.dcfUpside || aiRatingData?.dcfUpside || fairPriceData?.upside || 0);
-                                                                const vpaUpside = ((((asset?.fundamentalData?.vpa || 0) / (parseFloat(asset?.price || "1") || 1)) - 1) * 100);
+                                                                const vpaUpside = ((((isFIIAsset && parseFloat(String(aiRatingData?.fiiMetrics?.vpa || "0").replace(/[^0-9.,-]/g, "").replace(",", ".")) > 0 ? parseFloat(String(aiRatingData?.fiiMetrics?.vpa || "0").replace(/[^0-9.,-]/g, "").replace(",", ".")) : (asset?.fundamentalData?.vpa || 0)) / (parseFloat(asset?.price || "1") || 1)) - 1) * 100);
                                                                 const displayUpside = isFIIAsset ? vpaUpside : dcfUpside;
                                                                 return (
                                                                     <span className={`text-xs font-bold ${displayUpside >= 0 ? "text-primary" : "text-accent-red"}`}>
@@ -3123,7 +3186,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 </div>
                                 {/* --- AI RATING COMPONENT --- */}
-                                <div className={`relative overflow-hidden bg-zinc-900 border rounded-[2.5rem] p-8 transition-all duration-700 mb-6 ${aiRatingData ? 'border-primary/40 shadow-[0_0_50px_-20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'
+                                <div id="section-rating" className={`relative overflow-hidden bg-zinc-900 border rounded-[2.5rem] p-8 transition-all duration-700 mb-6 ${aiRatingData ? 'border-primary/40 shadow-[0_0_50px_-20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'
                                     }`}>
                                     {!(user && user.isLoggedIn && user.id !== "guest-user") && (
                                         <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-[2.5rem]">
@@ -3281,10 +3344,9 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                                 {isReportVisible ? "Ocultar Relatório" : "Ver Relatório Completo"}
                                             </button>
 
-                                            {isReportVisible && htmlReport && reportDate && (
+                                            {isReportVisible && htmlReport && (
                                                 <div className="mt-1.5 flex items-center gap-1 font-medium text-[10px]">
-                                                    <span className="text-slate-500">Atualizado em:</span>
-                                                    <span className="text-primary">{reportDate}</span>
+                                                    <span className="text-slate-500">Atualizado de 3 em 3 meses</span>
                                                 </div>
                                             )}
                                         </div>
@@ -3324,7 +3386,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 <div className="hidden lg:block space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
-                                    <section className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
+                                    <section id="section-sentimento-desktop" className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
                                         {!(user && user.isLoggedIn && user.id !== "guest-user") && (
                                             <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                                 <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
@@ -3427,7 +3489,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                     </section>
 
                                     {/* --- PULSO DE IA --- */}
-                                    <div className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
+                                    <div id="section-pulso-desktop" className={"bg-zinc-900/50 border rounded-3xl p-6 relative transition-all duration-500 border-zinc-800"}>
 
                                         {/* Overlay de Standby: Só aparece se NÃO for cripto E o mercado estiver fechado */}
                                         {!marketStatus.isOpen && !asset?.isCrypto && (

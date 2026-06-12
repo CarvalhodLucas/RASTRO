@@ -134,7 +134,7 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
                         variation: data.variation || asset.variation,
                         currency: isUS ? "U$" : "R$",
                         dataSource: "Yahoo Finance",
-                        marketCap: data.marketCap || asset.marketCap,
+                        marketCap: data.marketCap && data.marketCap !== "--" ? data.marketCap : asset.marketCap,
                         peRatio: data.p_l && data.p_l > 0 ? data.p_l.toFixed(2) : undefined,
                         dividendYield: data.dy && data.dy > 0 ? `${data.dy.toFixed(1)}%` : undefined,
                     };
@@ -183,9 +183,9 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
     const displayPrice = realData?.price !== undefined ? realData.price : (asset.price !== "N/D" && asset.price !== "0.00" ? asset.price : "N/D");
     const displayVariation = realData?.variation !== undefined ? realData.variation : asset.variation;
     const displayName = realData?.name && !realData.name.includes("ERRO") ? realData.name : asset.name;
-    const displayMarketCap = realData?.marketCap || asset.marketCap || "--";
-    const displayPeRatio = realData?.peRatio || asset.peRatio || "--";
-    const displayDividendYield = realData?.dividendYield || asset.dividendYield || "--";
+    const displayMarketCap = realData?.marketCap && realData.marketCap !== "--" ? realData.marketCap : (asset.marketCap && asset.marketCap !== "--" ? asset.marketCap : "--");
+    const displayPeRatio = realData?.peRatio && realData.peRatio !== "--" ? realData.peRatio : (asset.peRatio && asset.peRatio !== "--" ? asset.peRatio : "--");
+    const displayDividendYield = realData?.dividendYield && realData.dividendYield !== "--" ? realData.dividendYield : (asset.dividendYield && asset.dividendYield !== "--" ? asset.dividendYield : "--");
 
     const isPositive = !String(displayVariation).startsWith('-');
     const isCrypto = !!asset.cgId;
@@ -791,8 +791,13 @@ export default function MercadoPage() {
 
                 if (matchesMarket && b3Category !== "Todos") {
                     const cleanTicker = asset.ticker.replace(".SA", "");
-                    const isETF = asset.name.includes("ETF") || ["BOVA11", "IVVB11", "SMAL11", "HASH11", "ECOO11"].includes(cleanTicker);
-                    const isFII = cleanTicker.endsWith("11") && !isETF;
+                    const isETF = asset.type === "ETFs" || asset.sector === "ETF" || asset.name.includes("ETF") || ["BOVA11", "IVVB11", "SMAL11", "HASH11", "ECOO11", "COIN11", "NASD11", "BITH11", "MACI11", "DIVO11", "XINA11"].includes(cleanTicker);
+                    const isFII = !isETF && (
+                        asset.type === "FIIs" ||
+                        asset.type === "Fundo Imobiliário" ||
+                        asset.sector === "Fundos Imobiliários" ||
+                        ((cleanTicker.endsWith("11") || asset.ticker.endsWith("11.SA")) && asset.type !== "Ações" && asset.type !== "Ação")
+                    );
                     const isAcao = !isETF && !isFII;
 
                     if (b3Category === "Ações") matchesMarket = isAcao;
