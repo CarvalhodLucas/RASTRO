@@ -6,6 +6,7 @@ import { assetsDatabase, Asset, normalizeTickerForCache } from "@/lib/data";
 import Header from "@/components/Header";
 import AssetLogo from "@/components/AssetLogo";
 import MarketTicker from "@/components/MarketTicker";
+import { useAuth } from "@/lib/useAuth";
 
 const InfoTooltip = ({ text }: { text: string }) => (
     <div className="relative group inline-block">
@@ -34,7 +35,7 @@ const InfoTooltip = ({ text }: { text: string }) => (
 
 
 
-const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore?: number | null }) => {
+const AssetRow = ({ asset, aiScore: aiScoreFromParent, sentimentValue: sentimentFromParent, isLoggedIn }: { asset: Asset, aiScore?: number | null, sentimentValue?: number, isLoggedIn: boolean }) => {
     const [imageError, setImageError] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
     const [realData, setRealData] = useState<any>(null);
@@ -171,7 +172,6 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
         "PETR4": "petrobras.com.br",
         "AAPL": "apple.com",
         "VALE3": "vale.com",
-        "NU": "nubank.com.br",
         "ROXO34": "nubank.com.br"
     };
 
@@ -193,62 +193,7 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
     const currency = isCrypto ? "R$" : (isUS ? "U$" : "R$");
     const currencyPrefix = isCrypto ? "" : (isUS ? "U$ " : "R$ ");
 
-    // Helper para limpar tickers (BTC-USD -> BTC, PETR4.SA -> PETR4)
-    const getCleanKey = (t: string) => t.replace('-USD', '').replace('.SA', '').toUpperCase();
-
-    // Logic to read sentiment from localStorage (Synced with Asset Page)
-    const getSentimentData = () => {
-        if (typeof window === 'undefined') return { value: asset.sentiment || 50, isCached: false };
-        
-        const cleanT = normalizeTickerForCache(asset.ticker);
-        const keysToTry = [
-            `grok_sent_v3_${cleanT}`,
-            `grok_sentiment_v2_${asset.ticker}`,
-            `sentiment_cache_${cleanT}`,
-            `sentiment_cache_${asset.ticker}`
-        ];
-
-        for (const key of keysToTry) {
-            const cached = localStorage.getItem(key);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    // Busca abrangente pelo valor (cobre múltiplas estruturas que a IA pode ter devolvido)
-                    const val = parsed.data?.value ?? parsed.value ?? parsed.data?.sentiment ?? parsed.sentiment ?? (typeof parsed.data === 'number' ? parsed.data : undefined);
-                    
-                    if (val !== undefined && !isNaN(val)) {
-                        return { value: Number(val), isCached: true };
-                    }
-                } catch (e) {}
-            }
-        }
-        return { value: asset.sentiment || 50, isCached: false };
-    };
-
-    const [localSentiment, setLocalSentiment] = useState<{value: number, isCached: boolean}>({ value: asset.sentiment || 50, isCached: false });
-
-    React.useEffect(() => {
-        // Hydration via React (read real value only on client)
-        setLocalSentiment(getSentimentData());
-
-        const handleUpdate = () => {
-            setLocalSentiment(getSentimentData());
-        };
-
-        window.addEventListener('sentimentUpdated', handleUpdate);
-        window.addEventListener('storage', (e) => {
-            if (e.key?.startsWith('grok_sentiment_v2_') || e.key?.startsWith('sentiment_cache_')) handleUpdate();
-        });
-        window.addEventListener('focus', handleUpdate);
-
-        return () => {
-            window.removeEventListener('sentimentUpdated', handleUpdate);
-            window.removeEventListener('focus', handleUpdate);
-            // removing anonymous storage listener can be tricky, but this is a light component
-        };
-    }, [asset.ticker]);
-
-    const { value: sentimentValue, isCached } = localSentiment;
+    const sentimentValue = sentimentFromParent ?? asset.sentiment ?? 50;
 
     // Usa a nota vinda do pai (estado centralizado) se disponível
     const aiScore = aiScoreFromParent ?? null;
@@ -352,47 +297,40 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
 
             {/* Sentimento */}
             <div className="hidden sm:flex sm:col-span-2 items-center gap-2 px-2 overflow-visible">
-                {aiScore !== null ? (
-                    // Se houver nota de IA, priorizamos a nota e escondemos placeholder de sentimento
-                    <div className="flex-1 flex items-baseline gap-1">
-                        <span className={`text-[10px] font-bold ${sentimentColor} ${sentimentGlow}`}>{sentimentValue}%</span>
-                        <div className="flex-1 h-1.5 min-w-[50px] bg-zinc-800/50 rounded-full overflow-hidden">
-                            <div
-                                className={`h-full transition-all duration-500 ${sentimentBg} ${sentimentGlow}`}
-                                style={{ width: `${sentimentValue}%` }}
-                            ></div>
-                        </div>
+                <div className="flex-1 flex items-baseline gap-1">
+                    <span className={`text-[10px] font-bold ${sentimentColor} ${sentimentGlow}`}>
+                        {sentimentValue}%
+                    </span>
+                    <div className={`flex-1 h-1.5 ${aiScore !== null ? 'min-w-[50px]' : 'min-w-[70px]'} bg-zinc-800/50 rounded-full overflow-hidden`}>
+                        <div
+                            className={`h-full transition-all duration-500 ${sentimentBg} ${sentimentGlow}`}
+                            style={{ width: `${sentimentValue}%` }}
+                        ></div>
                     </div>
-                ) : isCached ? (
-                    <div className="flex-1 flex items-baseline gap-1">
-                        <span className={`text-[10px] font-bold ${sentimentColor} ${sentimentGlow}`}>{sentimentValue}%</span>
-                        <div className="flex-1 h-1.5 min-w-[70px] bg-zinc-800/50 rounded-full overflow-hidden">
-                            <div
-                                className={`h-full transition-all duration-500 ${sentimentBg} ${sentimentGlow}`}
-                                style={{ width: `${sentimentValue}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                ) : (
-                    <span className="text-slate-600 font-bold text-[10px]">--</span>
-                )}
+                </div>
             </div>
 
             {/* Analista Rastro Ativa (Score de IA) */}
             <div className="hidden sm:flex sm:col-span-2 items-center justify-center gap-2 px-2 overflow-visible">
-                {aiScore !== null ? (
-                    <div className="flex flex-col items-center">
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-emerald-400">
-                                {aiScore.toFixed(1)}
-                            </span>
-                            <span className="text-[10px] text-slate-600 font-bold">/10</span>
+                {isLoggedIn ? (
+                    aiScore !== null ? (
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-lg font-black text-emerald-400">
+                                    {aiScore.toFixed(1)}
+                                </span>
+                                <span className="text-[10px] text-slate-600 font-bold">/10</span>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex items-center justify-center opacity-40 group-hover:opacity-80 transition-opacity" title="Aguardando análise automática (abra o ativo para carregar)">
+                            <span className="material-symbols-outlined text-[14px]">terminal</span>
+                            <span className="text-[9px] font-mono ml-1 uppercase tracking-tighter text-amber-500/80">[ PENDING ]</span>
+                        </div>
+                    )
                 ) : (
-                    <div className="flex items-center justify-center opacity-40 group-hover:opacity-80 transition-opacity" title="Aguardando análise automática (abra o ativo para carregar)">
-                        <span className="material-symbols-outlined text-[14px]">terminal</span>
-                        <span className="text-[9px] font-mono ml-1 uppercase tracking-tighter text-amber-500/80">[ PENDING ]</span>
+                    <div className="flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity" title="Faça login para ver a nota da IA">
+                        <span className="material-symbols-outlined text-[16px] text-slate-500">lock</span>
                     </div>
                 )}
             </div>
@@ -401,12 +339,16 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent }: { asset: Asset, aiScore
 };
 
 export default function MercadoPage() {
+    const { user, hasMounted: authMounted } = useAuth();
+    const isLoggedIn = !!(authMounted && user && user.isLoggedIn && user.id !== "guest-user");
+
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
     const [selectedSentiment, setSelectedSentiment] = useState("Todos");
     const [marketCapRange, setMarketCapRange] = useState<[number, number]>([0, 3000]); // 0 to $3T+
     const [selectedMarket, setSelectedMarket] = useState<string>("Todos");
     const [aiRatings, setAiRatings] = useState<Record<string, number>>({});
+    const [sentimentMap, setSentimentMap] = useState<Record<string, number>>({});
     const [b3Category, setB3Category] = useState<string>("Todos");
     const [currentPage, setCurrentPage] = useState(1);
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
@@ -548,6 +490,37 @@ export default function MercadoPage() {
         setAiRatings(ratingsMap);
     };
 
+    const loadSentiments = () => {
+        if (typeof window === 'undefined') return;
+        const sentMap: Record<string, number> = {};
+        assetsDatabase.forEach(asset => {
+            const cleanT = normalizeTickerForCache(asset.ticker);
+            // Keys in priority order: grok_sent_v3 is the primary key written by the asset page
+            const keysToTry = [
+                `grok_sent_v3_${cleanT}`,
+                `grok_sentiment_v2_${asset.ticker}`,
+                `sentiment_cache_${cleanT}`,
+                `sentiment_cache_${asset.ticker}`
+            ];
+            for (const key of keysToTry) {
+                const cached = localStorage.getItem(key);
+                if (cached) {
+                    try {
+                        const parsed = JSON.parse(cached);
+                        // Asset page saves: { data: { score, label, analysis }, timestamp }
+                        // So we read data.score first, then fallback to other possible structures
+                        const val = parsed.data?.score ?? parsed.data?.value ?? parsed.value ?? parsed.data?.sentiment ?? parsed.sentiment ?? (typeof parsed.data === 'number' ? parsed.data : undefined);
+                        if (val !== undefined && !isNaN(Number(val))) {
+                            sentMap[asset.ticker] = Number(val);
+                            break;
+                        }
+                    } catch (e) {}
+                }
+            }
+        });
+        setSentimentMap(sentMap);
+    };
+
     useEffect(() => {
         // --- LIMPEZA DE ALUCINAÇÕES (PURGE) ---
         // Se encontrarmos notas que foram geradas sem relatório (usando o prompt genérico antigo),
@@ -582,24 +555,28 @@ export default function MercadoPage() {
         purgeHallucinations();
         loadRatings();
         loadMarketData();
+        loadSentiments();
         
         const handleCacheUpdate = () => {
             setPendingUpdate(true);
             loadRatings();
             loadMarketData();
+            loadSentiments();
         };
         const handleFocus = () => {
             console.log("🔄 Janela focada: Atualizando dados do cache...");
             setPendingUpdate(true);
             loadRatings();
             loadMarketData();
+            loadSentiments();
         };
         const handleStorage = (e: StorageEvent) => {
-            if (e.key?.startsWith('ai_rating_') || e.key === 'user_market_filters' || e.key?.startsWith('api_data_')) {
+            if (e.key?.startsWith('ai_rating_') || e.key === 'user_market_filters' || e.key?.startsWith('api_data_') || e.key?.startsWith('grok_sent_v3_') || e.key?.startsWith('sentiment_cache_')) {
                 console.log("💾 Storage alterado: Sincronizando notas...");
                 setPendingUpdate(true);
                 loadRatings();
                 loadMarketData();
+                loadSentiments();
             }
         };
 
@@ -1137,6 +1114,8 @@ export default function MercadoPage() {
                                                     key={asset.ticker} 
                                                     asset={asset} 
                                                     aiScore={aiRatings[asset.ticker]} 
+                                                    sentimentValue={sentimentMap[asset.ticker]}
+                                                    isLoggedIn={isLoggedIn}
                                                 />
                                             ))
                                         ) : (
