@@ -44,6 +44,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
 
     const navLinks = [
         { name: "Início", href: "/" },
+        { name: "Sobre", href: "/sobre" },
         { name: "Rastreamento", href: "/mercado" },
         { name: "Notícias", href: "/noticias" },
         { name: "Square", href: "/square" },

@@ -107,6 +107,7 @@ export default function Footer() {
                             >
                                 Feedback
                             </button>
+                            <Link href="/sobre" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Sobre o Rastro</Link>
                             <Link href="/termos" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Termos de Uso</Link>
                             <Link href="/privacidade" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Política de Privacidade</Link>
                             <Link href="/square" className="text-xs font-bold text-zinc-500 hover:text-primary transition-colors uppercase tracking-widest">Comunidade</Link>

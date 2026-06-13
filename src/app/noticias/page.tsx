@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, MouseEvent } from "react";
+import { useState, useEffect, MouseEvent } from "react";
 import Header from "@/components/Header";
 
 // Removed all mock news data to ensure real-time dynamic content
@@ -13,12 +13,17 @@ interface NewsItem {
     url: string;
 }
 
+const DEFAULT_NEWS_QUERY = "Mercado Financeiro OR Ibovespa OR PETR4 OR BTC";
 
 export default function NoticiasPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [news, setNews] = useState<NewsItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        searchRealNews(DEFAULT_NEWS_QUERY);
+    }, []);
 
     const formatTimeAgo = (dateString: string) => {
         const date = new Date(dateString);
@@ -98,7 +103,7 @@ export default function NoticiasPage() {
     const handleSearch = (query: string) => {
         setSearchQuery(query);
         if (!query.trim()) {
-            setNews([]);
+            searchRealNews(DEFAULT_NEWS_QUERY);
             return;
         }
         searchRealNews(query);

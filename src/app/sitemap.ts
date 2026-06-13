@@ -7,6 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Rotas estáticas centrais
     const staticRoutes = [
         "",
+        "/sobre",
         "/mercado",
         "/portfolio",
         "/noticias",

@@ -2446,6 +2446,26 @@ export const b3Assets: Asset[] = [
         lastUpdate: new Date().toLocaleDateString('pt-BR')
     },
     {
+        ticker: "GARE11.SA",
+        type: "FIIs",
+        name: "Guardian Logística e Renda - FII",
+        price: "0.00",
+        variation: "0.0",
+        sector: "Fundos Imobiliários",
+        exchange: "B3",
+        sentiment: 50,
+        bullCase: [],
+        bearCase: [],
+        logo: "https://www.google.com/s2/favicons?domain=guardiangestora.com.br&sz=128",
+        size: 15,
+        cgId: "",
+        aiPulse: "FII com foco híbrido em galpões logísticos e imóveis de renda urbana.",
+        marketCap: "1.2B",
+        peRatio: "--",
+        dividendYield: "10.5%",
+        lastUpdate: new Date().toLocaleDateString('pt-BR')
+    },
+    {
         ticker: "VBBR3.SA",
         type: "Ações",
         name: "Vibra Energia SA",
