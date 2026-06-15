@@ -127,6 +127,42 @@ export default function AuthModal() {
         }
     };
 
+    const testLoginSDK = async () => {
+        if (!email || !password) {
+            setTestLoginResult("Insira e-mail e senha acima antes de testar.");
+            return;
+        }
+        setTestLoginResult("Testando login SDK...");
+        try {
+            const t0 = performance.now();
+            const res = await supabase.auth.signInWithPassword({ email, password });
+            const duration = (performance.now() - t0).toFixed(0);
+            if (res.error) {
+                setTestLoginResult(`Erro SDK (${duration}ms): ${res.error.message}`);
+            } else {
+                setTestLoginResult(`Logado SDK em ${duration}ms! User ID: ${res.data.user?.id}`);
+            }
+        } catch (err: any) {
+            setTestLoginResult(`Exceção SDK: ${err.message || String(err)}`);
+        }
+    };
+
+    const testDbSDK = async () => {
+        setTestResult("Querying DB via SDK...");
+        try {
+            const t0 = performance.now();
+            const { data, error } = await supabase.from('profiles').select('id').limit(1);
+            const duration = (performance.now() - t0).toFixed(0);
+            if (error) {
+                setTestResult(`Erro DB (${duration}ms): ${error.message}`);
+            } else {
+                setTestResult(`Sucesso DB (${duration}ms): ${JSON.stringify(data)}`);
+            }
+        } catch (err: any) {
+            setTestResult(`Exceção DB: ${err.message || String(err)}`);
+        }
+    };
+
 
     useEffect(() => {
         const handleOpen = (e: any) => {
@@ -558,26 +594,40 @@ export default function AuthModal() {
                                         <div>[Navegador] URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 25)}...` : <span className="text-red-500 font-bold">URL VAZIA!</span>}</div>
                                         <div>[Navegador] KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}... (${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length} chars)` : <span className="text-red-500 font-bold">CHAVE VAZIA!</span>}</div>
                                         
-                                        <div className="flex gap-2 w-full">
+                                        <div className="grid grid-cols-2 gap-1.5 w-full">
                                             <button 
                                                 type="button"
                                                 onClick={testConnection}
-                                                className="flex-1 py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                                className="py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
                                             >
-                                                Testar URL/Rede
+                                                Rede Health
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={testDbSDK}
+                                                className="py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                            >
+                                                Query DB (SDK)
                                             </button>
                                             <button 
                                                 type="button"
                                                 onClick={testLoginDirect}
-                                                className="flex-1 py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                                className="py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
                                             >
-                                                Testar Login Direto
+                                                Login Direto (API)
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={testLoginSDK}
+                                                className="py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                            >
+                                                Login SDK (Supabase)
                                             </button>
                                         </div>
                                         
                                         {testResult && (
                                             <div className="text-primary text-[9px] mt-0.5 font-sans break-all border-t border-neutral-800 pt-1">
-                                                Rede: {testResult}
+                                                Rede/DB: {testResult}
                                             </div>
                                         )}
                                         {testLoginResult && (
