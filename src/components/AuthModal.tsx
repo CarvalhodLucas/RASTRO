@@ -502,6 +502,14 @@ export default function AuthModal() {
                                     </div>
                                 )}
 
+                                {/* Debug client keys info */}
+                                {typeof window !== 'undefined' && (
+                                    <div className="text-[10px] text-slate-400 bg-black/60 border border-neutral-800 p-2.5 rounded-lg flex flex-col gap-1 text-center font-mono">
+                                        <div>[Navegador] URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 25)}...` : <span className="text-red-500 font-bold">URL VAZIA!</span>}</div>
+                                        <div>[Navegador] KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}... (${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length} chars)` : <span className="text-red-500 font-bold">CHAVE VAZIA!</span>}</div>
+                                    </div>
+                                )}
+
 
                                 {/* Login Form */}
                                 {activeTab === "login" && !showTerms && !showProfileForm && (
