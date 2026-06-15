@@ -38,6 +38,13 @@ const formatAuthError = (err: any): string => {
     return rawMsg;
 };
 
+const withTimeout = <T,>(promise: Promise<T>, ms: number = 10000, errorMsg: string = "Tempo limite excedido. Verifique sua conexão com a internet ou tente novamente mais tarde."): Promise<T> => {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+    ]);
+};
+
 export default function AuthModal() {
     const router = useRouter();
     const { user, logout } = useAuth();
@@ -156,10 +163,14 @@ export default function AuthModal() {
         setIsLoading(true);
 
         try {
-            const { error: loginError } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
+            const { error: loginError } = await withTimeout(
+                supabase.auth.signInWithPassword({
+                    email,
+                    password
+                }),
+                15000,
+                "O servidor demorou muito para responder. Tente novamente."
+            ) as any;
 
             if (loginError) {
                 setError(formatAuthError(loginError));
@@ -252,15 +263,19 @@ export default function AuthModal() {
             // 3. Registro manual (E-mail e Senha)
             console.log(`[Auth] 📝 Tentando registrar usuário manual: ${regEmail}`);
             
-            const { data, error: signUpError } = await supabase.auth.signUp({
-                email: regEmail,
-                password: regPassword,
-                options: {
-                    data: {
-                        full_name: regName
+            const { data, error: signUpError } = await withTimeout(
+                supabase.auth.signUp({
+                    email: regEmail,
+                    password: regPassword,
+                    options: {
+                        data: {
+                            full_name: regName
+                        }
                     }
-                }
-            });
+                }),
+                15000,
+                "O servidor demorou muito para responder no cadastro. Tente novamente."
+            ) as any;
 
             if (signUpError) {
                 console.error("[Auth] ❌ Erro no signUp:", signUpError.message);
@@ -317,10 +332,14 @@ export default function AuthModal() {
         
         try {
             const redirectTo = `${window.location.origin}/auth/callback`;
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider,
-                options: { redirectTo }
-            });
+            const { error } = await withTimeout(
+                supabase.auth.signInWithOAuth({
+                    provider,
+                    options: { redirectTo }
+                }),
+                15000,
+                "O servidor demorou muito para responder. Tente novamente."
+            ) as any;
             if (error) setError(formatAuthError(error));
         } catch (err) {
             console.error("[Auth] ❌ Erro no login social:", err);
