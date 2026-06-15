@@ -1,38 +1,43 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase/client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const DATA_PATH = path.join(process.cwd(), 'src', 'data', 'support_messages.json');
-
-// Ensure data file exists
-function ensureDataFile() {
-    if (!fs.existsSync(path.dirname(DATA_PATH))) {
-        fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
-    }
-    if (!fs.existsSync(DATA_PATH)) {
-        fs.writeFileSync(DATA_PATH, JSON.stringify([]));
-    }
-}
-
+// GET: Fetch all support messages from Supabase
 export async function GET() {
     try {
-        ensureDataFile();
-        const data = fs.readFileSync(DATA_PATH, 'utf8');
-        const messages = JSON.parse(data);
-        // Sort by most recent
-        const sortedMessages = messages.sort((a: any, b: any) => 
+        const { data: messages, error } = await supabase
+            .from('support_messages')
+            .select('*');
+
+        if (error) {
+            console.error('Supabase query error in GET support messages:', error);
+            return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+        }
+
+        // Map snake_case to camelCase and sort by most recent
+        const formattedMessages = (messages || []).map((msg) => ({
+            id: msg.id,
+            email: msg.email,
+            subject: msg.subject,
+            message: msg.message,
+            createdAt: msg.created_at,
+            status: msg.status
+        }));
+
+        formattedMessages.sort((a, b) => 
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-        return NextResponse.json(sortedMessages);
+
+        return NextResponse.json(formattedMessages);
     } catch (error) {
         console.error('Error reading support messages:', error);
         return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
     }
 }
 
+// POST: Save a new support message in Supabase
 export async function POST(req: Request) {
     try {
         const { email, subject, message } = await req.json();
@@ -41,21 +46,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        ensureDataFile();
-        const data = fs.readFileSync(DATA_PATH, 'utf8');
-        const messages = JSON.parse(data);
+        const id = crypto.randomUUID();
 
-        const newMessage = {
-            id: Date.now().toString(),
-            email,
-            subject,
-            message,
-            createdAt: new Date().toISOString(),
-            status: 'unread'
-        };
+        const { error } = await supabase
+            .from('support_messages')
+            .insert({
+                id,
+                email,
+                subject,
+                message,
+                status: 'unread'
+            });
 
-        messages.push(newMessage);
-        fs.writeFileSync(DATA_PATH, JSON.stringify(messages, null, 2));
+        if (error) {
+            console.error('Supabase insert error in POST support messages:', error);
+            return NextResponse.json({ error: 'Database insert failed' }, { status: 500 });
+        }
 
         return NextResponse.json({ success: true, message: 'Message saved' });
     } catch (error) {
@@ -64,6 +70,7 @@ export async function POST(req: Request) {
     }
 }
 
+// DELETE: Delete a support message from Supabase
 export async function DELETE(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -73,12 +80,15 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Missing message ID' }, { status: 400 });
         }
 
-        ensureDataFile();
-        const data = fs.readFileSync(DATA_PATH, 'utf8');
-        let messages = JSON.parse(data);
+        const { error } = await supabase
+            .from('support_messages')
+            .delete()
+            .eq('id', id);
 
-        messages = messages.filter((msg: any) => msg.id !== id);
-        fs.writeFileSync(DATA_PATH, JSON.stringify(messages, null, 2));
+        if (error) {
+            console.error('Supabase delete error in DELETE support messages:', error);
+            return NextResponse.json({ error: 'Database delete failed' }, { status: 500 });
+        }
 
         return NextResponse.json({ success: true, message: 'Message deleted' });
     } catch (error) {
@@ -86,3 +96,4 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ error: 'Failed to delete message' }, { status: 500 });
     }
 }
+

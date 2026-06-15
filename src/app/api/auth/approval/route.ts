@@ -1,42 +1,9 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase/client';
 import { ADMIN_EMAILS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const DATA_PATH = path.join(process.cwd(), 'src', 'data', 'users_status.json');
-
-// Helper to ensure data file exists and is populated
-function ensureDataFile() {
-    const dir = path.dirname(DATA_PATH);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(DATA_PATH)) {
-        // Pre-populate with a template or empty object
-        fs.writeFileSync(DATA_PATH, JSON.stringify({}, null, 2));
-    }
-}
-
-// Helper to read data
-function readData(): Record<string, { name: string; status: 'pending' | 'approved'; createdAt: string; phone?: string; investorType?: string; profession?: string; experienceLevel?: string; reason?: string }> {
-    ensureDataFile();
-    try {
-        const fileContent = fs.readFileSync(DATA_PATH, 'utf8');
-        return JSON.parse(fileContent);
-    } catch (error) {
-        console.error('Error reading users_status.json:', error);
-        return {};
-    }
-}
-
-// Helper to write data
-function writeData(data: Record<string, any>) {
-    ensureDataFile();
-    fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-}
 
 // GET: Check approval status of a user
 export async function GET(req: Request) {
@@ -53,8 +20,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ approved: true, status: 'approved' });
         }
 
-        const data = readData();
-        const userStatus = data[email];
+        // Query waitlist in Supabase
+        const { data: userStatus, error } = await supabase
+            .from('waitlist')
+            .select('*')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Supabase query error in GET approval:', error);
+            return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+        }
 
         if (!userStatus) {
             return NextResponse.json({ approved: false, status: 'none' });
@@ -64,7 +40,7 @@ export async function GET(req: Request) {
             approved: userStatus.status === 'approved',
             status: userStatus.status,
             name: userStatus.name,
-            createdAt: userStatus.createdAt
+            createdAt: userStatus.created_at
         });
     } catch (error) {
         console.error('Error in GET /api/auth/approval:', error);
@@ -84,40 +60,58 @@ export async function POST(req: Request) {
         const cleanEmail = email.toLowerCase().trim();
         const cleanName = name?.trim() || cleanEmail.split('@')[0];
 
-        const data = readData();
+        // Query to check if user already exists
+        const { data: existingUser, error: queryError } = await supabase
+            .from('waitlist')
+            .select('status')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+
+        if (queryError) {
+            console.error('Supabase query error in POST approval:', queryError);
+            return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+        }
 
         // If user already exists, don't overwrite approved status to pending
-        if (data[cleanEmail]) {
+        if (existingUser) {
             return NextResponse.json({ 
                 success: true, 
                 message: 'User already exists', 
-                status: data[cleanEmail].status 
+                status: existingUser.status 
             });
         }
 
         // If it's an admin, automatically mark as approved
         const isDefaultAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(cleanEmail);
+        const status = isDefaultAdmin ? 'approved' : 'pending';
 
-        data[cleanEmail] = {
-            name: cleanName,
-            status: isDefaultAdmin ? 'approved' : 'pending',
-            createdAt: new Date().toISOString(),
-            phone: phone || '',
-            investorType: investorType || '',
-            profession: profession || '',
-            experienceLevel: experienceLevel || '',
-            reason: reason || ''
-        };
+        // Insert new waitlist user in Supabase
+        const { error: insertError } = await supabase
+            .from('waitlist')
+            .insert({
+                email: cleanEmail,
+                name: cleanName,
+                status: status,
+                phone: phone || '',
+                investor_type: investorType || '',
+                profession: profession || '',
+                experience_level: experienceLevel || '',
+                reason: reason || ''
+            });
 
-        writeData(data);
+        if (insertError) {
+            console.error('Supabase insert error in POST approval:', insertError);
+            return NextResponse.json({ error: 'Database insert failed' }, { status: 500 });
+        }
 
         return NextResponse.json({ 
             success: true, 
             message: isDefaultAdmin ? 'Admin auto-approved' : 'User added to approval queue',
-            status: data[cleanEmail].status
+            status: status
         });
     } catch (error) {
         console.error('Error in POST /api/auth/approval:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+

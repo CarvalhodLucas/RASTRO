@@ -1,55 +1,31 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase/client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const DATA_PATH = path.join(process.cwd(), 'src', 'data', 'users_status.json');
-
-// Helper to ensure data file exists and is populated
-function ensureDataFile() {
-    const dir = path.dirname(DATA_PATH);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(DATA_PATH)) {
-        fs.writeFileSync(DATA_PATH, JSON.stringify({}, null, 2));
-    }
-}
-
-// Helper to read data
-function readData(): Record<string, { name: string; status: 'pending' | 'approved'; createdAt: string; phone?: string; investorType?: string; profession?: string; experienceLevel?: string; reason?: string }> {
-    ensureDataFile();
-    try {
-        const fileContent = fs.readFileSync(DATA_PATH, 'utf8');
-        return JSON.parse(fileContent);
-    } catch (error) {
-        console.error('Error reading users_status.json:', error);
-        return {};
-    }
-}
-
-// Helper to write data
-function writeData(data: Record<string, any>) {
-    ensureDataFile();
-    fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-}
-
-// GET: List all users from users_status.json
+// GET: List all users from waitlist table
 export async function GET() {
     try {
-        const data = readData();
-        // Format object to array
-        const usersList = Object.entries(data).map(([email, info]) => ({
-            email,
+        const { data: users, error } = await supabase
+            .from('waitlist')
+            .select('*');
+
+        if (error) {
+            console.error('Supabase query error in GET admin users:', error);
+            return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+        }
+
+        // Format snake_case to camelCase for the frontend
+        const usersList = (users || []).map((info) => ({
+            email: info.email,
             name: info.name,
             status: info.status,
-            createdAt: info.createdAt,
+            createdAt: info.created_at,
             phone: info.phone || '',
-            investorType: info.investorType || '',
+            investorType: info.investor_type || '',
             profession: info.profession || '',
-            experienceLevel: info.experienceLevel || '',
+            experienceLevel: info.experience_level || '',
             reason: info.reason || ''
         }));
 
@@ -73,14 +49,23 @@ export async function POST(req: Request) {
         }
 
         const cleanEmail = email.toLowerCase().trim();
-        const data = readData();
 
-        if (!data[cleanEmail]) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        // Update status in Supabase and select the updated row
+        const { data: updatedUser, error: updateError } = await supabase
+            .from('waitlist')
+            .update({ status: 'approved' })
+            .eq('email', cleanEmail)
+            .select()
+            .maybeSingle();
+
+        if (updateError) {
+            console.error('Supabase update error in POST admin users:', updateError);
+            return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
         }
 
-        data[cleanEmail].status = 'approved';
-        writeData(data);
+        if (!updatedUser) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
 
         // Trigger n8n webhook if configured
         const webhookUrl = process.env.NEXT_PUBLIC_N8N_WAITLIST_WEBHOOK || process.env.N8N_WAITLIST_WEBHOOK;
@@ -90,10 +75,10 @@ export async function POST(req: Request) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: data[cleanEmail].name,
+                        name: updatedUser.name,
                         email: cleanEmail,
                         status: 'approved',
-                        phone: data[cleanEmail].phone || ''
+                        phone: updatedUser.phone || ''
                     })
                 });
             } catch (err) {
@@ -118,14 +103,22 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Missing email parameter' }, { status: 400 });
         }
 
-        const data = readData();
+        // Delete row in Supabase
+        const { data: deletedUser, error: deleteError } = await supabase
+            .from('waitlist')
+            .delete()
+            .eq('email', email)
+            .select()
+            .maybeSingle();
 
-        if (!data[email]) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        if (deleteError) {
+            console.error('Supabase delete error in DELETE admin users:', deleteError);
+            return NextResponse.json({ error: 'Database delete failed' }, { status: 500 });
         }
 
-        delete data[email];
-        writeData(data);
+        if (!deletedUser) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
 
         return NextResponse.json({ success: true, message: 'User removed successfully' });
     } catch (error) {
@@ -133,3 +126,4 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
