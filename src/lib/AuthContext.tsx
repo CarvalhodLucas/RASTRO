@@ -104,8 +104,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const response = await fetch(`/api/auth/approval?email=${encodeURIComponent(email)}`);
                     if (response.ok) {
                         const approvalInfo = await response.json();
-                        isApproved = approvalInfo.approved;
-                        isPending = approvalInfo.status === 'pending';
+                        
+                        if (approvalInfo.status === 'none') {
+                            // User logged in via Google OAuth but isn't in the waitlist yet.
+                            // Auto-register them into the waitlist.
+                            console.log("[Auth] 🆕 Usuário não encontrado na lista de espera. Auto-registrando...");
+                            const nameToUse = profileData?.full_name || metadata?.full_name || metadata?.name || email.split("@")[0];
+                            const regRes = await fetch("/api/auth/approval", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ email: email, name: nameToUse })
+                            });
+                            
+                            if (regRes.ok) {
+                                const regData = await regRes.json();
+                                isApproved = regData.status === 'approved';
+                                isPending = regData.status === 'pending';
+                            }
+                        } else {
+                            isApproved = approvalInfo.approved;
+                            isPending = approvalInfo.status === 'pending';
+                        }
                     }
                 } catch (err) {
                     console.error("Error checking approval:", err);
