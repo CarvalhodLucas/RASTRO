@@ -324,12 +324,12 @@ export async function POST(req: Request) {
 
         // ÚLTIMO RECURSO: FALLBACK GLOBAL PARA DEEPSEEK
         if (!reply) {
-            console.warn(`🔄 [ULTIMATE FALLBACK] Tentando modelo DeepSeek-v4-Flash via OpenRouter...`);
+            console.warn(`🔄 [ULTIMATE FALLBACK] Tentando modelo DeepSeek-v3 (Chat) via OpenRouter...`);
             const openRouterKey = process.env.OPENROUTER_API_KEY || "";
             if (openRouterKey) {
                 try {
                     const fallbackPayload = {
-                        model: "deepseek/deepseek-v4-flash",
+                        model: "deepseek/deepseek-chat",
                         messages: [
                             { role: "system", content: systemInstruction },
                             ...finalMessages
