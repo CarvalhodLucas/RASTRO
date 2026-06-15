@@ -14,6 +14,7 @@ export interface AuthUser {
     avatarImage?: string;
     joinedAt?: string;
     investorType?: string;
+    isPendingApproval?: boolean;
 }
 
 interface AuthContextType {
@@ -31,7 +32,8 @@ const GUEST_USER: AuthUser = {
     isLoggedIn: false,
     theme: "dark",
     joinedAt: "2026",
-    investorType: "curioso"
+    investorType: "curioso",
+    isPendingApproval: false
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (sessionString) {
             try {
                 const parsedSession = JSON.parse(sessionString);
-                if (parsedSession && parsedSession.isLoggedIn) {
+                if (parsedSession && (parsedSession.isLoggedIn || parsedSession.isPendingApproval)) {
                     return parsedSession;
                 }
             } catch (e) {
@@ -95,11 +97,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const finalAvatar = profileData?.avatar_url || metadata?.avatar_url || undefined;
                 console.log(`[Auth] 🖼️ URL da foto final definida como:`, finalAvatar);
 
+                // Call the approval check API
+                let isApproved = false;
+                let isPending = false;
+                try {
+                    const response = await fetch(`/api/auth/approval?email=${encodeURIComponent(email)}`);
+                    if (response.ok) {
+                        const approvalInfo = await response.json();
+                        isApproved = approvalInfo.approved;
+                        isPending = approvalInfo.status === 'pending';
+                    }
+                } catch (err) {
+                    console.error("Error checking approval:", err);
+                }
+
                 const authUser: AuthUser = {
                     id: userId,
                     name: profileData?.full_name || metadata?.full_name || metadata?.name || email.split("@")[0],
                     email: email,
-                    isLoggedIn: true,
+                    isLoggedIn: isApproved, // Only logged in if approved
+                    isPendingApproval: isPending,
                     avatarImage: finalAvatar,
                     theme: profileData?.theme || localUser?.theme || "dark",
                     joinedAt: profileData?.created_at ? new Date(profileData.created_at).getFullYear().toString() : (localUser?.joinedAt || "2026"),

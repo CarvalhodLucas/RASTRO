@@ -725,6 +725,206 @@ export default function Home() {
                         </div>
                     </section>
 
+                    {/* Waitlist Section */}
+                    <section id="waitlist" className="w-full py-12 border-t border-neutral-dark-border">
+                        <style>{`
+                            #waitlist .waitlist-card {
+                                background: linear-gradient(135deg, #0e0e15 0%, #060609 100%);
+                                position: relative;
+                                overflow: hidden;
+                                border: 1px solid rgba(240, 180, 41, 0.15);
+                            }
+                            #waitlist .waitlist-card::before {
+                                content: '';
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                height: 1px;
+                                background: linear-gradient(90deg, transparent, rgba(240, 180, 41, 0.3), transparent);
+                            }
+                            #waitlist .waitlist-input {
+                                background-color: rgba(5, 5, 8, 0.8);
+                                border: 1px solid rgba(240, 180, 41, 0.3);
+                                color: #ffffff;
+                                border-radius: 12px;
+                                padding: 0.875rem 1.25rem;
+                                font-size: 0.95rem;
+                                width: 100%;
+                                outline: none;
+                                transition: all 0.3s ease;
+                            }
+                            #waitlist .waitlist-input::placeholder {
+                                color: rgba(255, 255, 255, 0.4);
+                            }
+                            #waitlist .waitlist-input:focus {
+                                border-color: rgba(240, 180, 41, 1);
+                                box-shadow: 0 0 12px rgba(240, 180, 41, 0.25);
+                            }
+                            #waitlist .waitlist-btn {
+                                background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+                                color: #050505;
+                                font-weight: 800;
+                                border-radius: 12px;
+                                padding: 0.875rem 2rem;
+                                font-size: 0.95rem;
+                                cursor: pointer;
+                                border: none;
+                                transition: all 0.3s ease;
+                                box-shadow: 0 4px 15px rgba(240, 180, 41, 0.2);
+                                width: 100%;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 0.5rem;
+                                text-transform: uppercase;
+                                letter-spacing: 0.05em;
+                            }
+                            #waitlist .waitlist-btn:hover:not(:disabled) {
+                                transform: translateY(-2px);
+                                box-shadow: 0 6px 20px rgba(240, 180, 41, 0.4);
+                                filter: brightness(1.1);
+                            }
+                            #waitlist .waitlist-btn:active:not(:disabled) {
+                                transform: translateY(0);
+                            }
+                            #waitlist .waitlist-btn:disabled {
+                                opacity: 0.6;
+                                cursor: not-allowed;
+                            }
+                            @keyframes fadeIn {
+                                from { opacity: 0; transform: translateY(10px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                            #waitlist .animate-fade-in {
+                                animation: fadeIn 0.4s ease forwards;
+                            }
+                        `}</style>
+                        
+                        <div className="w-full">
+                            <div className="max-w-3xl mx-auto waitlist-card rounded-2xl p-8 md:p-12 text-center shadow-2xl">
+                                
+                                {/* Exclusive Badge */}
+                                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[#fbbf24] text-xs font-bold uppercase tracking-wider mb-6">
+                                    <span>🔒</span> Acesso Beta Exclusivo
+                                </div>
+                                
+                                {/* Title & Subtitle */}
+                                <h2 className="text-white text-3xl md:text-4xl font-extrabold tracking-tight mb-3">
+                                    Entre para a lista de espera
+                                </h2>
+                                <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto leading-relaxed mb-8">
+                                    Seja um dos primeiros a acessar o Rastro completo. Inteligência de mercado com IA para B3, S&P 500 e Cripto.
+                                </p>
+                                
+                                {/* Success Message */}
+                                <div id="waitlist-success" className="animate-fade-in p-6 bg-emerald-950/20 border border-emerald-500/30 rounded-xl text-emerald-400 text-sm md:text-base font-semibold" style={{ display: 'none' }}>
+                                    ✅ Você entrou na lista! Avisaremos quando seu acesso estiver pronto.
+                                </div>
+                                
+                                {/* Form Fields */}
+                                <div id="waitlist-fields">
+                                    <form
+                                        action="https://formsubmit.co/rastro@rastroia.com"
+                                        method="POST"
+                                        className="w-full max-w-md mx-auto space-y-4"
+                                        onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            const form = e.currentTarget;
+                                            const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+                                            const btnText = form.querySelector('.btn-text') as HTMLSpanElement;
+                                            const successMsg = document.getElementById('waitlist-success');
+                                            const fieldsContainer = document.getElementById('waitlist-fields');
+
+                                            if (button) button.disabled = true;
+                                            if (btnText) btnText.innerText = "Entrando na fila...";
+
+                                            const formData = new FormData(form);
+                                            const name = formData.get('name') as string;
+                                            const email = formData.get('email') as string;
+                                            const webhookUrl = process.env.NEXT_PUBLIC_N8N_WAITLIST_WEBHOOK || "http://localhost:5678/webhook/rastro-waitlist";
+
+                                            // 1. Local Registration for Admin Queue
+                                            try {
+                                                await fetch('/api/auth/approval', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    body: JSON.stringify({ name, email })
+                                                });
+                                            } catch (localErr) {
+                                                console.error('Local queue registration failed:', localErr);
+                                            }
+
+                                            // 2. Parallel AJAX submission to FormSubmit (which triggers n8n Webhook)
+                                            try {
+                                                await fetch('https://formsubmit.co/ajax/rastro@rastroia.com', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'Accept': 'application/json'
+                                                    },
+                                                    body: JSON.stringify({
+                                                        name,
+                                                        email,
+                                                        _next: "https://www.rastroia.com",
+                                                        _captcha: "false",
+                                                        _webhook: webhookUrl
+                                                    })
+                                                });
+                                            } catch (fsErr) {
+                                                console.error('FormSubmit AJAX notification failed:', fsErr);
+                                            }
+
+                                            // 3. Show success state to user without redirect
+                                            if (fieldsContainer) fieldsContainer.style.display = 'none';
+                                            if (successMsg) successMsg.style.display = 'block';
+                                        }}
+                                    >
+                                        <input type="hidden" name="_next" value="https://www.rastroia.com" />
+                                        <input type="hidden" name="_captcha" value="false" />
+                                        <input type="hidden" name="_webhook" value={process.env.NEXT_PUBLIC_N8N_WAITLIST_WEBHOOK || "http://localhost:5678/webhook/rastro-waitlist"} />
+                                        
+                                        <div className="flex flex-col md:flex-row gap-4">
+                                            <input
+                                                type="text"
+                                                name="name"
+                                                placeholder="Seu nome"
+                                                required
+                                                className="waitlist-input"
+                                            />
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                placeholder="Seu melhor e-mail"
+                                                required
+                                                className="waitlist-input"
+                                            />
+                                        </div>
+                                        
+                                        <button type="submit" className="waitlist-btn mt-2">
+                                            <span className="btn-text">Garantir meu acesso →</span>
+                                        </button>
+                                    </form>
+                                    
+                                    {/* Subtext */}
+                                    <p className="text-zinc-500 text-[11px] leading-normal mt-4">
+                                        Sem spam. Você receberá apenas o aviso de liberação do seu acesso.
+                                    </p>
+                                </div>
+                                
+                                {/* Counter */}
+                                <div className="mt-8">
+                                    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-amber-500 text-xs font-black tracking-wide uppercase shadow-inner">
+                                        🔥 +347 pessoas já na fila
+                                    </span>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </section>
+
                 </div>
             </main>
         </div>

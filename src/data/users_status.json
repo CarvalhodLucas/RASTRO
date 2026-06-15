@@ -1,0 +1,27 @@
+{
+  "carvalhodlucas4@gmail.com": {
+    "name": "Lucas carvalho",
+    "status": "approved",
+    "createdAt": "2026-06-14T22:02:22.704Z"
+  },
+  "carvalhodlucas10@gmail.com": {
+    "name": "Lucas Carvalho",
+    "status": "approved",
+    "createdAt": "2026-06-14T22:30:02.488Z",
+    "phone": "321312",
+    "investorType": "Buy & Hold",
+    "profession": "medico",
+    "experienceLevel": "Iniciante",
+    "reason": "pq sim"
+  },
+  "carvalhodlucas7@gmail.com": {
+    "name": "Lucas de Carvalho",
+    "status": "approved",
+    "createdAt": "2026-06-14T22:35:24.342Z",
+    "phone": "321421",
+    "investorType": "Day Trader",
+    "profession": "2313",
+    "experienceLevel": "Iniciante",
+    "reason": "dadas"
+  }
+}

@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { ADMIN_EMAILS } from "@/lib/constants";
-
+import { useAuth } from "@/lib/useAuth";
+import { supabase } from "@/lib/supabase/client";
 
 const formatAuthError = (err: any): string => {
     if (!err) return "";
@@ -40,6 +40,7 @@ const formatAuthError = (err: any): string => {
 
 export default function AuthModal() {
     const router = useRouter();
+    const { user, logout } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<"login" | "register" | "no-account">("login");
 
@@ -59,7 +60,15 @@ export default function AuthModal() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [showTerms, setShowTerms] = useState(false);
+    const [showProfileForm, setShowProfileForm] = useState(false);
     const [pendingSocialProvider, setPendingSocialProvider] = useState<'google' | null>(null);
+
+    // Profile form fields
+    const [profPhone, setProfPhone] = useState("");
+    const [profInvestorType, setProfInvestorType] = useState("Day Trader");
+    const [profProfession, setProfProfession] = useState("");
+    const [profExperience, setProfExperience] = useState("Iniciante");
+    const [profReason, setProfReason] = useState("");
 
 
     useEffect(() => {
@@ -81,7 +90,7 @@ export default function AuthModal() {
         // Check for require_terms in URL
         if (params.get('require_terms') === 'true') {
             console.log("[AuthModal] Require terms detected from URL");
-            setShowTerms(true);
+            setShowProfileForm(true);
             setIsOpen(true);
         }
 
@@ -95,6 +104,7 @@ export default function AuthModal() {
         setError("");
         setSuccess("");
         setShowTerms(false);
+        setShowProfileForm(false);
     };
 
 
@@ -102,7 +112,7 @@ export default function AuthModal() {
         const handleRequireTerms = (e: any) => {
             console.log("[AuthModal] Terms required event received");
             setRegEmail(e.detail.email);
-            setShowTerms(true);
+            setShowProfileForm(true);
             setIsLoading(false);
             setIsOpen(true); // Open the modal automatically!
         };
@@ -121,7 +131,7 @@ export default function AuthModal() {
         // PERSISTENCE CHECK: If we reloaded and have a pending registration
         const mode = localStorage.getItem("pending_auth_mode");
         if (mode === "register_intercepted") {
-            setShowTerms(true);
+            setShowProfileForm(true);
             setIsOpen(true);
             setActiveTab("register");
         }
@@ -171,7 +181,7 @@ export default function AuthModal() {
         if (!regEmail.includes("@")) return setError("E-mail inválido.");
         if (regPassword.length < 6) return setError("Senha curta.");
 
-        setShowTerms(true);
+        setShowProfileForm(true);
     };
 
 
@@ -196,6 +206,25 @@ export default function AuthModal() {
                     console.error("[Auth] ❌ Erro ao criar perfil pós-google:", profileError.message);
                     setError("Erro ao finalizar seu perfil. Tente novamente.");
                     return;
+                }
+                
+                // Add to approval queue
+                try {
+                    await fetch('/api/auth/approval', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            email: user.email, 
+                            name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+                            phone: profPhone,
+                            investorType: profInvestorType,
+                            profession: profProfession,
+                            experienceLevel: profExperience,
+                            reason: profReason
+                        })
+                    });
+                } catch (err) {
+                    console.error("[Auth] Failed to register pending status:", err);
                 }
                 
                 handleClose();
@@ -245,12 +274,31 @@ export default function AuthModal() {
                         id: data.user.id,
                         email: regEmail
                     });
+
+                    // Add to approval queue
+                    try {
+                        await fetch('/api/auth/approval', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                email: regEmail, 
+                                name: regName,
+                                phone: profPhone,
+                                investorType: profInvestorType,
+                                profession: profProfession,
+                                experienceLevel: profExperience,
+                                reason: profReason 
+                            })
+                        });
+                    } catch (err) {
+                        console.error("[Auth] Failed to register pending status:", err);
+                    }
                 }
 
                 if (data.session) {
                     handleClose();
                 } else {
-                    setSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
+                    setSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta e aguarde a aprovação do administrador.");
                     setShowTerms(false);
                 }
             }
@@ -283,6 +331,53 @@ export default function AuthModal() {
     };
 
 
+    if (user?.isPendingApproval) {
+        return (
+            <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                <div className="w-full max-w-md z-10 animate-in zoom-in-95 duration-300">
+                    <div className="bg-neutral-dark-surface border border-neutral-dark-border rounded-2xl shadow-2xl shadow-black overflow-y-auto max-h-[92vh] relative no-scrollbar p-8 text-center flex flex-col gap-6">
+                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50"></div>
+                        
+                        <div className="size-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-2">
+                            <span className="material-symbols-outlined text-amber-500 text-3xl">hourglass_empty</span>
+                        </div>
+
+                        <h2 className="text-2xl font-bold text-white tracking-tight">Cadastro em Análise</h2>
+                        
+                        <div className="bg-black/40 border border-neutral-dark-border rounded-xl p-5 text-sm text-slate-300 leading-relaxed text-justify">
+                            <p className="mb-3">
+                                Olá, <span className="text-white font-bold">{user.name}</span>! Recebemos sua solicitação de acesso para o e-mail <span className="text-primary font-bold">{user.email}</span>.
+                            </p>
+                            <p>
+                                Seu cadastro foi para a fila de aprovação e está sendo analisado por um administrador. Você terá acesso total à plataforma assim que seu cadastro for liberado.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={() => {
+                                    window.location.reload();
+                                }}
+                                className="w-full h-11 bg-primary hover:bg-primary-hover text-black font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">refresh</span>
+                                Verificar Status Novamente
+                            </button>
+                            <button
+                                onClick={() => {
+                                    logout();
+                                }}
+                                className="w-full h-10 bg-transparent hover:bg-white/5 text-slate-400 hover:text-white font-medium rounded-xl transition-all cursor-pointer"
+                            >
+                                Sair da Conta
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!isOpen) return null;
 
     return (
@@ -304,7 +399,7 @@ export default function AuthModal() {
                     </button>
 
                     {/* Tabs */}
-                    {!showTerms && activeTab !== "no-account" && (
+                    {!showTerms && !showProfileForm && activeTab !== "no-account" && (
 
                         <div className="flex border-b border-neutral-dark-border">
                             <button
@@ -360,7 +455,7 @@ export default function AuthModal() {
                         ) : (
                             <>
                                 {/* Title */}
-                                {!showTerms && (
+                                {!showTerms && !showProfileForm && (
 
                                     <div className="text-center mb-8">
                                         <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">
@@ -390,7 +485,7 @@ export default function AuthModal() {
 
 
                                 {/* Login Form */}
-                                {activeTab === "login" && !showTerms && (
+                                {activeTab === "login" && !showTerms && !showProfileForm && (
 
                                     <div className="flex flex-col gap-4">
                                         {/* Social Login */}
@@ -516,7 +611,7 @@ export default function AuthModal() {
                                 )}
 
                                 {/* Register Form */}
-                                {activeTab === "register" && !showTerms && (
+                                {activeTab === "register" && !showTerms && !showProfileForm && (
 
                                     <div className="flex flex-col gap-4">
                                         {/* Social Signup */}
@@ -628,7 +723,108 @@ export default function AuthModal() {
                                     </div>
                                 )}
 
+                                {/* Profile Form Step */}
+                                {showProfileForm && (
+                                    <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                                        <div className="text-center mb-2">
+                                            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <span className="material-symbols-outlined !text-[28px] text-primary">person_edit</span>
+                                            </div>
+                                            <h2 className="text-xl font-bold text-white tracking-tight">Complete seu Perfil</h2>
+                                            <p className="text-sm text-slate-400 mt-1">Precisamos de alguns dados para a aprovação do seu acesso.</p>
+                                        </div>
 
+                                        <form className="flex flex-col gap-4" onSubmit={(e) => {
+                                            e.preventDefault();
+                                            setShowProfileForm(false);
+                                            setShowTerms(true);
+                                        }}>
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide ml-1">Telefone / WhatsApp</label>
+                                                <div className="relative">
+                                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                                                        <span className="material-symbols-outlined !text-[20px]">phone</span>
+                                                    </span>
+                                                    <input
+                                                        type="tel"
+                                                        required
+                                                        value={profPhone}
+                                                        onChange={e => setProfPhone(e.target.value)}
+                                                        placeholder="(11) 99999-9999"
+                                                        className="block w-full h-11 pl-10 pr-3 rounded-lg bg-black border border-neutral-dark-border text-white placeholder-slate-600 focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide ml-1">Tipo de Investidor</label>
+                                                    <select
+                                                        value={profInvestorType}
+                                                        onChange={e => setProfInvestorType(e.target.value)}
+                                                        className="block w-full h-11 px-3 rounded-lg bg-black border border-neutral-dark-border text-white focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm outline-none appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="Day Trader">Day Trader</option>
+                                                        <option value="Buy & Hold">Buy &amp; Hold</option>
+                                                        <option value="Swing Trader">Swing Trader</option>
+                                                        <option value="Institucional">Institucional</option>
+                                                        <option value="Iniciante">Iniciante</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide ml-1">Experiência</label>
+                                                    <select
+                                                        value={profExperience}
+                                                        onChange={e => setProfExperience(e.target.value)}
+                                                        className="block w-full h-11 px-3 rounded-lg bg-black border border-neutral-dark-border text-white focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm outline-none appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="Iniciante">Iniciante</option>
+                                                        <option value="Intermediário">Intermediário</option>
+                                                        <option value="Avançado">Avançado</option>
+                                                        <option value="Profissional">Profissional</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide ml-1">Profissão / Cargo</label>
+                                                <div className="relative">
+                                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                                                        <span className="material-symbols-outlined !text-[20px]">work</span>
+                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        value={profProfession}
+                                                        onChange={e => setProfProfession(e.target.value)}
+                                                        placeholder="Ex: Analista Financeiro, Médico..."
+                                                        className="block w-full h-11 pl-10 pr-3 rounded-lg bg-black border border-neutral-dark-border text-white placeholder-slate-600 focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide ml-1">Por que quer ter acesso?</label>
+                                                <textarea
+                                                    required
+                                                    value={profReason}
+                                                    onChange={e => setProfReason(e.target.value)}
+                                                    placeholder="Descreva brevemente o seu objetivo com o RASTRO..."
+                                                    rows={3}
+                                                    className="block w-full p-3 rounded-lg bg-black border border-neutral-dark-border text-white placeholder-slate-600 focus:ring-1 focus:ring-primary focus:border-primary transition-colors text-sm outline-none resize-none"
+                                                ></textarea>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                className="w-full h-11 bg-primary hover:bg-primary-hover text-black font-bold rounded-lg transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-1 cursor-pointer"
+                                            >
+                                                <span>Avançar para os Termos</span>
+                                                <span className="material-symbols-outlined !text-[20px]">arrow_forward</span>
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
 
                                 {/* Terms of Responsibility Step */}
                                 {showTerms && (
