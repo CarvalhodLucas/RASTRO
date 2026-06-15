@@ -9,6 +9,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || "",
-  supabaseAnonKey || ""
+  supabaseAnonKey || "",
+  {
+    auth: {
+      // Bypass do navigator.locks para evitar congelamentos no Chrome (Web Locks API bug)
+      lock: (name, acquire) => acquire()
+    }
+  }
 );
 
