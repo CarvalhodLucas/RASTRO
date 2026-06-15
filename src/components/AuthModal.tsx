@@ -168,7 +168,7 @@ export default function AuthModal() {
                     email,
                     password
                 }),
-                15000,
+                25000,
                 "O servidor demorou muito para responder. Tente novamente."
             ) as any;
 
