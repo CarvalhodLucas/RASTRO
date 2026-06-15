@@ -73,6 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log(`[Auth] 🟢 Evento detectado: ${event}`);
             
             if (session?.user) {
+                // Remove access_token do URL hash, se existir, por segurança e estética
+                if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+                    console.log("[Auth] 🧹 Limpando hash de access_token da URL");
+                    window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+                }
+
                 const userId = session.user.id;
                 const email = session.user.email || "";
                 const metadata = session.user.user_metadata;
