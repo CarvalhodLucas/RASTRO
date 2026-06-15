@@ -77,6 +77,7 @@ export default function AuthModal() {
     const [profExperience, setProfExperience] = useState("Iniciante");
     const [profReason, setProfReason] = useState("");
     const [testResult, setTestResult] = useState("");
+    const [testLoginResult, setTestLoginResult] = useState("");
 
     const testConnection = async () => {
         setTestResult("Testando conexão...");
@@ -92,6 +93,37 @@ export default function AuthModal() {
             setTestResult(`Conectado! Status: ${res.status} (${duration}ms)`);
         } catch (err: any) {
             setTestResult(`Erro: ${err.message || String(err)}`);
+        }
+    };
+
+    const testLoginDirect = async () => {
+        if (!email || !password) {
+            setTestLoginResult("Insira e-mail e senha acima antes de testar.");
+            return;
+        }
+        setTestLoginResult("Testando login direto...");
+        try {
+            const t0 = performance.now();
+            const res = await fetch("https://aqheezfhlzfdekopbieq.supabase.co/auth/v1/token?grant_type=password", {
+                method: "POST",
+                headers: {
+                    "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email,
+                    password
+                })
+            });
+            const data = await res.json();
+            const duration = (performance.now() - t0).toFixed(0);
+            if (res.ok) {
+                setTestLoginResult(`Logado em ${duration}ms! ID: ${data.user?.id || '?'}`);
+            } else {
+                setTestLoginResult(`Erro API (${duration}ms): ${data.error_description || data.error || JSON.stringify(data)}`);
+            }
+        } catch (err: any) {
+            setTestLoginResult(`Erro Rede: ${err.message || String(err)}`);
         }
     };
 
@@ -525,16 +557,32 @@ export default function AuthModal() {
                                     <div className="text-[10px] text-slate-400 bg-black/60 border border-neutral-800 p-2.5 rounded-lg flex flex-col gap-2 text-center font-mono">
                                         <div>[Navegador] URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 25)}...` : <span className="text-red-500 font-bold">URL VAZIA!</span>}</div>
                                         <div>[Navegador] KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}... (${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length} chars)` : <span className="text-red-500 font-bold">CHAVE VAZIA!</span>}</div>
-                                        <button 
-                                            type="button"
-                                            onClick={testConnection}
-                                            className="w-full py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[9px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
-                                        >
-                                            Testar Conexão do Navegador
-                                        </button>
+                                        
+                                        <div className="flex gap-2 w-full">
+                                            <button 
+                                                type="button"
+                                                onClick={testConnection}
+                                                className="flex-1 py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                            >
+                                                Testar URL/Rede
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={testLoginDirect}
+                                                className="flex-1 py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[8px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                            >
+                                                Testar Login Direto
+                                            </button>
+                                        </div>
+                                        
                                         {testResult && (
                                             <div className="text-primary text-[9px] mt-0.5 font-sans break-all border-t border-neutral-800 pt-1">
-                                                {testResult}
+                                                Rede: {testResult}
+                                            </div>
+                                        )}
+                                        {testLoginResult && (
+                                            <div className="text-primary text-[9px] mt-0.5 font-sans break-all border-t border-neutral-800 pt-1">
+                                                Login: {testLoginResult}
                                             </div>
                                         )}
                                     </div>
