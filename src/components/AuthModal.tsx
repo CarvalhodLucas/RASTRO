@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ADMIN_EMAILS } from "@/lib/constants";
 import { useAuth } from "@/lib/useAuth";
 import { supabase } from "@/lib/supabase/client";
+import { createClient as createStandardClient } from "@supabase/supabase-js";
 
 const formatAuthError = (err: any): string => {
     if (!err) return "";
@@ -135,7 +136,11 @@ export default function AuthModal() {
         setTestLoginResult("Testando login SDK...");
         try {
             const t0 = performance.now();
-            const res = await supabase.auth.signInWithPassword({ email, password });
+            const standardSupabase = createStandardClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+            );
+            const res = await standardSupabase.auth.signInWithPassword({ email, password });
             const duration = (performance.now() - t0).toFixed(0);
             if (res.error) {
                 setTestLoginResult(`Erro SDK (${duration}ms): ${res.error.message}`);
@@ -151,7 +156,11 @@ export default function AuthModal() {
         setTestResult("Querying DB via SDK...");
         try {
             const t0 = performance.now();
-            const { data, error } = await supabase.from('profiles').select('id').limit(1);
+            const standardSupabase = createStandardClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+            );
+            const { data, error } = await standardSupabase.from('profiles').select('id').limit(1);
             const duration = (performance.now() - t0).toFixed(0);
             if (error) {
                 setTestResult(`Erro DB (${duration}ms): ${error.message}`);
