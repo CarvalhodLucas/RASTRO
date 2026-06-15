@@ -76,6 +76,24 @@ export default function AuthModal() {
     const [profProfession, setProfProfession] = useState("");
     const [profExperience, setProfExperience] = useState("Iniciante");
     const [profReason, setProfReason] = useState("");
+    const [testResult, setTestResult] = useState("");
+
+    const testConnection = async () => {
+        setTestResult("Testando conexão...");
+        try {
+            const t0 = performance.now();
+            const res = await fetch("https://aqheezfhlzfdekopbieq.supabase.co/auth/v1/health", {
+                method: "GET",
+                headers: {
+                    "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+                }
+            });
+            const duration = (performance.now() - t0).toFixed(0);
+            setTestResult(`Conectado! Status: ${res.status} (${duration}ms)`);
+        } catch (err: any) {
+            setTestResult(`Erro: ${err.message || String(err)}`);
+        }
+    };
 
 
     useEffect(() => {
@@ -504,9 +522,21 @@ export default function AuthModal() {
 
                                 {/* Debug client keys info */}
                                 {typeof window !== 'undefined' && (
-                                    <div className="text-[10px] text-slate-400 bg-black/60 border border-neutral-800 p-2.5 rounded-lg flex flex-col gap-1 text-center font-mono">
+                                    <div className="text-[10px] text-slate-400 bg-black/60 border border-neutral-800 p-2.5 rounded-lg flex flex-col gap-2 text-center font-mono">
                                         <div>[Navegador] URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 25)}...` : <span className="text-red-500 font-bold">URL VAZIA!</span>}</div>
                                         <div>[Navegador] KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20)}... (${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length} chars)` : <span className="text-red-500 font-bold">CHAVE VAZIA!</span>}</div>
+                                        <button 
+                                            type="button"
+                                            onClick={testConnection}
+                                            className="w-full py-1 bg-neutral-850 hover:bg-neutral-800 text-slate-300 hover:text-white rounded border border-neutral-700 text-[9px] font-sans font-bold cursor-pointer transition-colors uppercase tracking-wider"
+                                        >
+                                            Testar Conexão do Navegador
+                                        </button>
+                                        {testResult && (
+                                            <div className="text-primary text-[9px] mt-0.5 font-sans break-all border-t border-neutral-800 pt-1">
+                                                {testResult}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
