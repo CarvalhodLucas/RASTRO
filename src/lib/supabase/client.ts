@@ -13,7 +13,9 @@ export const supabase = createClient(
   {
     auth: {
       // Bypass do navigator.locks para evitar congelamentos no Chrome (Web Locks API bug)
-      lock: (name, acquire) => acquire()
+      lock: (name, acquireTimeout, fn) => {
+        return fn();
+      }
     }
   }
 );

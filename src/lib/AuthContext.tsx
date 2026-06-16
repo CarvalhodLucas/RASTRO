@@ -69,89 +69,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setHasMounted(true);
 
         // 2. Supabase session listener
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             console.log(`[Auth] 🟢 Evento detectado: ${event}`);
             
-            if (session?.user) {
-                // Remove access_token do URL hash, se existir, por segurança e estética
-                if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
-                    console.log("[Auth] 🧹 Limpando hash de access_token da URL");
-                    window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
-                }
-
-                const userId = session.user.id;
-                const email = session.user.email || "";
-                const metadata = session.user.user_metadata;
-                
-                console.log(`[Auth] 🔍 Buscando perfil para ID: ${userId}`);
-
-                // Busca a versão mais recente do perfil no banco de dados
-                const { data: profileData, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .maybeSingle();
-
-                if (profileError) {
-                    console.warn(`[Auth] ⚠️ Aviso na busca de perfil:`, profileError.message);
-                } else if (!profileData) {
-                    console.log(`[Auth] ℹ️ Nenhum perfil encontrado para este usuário.`);
-                } else {
-                    console.log(`[Auth] ✅ Perfil encontrado no banco:`, profileData);
-                }
-
-                const finalAvatar = profileData?.avatar_url || metadata?.avatar_url || undefined;
-                console.log(`[Auth] 🖼️ URL da foto final definida como:`, finalAvatar);
-
-                // Call the approval check API
-                let isApproved = false;
-                let isPending = false;
-                try {
-                    const response = await fetch(`/api/auth/approval?email=${encodeURIComponent(email)}`);
-                    if (response.ok) {
-                        const approvalInfo = await response.json();
-                        
-                        if (approvalInfo.status === 'none') {
-                            // User logged in via Google OAuth but isn't in the waitlist yet.
-                            // Trigger the waitlist registration form.
-                            console.log("[Auth] 🆕 Usuário não encontrado na lista de espera. Solicitando formulário de perfil...");
-                            window.dispatchEvent(new CustomEvent("auth-require-terms", {
-                                detail: { email: email }
-                            }));
-                        } else {
-                            isApproved = approvalInfo.approved;
-                            isPending = approvalInfo.status === 'pending';
-                        }
+            // Execute the async logic independently so it doesn't block the Supabase Auth Lock (Deadlock prevention)
+            const processAuthStateChange = async () => {
+                if (session?.user) {
+                    // Remove access_token do URL hash, se existir, por segurança e estética
+                    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+                        console.log("[Auth] 🧹 Limpando hash de access_token da URL");
+                        window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
                     }
-                } catch (err) {
-                    console.error("Error checking approval:", err);
+
+                    const userId = session.user.id;
+                    const email = session.user.email || "";
+                    const metadata = session.user.user_metadata;
+                    
+                    console.log(`[Auth] 🔍 Buscando perfil para ID: ${userId}`);
+
+                    // Busca a versão mais recente do perfil no banco de dados
+                    const { data: profileData, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', userId)
+                        .maybeSingle();
+
+                    if (profileError) {
+                        console.warn(`[Auth] ⚠️ Aviso na busca de perfil:`, profileError.message);
+                    } else if (!profileData) {
+                        console.log(`[Auth] ℹ️ Nenhum perfil encontrado para este usuário.`);
+                    } else {
+                        console.log(`[Auth] ✅ Perfil encontrado no banco:`, profileData);
+                    }
+
+                    const finalAvatar = profileData?.avatar_url || metadata?.avatar_url || undefined;
+                    console.log(`[Auth] 🖼️ URL da foto final definida como:`, finalAvatar);
+
+                    // Call the approval check API
+                    let isApproved = false;
+                    let isPending = false;
+                    try {
+                        const response = await fetch(`/api/auth/approval?email=${encodeURIComponent(email)}`);
+                        if (response.ok) {
+                            const approvalInfo = await response.json();
+                            
+                            if (approvalInfo.status === 'none') {
+                                // User logged in via Google OAuth but isn't in the waitlist yet.
+                                // Trigger the waitlist registration form.
+                                console.log("[Auth] 🆕 Usuário não encontrado na lista de espera. Solicitando formulário de perfil...");
+                                window.dispatchEvent(new CustomEvent("auth-require-terms", {
+                                    detail: { email: email }
+                                }));
+                            } else {
+                                isApproved = approvalInfo.approved;
+                                isPending = approvalInfo.status === 'pending';
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error checking approval:", err);
+                    }
+
+                    const authUser: AuthUser = {
+                        id: userId,
+                        name: profileData?.full_name || metadata?.full_name || metadata?.name || email.split("@")[0],
+                        email: email,
+                        isLoggedIn: isApproved, // Only logged in if approved
+                        isPendingApproval: isPending,
+                        avatarImage: finalAvatar,
+                        theme: profileData?.theme || localUser?.theme || "dark",
+                        joinedAt: profileData?.created_at ? new Date(profileData.created_at).getFullYear().toString() : (localUser?.joinedAt || "2026"),
+                        investorType: profileData?.investor_type || localUser?.investorType
+                    };
+
+                    // Persiste e atualiza
+                    localStorage.setItem("user_session", JSON.stringify(authUser));
+                    setUser(authUser);
+                    window.dispatchEvent(new Event("auth-update"));
+
+                    // Removido a auto-criação na inicialização que estava causando erro 400
+                    // O perfil deve ser criado pelo trigger do Supabase ou via Upsert nas configurações.
+                } else if (event === "SIGNED_OUT") {
+                    console.log("[Auth] 🔴 Usuário deslogado - Retornando ao Modo Convidado");
+                    localStorage.removeItem("user_session");
+                    setUser(GUEST_USER);
+                    window.dispatchEvent(new Event("auth-update"));
                 }
+            };
 
-                const authUser: AuthUser = {
-                    id: userId,
-                    name: profileData?.full_name || metadata?.full_name || metadata?.name || email.split("@")[0],
-                    email: email,
-                    isLoggedIn: isApproved, // Only logged in if approved
-                    isPendingApproval: isPending,
-                    avatarImage: finalAvatar,
-                    theme: profileData?.theme || localUser?.theme || "dark",
-                    joinedAt: profileData?.created_at ? new Date(profileData.created_at).getFullYear().toString() : (localUser?.joinedAt || "2026"),
-                    investorType: profileData?.investor_type || localUser?.investorType
-                };
-
-                // Persiste e atualiza
-                localStorage.setItem("user_session", JSON.stringify(authUser));
-                setUser(authUser);
-                window.dispatchEvent(new Event("auth-update"));
-
-                // Removido a auto-criação na inicialização que estava causando erro 400
-                // O perfil deve ser criado pelo trigger do Supabase ou via Upsert nas configurações.
-            } else if (event === "SIGNED_OUT") {
-                console.log("[Auth] 🔴 Usuário deslogado - Retornando ao Modo Convidado");
-                localStorage.removeItem("user_session");
-                setUser(GUEST_USER);
-                window.dispatchEvent(new Event("auth-update"));
-            }
+            processAuthStateChange();
         });
 
 
