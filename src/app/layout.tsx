@@ -7,7 +7,7 @@ import LogoutModal from "@/components/LogoutModal";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import GoogleAnalytics from "@/components/Analytics";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 
 
 export const metadata: Metadata = {
