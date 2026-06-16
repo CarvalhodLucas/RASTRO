@@ -6,7 +6,8 @@ import Providers from "@/components/Providers";
 import LogoutModal from "@/components/LogoutModal";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
-import Analytics from "@/components/Analytics";
+import GoogleAnalytics from "@/components/Analytics";
+import { Analytics } from "@vercel/analytics/react";
 
 
 export const metadata: Metadata = {
@@ -76,6 +77,7 @@ export default function RootLayout({
                     <AuthModal />
                     <LogoutModal />
                     <CookieBanner />
+                    <GoogleAnalytics />
                     <Analytics />
                 </Providers>
             </body>
