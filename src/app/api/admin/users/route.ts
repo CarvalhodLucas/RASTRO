@@ -73,7 +73,10 @@ export async function POST(req: Request) {
             try {
                 await fetch(webhookUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Bypass-Tunnel-Reminder': 'true'
+                    },
                     body: JSON.stringify({
                         name: updatedUser.name,
                         email: cleanEmail,
