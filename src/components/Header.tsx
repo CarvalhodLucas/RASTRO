@@ -168,7 +168,7 @@ export default function Header({ currentPath = "/", hideNav = false }: HeaderPro
 
 
                     <div className="flex items-center gap-3">
-                        {authMounted && user && user.isLoggedIn && user.id !== "guest-user" ? (
+                        {authMounted && user && user.isLoggedIn ? (
                             <div className="flex items-center gap-3">
                                 <Link href="/perfil" className="flex items-center gap-2 text-sm text-white hover:text-primary transition-colors group">
                                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-black font-bold text-xs group-hover:scale-110 transition-transform overflow-hidden">

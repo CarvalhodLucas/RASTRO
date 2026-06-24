@@ -183,7 +183,7 @@ export default function SquarePage() {
     const [showMoodSelector, setShowMoodSelector] = useState(false);
     
     // User Stats Calculations
-    const isLogged = user && user.isLoggedIn && user.id !== "guest-user";
+    const isLogged = user && user.isLoggedIn;
     const myPosts = posts.filter(p => p.author === (user?.name || 'User'));
     const likesReceived = myPosts.reduce((acc, post) => acc + (post.likes || 0), 0);
     const followingCount = following.length;
@@ -202,7 +202,7 @@ export default function SquarePage() {
     };
 
     const checkAuth = () => {
-        if (!user || !user.isLoggedIn || user.id === "guest-user") {
+        if (!user || !user.isLoggedIn) {
             window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
             return false;
         }

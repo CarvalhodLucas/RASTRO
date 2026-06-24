@@ -600,7 +600,7 @@ const PortfolioPage: React.FC = () => {
     useEffect(() => {
         if (!authMounted) return;
 
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (isLoggedIn && user?.email) {
             const key = `user_watchlist_${user.email}`;
             const saved = localStorage.getItem(key);
@@ -675,7 +675,7 @@ const PortfolioPage: React.FC = () => {
             return;
         }
 
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (!isLoggedIn) {
             alert("Por favor, faça login para adicionar ativos à sua watchlist.");
             window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
@@ -702,7 +702,7 @@ const PortfolioPage: React.FC = () => {
         const normalizedTarget = normalizeTicker(tickerToRemove);
         const newList = watchlist.filter(t => normalizeTicker(t) !== normalizedTarget);
         setWatchlist(newList);
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (isLoggedIn && user?.email) {
             localStorage.setItem(`user_watchlist_${user.email}`, JSON.stringify(newList));
         }
@@ -781,7 +781,7 @@ ESTRUTURA DE RESPOSTA:
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || isAIThinking) return;
 
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (!isLoggedIn) {
             setMessages((prev) => [...prev, { role: "ia", text: "Você precisa estar logado para falar com o RASTRO SÊNIOR." }]);
             return;

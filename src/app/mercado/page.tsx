@@ -340,7 +340,7 @@ const AssetRow = ({ asset, aiScore: aiScoreFromParent, sentimentValue: sentiment
 
 export default function MercadoPage() {
     const { user, hasMounted: authMounted } = useAuth();
-    const isLoggedIn = !!(authMounted && user && user.isLoggedIn && user.id !== "guest-user");
+    const isLoggedIn = !!(authMounted && user && user.isLoggedIn);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedSectors, setSelectedSectors] = useState<string[]>([]);

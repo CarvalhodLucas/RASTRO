@@ -1281,7 +1281,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
 
     useEffect(() => {
         if (!hasMounted) return;
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (isLoggedIn && user?.email) {
             const savedWatchlist = JSON.parse(localStorage.getItem(`user_watchlist_${user.email}`) || '[]');
             const cleanTicker = ticker.toUpperCase().replace('.SA', '');
@@ -1461,7 +1461,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isLoadingChat) return;
 
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (!isLoggedIn) {
             setMessages((prev) => [...prev, { role: "ia", text: "Você precisa estar logado para falar com o Analista RASTRO." }]);
             return;
@@ -1576,7 +1576,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
     };
 
     const handleToggleWatchlist = () => {
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         if (!isLoggedIn) {
             alert("Por favor, faça login para adicionar ativos à sua watchlist.");
             window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
@@ -2325,7 +2325,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 <div className="lg:hidden space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
                                     <section id="section-sentimento-mobile" className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
-                                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                        {!(user && user.isLoggedIn) && (
                                             <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                                 <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                                 <h3 className="text-white font-bold">Acesso Restrito</h3>
@@ -3230,7 +3230,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 {/* --- AI RATING COMPONENT --- */}
                                 <div id="section-rating" className={`relative overflow-hidden bg-zinc-900 border rounded-[2.5rem] p-8 transition-all duration-700 mb-6 ${aiRatingData ? 'border-primary/40 shadow-[0_0_50px_-20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'
                                     }`}>
-                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                    {!(user && user.isLoggedIn) && (
                                         <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-[2.5rem]">
                                             <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                             <h3 className="text-white font-bold">Acesso Restrito</h3>
@@ -3355,7 +3355,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 {/* SEÇÃO DE DEEP RESEARCH / RELATÓRIO */}
                                 <section className="rounded-xl border border-border-dark bg-card-dark p-6 transition-none relative overflow-hidden">
-                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                    {!(user && user.isLoggedIn) && (
                                         <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                             <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                             <h3 className="text-white font-bold">Relatório Exclusivo</h3>
@@ -3429,7 +3429,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                                 <div className="hidden lg:block space-y-6">
                                     {/* SENTIMENTO DO MERCADO */}
                                     <section id="section-sentimento-desktop" className="rounded-xl border border-border-dark bg-card-dark p-6 relative overflow-hidden">
-                                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                        {!(user && user.isLoggedIn) && (
                                             <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                                 <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                                 <h3 className="text-white font-bold">Acesso Restrito</h3>
@@ -3676,7 +3676,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
 
                                 {/* CHAT IA DINÂMICO */}
                                 <section className="hidden md:flex rounded-xl border border-border-dark bg-card-dark flex-col h-[500px] relative overflow-hidden">
-                                    {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                                    {!(user && user.isLoggedIn) && (
                                         <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-xl">
                                             <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                             <h3 className="text-white font-bold">Chat Restrito</h3>
@@ -4076,7 +4076,7 @@ Diga qual tem melhores fundamentos e declare UM VENCEDOR. Seja curto, grosso e s
                 {/* Janela do ChatLive */}
                 {isChatLiveOpen && (
                     <div className="w-[calc(100vw-32px)] sm:max-w-[360px] h-[60svh] min-h-[350px] max-h-[500px] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto relative">
-                        {!(user && user.isLoggedIn && user.id !== "guest-user") && (
+                        {!(user && user.isLoggedIn) && (
                             <div className="absolute inset-0 z-50 backdrop-blur-md bg-black/80 flex flex-col items-center justify-center rounded-3xl p-4">
                                 <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">lock</span>
                                 <h3 className="text-white font-bold text-center">Chat Restrito</h3>

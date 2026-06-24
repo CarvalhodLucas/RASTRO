@@ -23,7 +23,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const checkStats = () => {
-            const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+            const isLoggedIn = user && user.isLoggedIn;
             if (isLoggedIn && user?.email) {
                 const saved = localStorage.getItem(`user_watchlist_${user.email}`);
                 if (saved) {
@@ -229,7 +229,7 @@ export default function ProfilePage() {
     };
 
     const handleAnalyzeProfile = async () => {
-        const isLoggedIn = user && user.isLoggedIn && user.id !== "guest-user";
+        const isLoggedIn = user && user.isLoggedIn;
         let portfolio = [];
         if (isLoggedIn && user?.email) {
             const saved = localStorage.getItem(`user_watchlist_${user.email}`);

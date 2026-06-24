@@ -213,7 +213,7 @@ const InsightCard: React.FC<InsightCardProps> = ({
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        if (!user || !user.isLoggedIn || user.id === "guest-user") {
+                                        if (!user || !user.isLoggedIn) {
                                             window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login' } }));
                                             return;
                                         }
