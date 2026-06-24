@@ -20,6 +20,7 @@ export interface AuthUser {
 interface AuthContextType {
     user: AuthUser | null;
     hasMounted: boolean;
+    isSitePublic: boolean;
     logout: () => void;
     confirmLogout: () => void;
     updateProfile: (updates: Partial<AuthUser>) => void;
@@ -42,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const [user, setUser] = useState<AuthUser | null>(null);
     const [hasMounted, setHasMounted] = useState(false);
+    const [isSitePublic, setIsSitePublic] = useState(false);
 
-    const checkAuth = () => {
+    const checkAuth = (publicMode?: boolean) => {
         if (typeof window === "undefined") return null;
         const sessionString = localStorage.getItem("user_session");
         if (sessionString) {
@@ -56,8 +58,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.error("Error parsing user_session", e);
             }
         }
+        // Se o site está em modo público, o visitante tem acesso total
+        if (publicMode) {
+            return { ...GUEST_USER, isLoggedIn: true };
+        }
         // Retorna o usuário convidado por padrão se não houver sessão (Desativação temporária de login)
         return GUEST_USER;
+    };
+
+    // Verifica o estado de restrição do site
+    const fetchSiteAccess = async () => {
+        try {
+            const response = await fetch("/api/admin/site-access");
+            if (response.ok) {
+                const data = await response.json();
+                const isPublic = data.restricted === false;
+                setIsSitePublic(isPublic);
+                return isPublic;
+            }
+        } catch (err) {
+            console.error("[Auth] Erro ao buscar site-access config:", err);
+        }
+        return false;
     };
 
     useEffect(() => {
@@ -67,6 +89,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const localUser = checkAuth();
         if (localUser) setUser(localUser);
         setHasMounted(true);
+
+        // 1.1 Fetch site-access config and update guest user if public
+        fetchSiteAccess().then((isPublic) => {
+            // Se não tem sessão ativa (é guest) e o site é público, eleva o guest
+            const sessionString = localStorage.getItem("user_session");
+            const hasRealSession = sessionString && (() => {
+                try {
+                    const s = JSON.parse(sessionString);
+                    return s && (s.isLoggedIn || s.isPendingApproval);
+                } catch { return false; }
+            })();
+
+            if (isPublic && !hasRealSession) {
+                setUser({ ...GUEST_USER, isLoggedIn: true });
+            }
+        });
 
         // 2. Supabase session listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -173,13 +211,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
         };
 
+        // Listener para quando o admin altera o modo de acesso do site
+        const handleSiteAccessChanged = async () => {
+            const isPublic = await fetchSiteAccess();
+            const sessionString = localStorage.getItem("user_session");
+            const hasRealSession = sessionString && (() => {
+                try {
+                    const s = JSON.parse(sessionString);
+                    return s && (s.isLoggedIn || s.isPendingApproval);
+                } catch { return false; }
+            })();
+
+            if (!hasRealSession) {
+                setUser(isPublic ? { ...GUEST_USER, isLoggedIn: true } : GUEST_USER);
+            }
+        };
+
         window.addEventListener("storage", handleUpdates);
         window.addEventListener("auth-update", handleUpdates);
+        window.addEventListener("site-access-changed", handleSiteAccessChanged);
 
         return () => {
             subscription.unsubscribe();
             window.removeEventListener("storage", handleUpdates);
             window.removeEventListener("auth-update", handleUpdates);
+            window.removeEventListener("site-access-changed", handleSiteAccessChanged);
         };
     }, []);
 
@@ -279,7 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
     return (
-        <AuthContext.Provider value={{ user, hasMounted, logout, confirmLogout, updateProfile }}>
+        <AuthContext.Provider value={{ user, hasMounted, isSitePublic, logout, confirmLogout, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );

@@ -859,7 +859,7 @@ export default function MercadoPage() {
                         <p className="text-slate-400 text-xs md:text-sm mt-1">Filtre ativos com métricas baseadas em IA e sentimento social.</p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full pb-2 md:pb-0">
                         {/* BARRA DE PESQUISA INTEGRADA AOS BOTÕES */}
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative flex-1 md:w-64">
@@ -884,7 +884,7 @@ export default function MercadoPage() {
 
                         <button
                             onClick={saveFilters}
-                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-all group ${isSaving ? 'bg-primary/20 border-primary text-primary' : 'bg-neutral-dark-surface border-neutral-dark-border hover:border-primary text-white'}`}
+                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-all group shrink-0 whitespace-nowrap ${isSaving ? 'bg-primary/20 border-primary text-primary' : 'bg-neutral-dark-surface border-neutral-dark-border hover:border-primary text-white'}`}
                         >
                             <span className={`material-symbols-outlined transition-transform text-[18px] ${isSaving ? 'text-primary' : 'text-primary group-hover:scale-110'}`}>
                                 {isSaving ? 'check_circle' : 'bookmark'}
@@ -899,7 +899,7 @@ export default function MercadoPage() {
                                 });
                                 window.location.reload();
                             }}
-                            className="flex items-center gap-1 px-3 py-2 bg-neutral-dark-surface border border-neutral-dark-border hover:border-red-500/50 text-slate-400 hover:text-red-400 rounded-lg text-sm transition-all group"
+                            className="flex items-center gap-1 px-3 py-2 bg-neutral-dark-surface border border-neutral-dark-border hover:border-red-500/50 text-slate-400 hover:text-red-400 rounded-lg text-sm transition-all group shrink-0"
                             title="Limpar cache e recarregar dados da API"
                         >
                             <span className="material-symbols-outlined text-[18px] group-hover:animate-spin">refresh</span>

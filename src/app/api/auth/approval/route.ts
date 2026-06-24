@@ -28,6 +28,22 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Missing email parameter' }, { status: 400 });
         }
 
+        // --- NEW: Check if site-access is restricted ---
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const configPath = path.join(process.cwd(), 'public', 'site-access.config.json');
+            if (fs.existsSync(configPath)) {
+                const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+                // Se a restrição for falsa (restricted === false), o site está totalmente liberado (qualquer usuário é aprovado)
+                if (config.restricted === false) {
+                    return NextResponse.json({ approved: true, status: 'approved' });
+                }
+            }
+        } catch (e) {
+            console.error('Error reading site-access config in GET approval:', e);
+        }
+
         // Admins are always approved
         if (ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email)) {
             return NextResponse.json({ approved: true, status: 'approved' });

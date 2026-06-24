@@ -24,6 +24,9 @@ export default function AdminUsersPage() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
+    const [siteRestricted, setSiteRestricted] = useState<boolean>(true);
+    const [isUpdatingRestriction, setIsUpdatingRestriction] = useState(false);
+
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
@@ -41,9 +44,54 @@ export default function AdminUsersPage() {
         }
     };
 
+    const fetchSiteAccess = async () => {
+        try {
+            const response = await fetch("/api/admin/site-access");
+            if (response.ok) {
+                const data = await response.json();
+                setSiteRestricted(data.restricted !== false);
+            }
+        } catch (err) {
+            console.error("Error fetching site-access config:", err);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
+        fetchSiteAccess();
     }, []);
+
+    const toggleSiteRestriction = async () => {
+        const newValue = !siteRestricted;
+        const msg = newValue 
+            ? "Ativar restrições? Qualquer visitante precisará estar aprovado para acessar." 
+            : "Desativar restrições? Qualquer visitante terá acesso total e ilimitado ao site sem precisar estar logado.";
+        
+        if (!confirm(msg)) return;
+
+        setIsUpdatingRestriction(true);
+        try {
+            const response = await fetch("/api/admin/site-access", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ restricted: newValue })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setSiteRestricted(data.restricted !== false);
+                // Notifica o AuthContext para atualizar o estado de acesso em tempo real
+                window.dispatchEvent(new Event("site-access-changed"));
+            } else {
+                alert("Erro ao alterar restrição de acesso.");
+            }
+        } catch (err) {
+            console.error("Error updating site restriction:", err);
+            alert("Erro de conexão.");
+        } finally {
+            setIsUpdatingRestriction(false);
+        }
+    };
 
     const handleApprove = async (email: string) => {
         setActionLoading(email);
@@ -105,7 +153,7 @@ export default function AdminUsersPage() {
     return (
         <div className="min-h-screen bg-black font-display text-slate-100 flex flex-col">
             {/* Header */}
-            <header className="flex items-center justify-between border-b border-neutral-dark-border px-8 py-4 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+            <header className="flex flex-col md:flex-row md:items-center justify-between border-b border-neutral-dark-border px-8 py-4 bg-black/50 backdrop-blur-md sticky top-0 z-50 gap-4">
                 <div className="flex items-center gap-6">
                     <Link href="/admin/inbox" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
                         <span className="material-symbols-outlined">arrow_back</span>
@@ -118,7 +166,24 @@ export default function AdminUsersPage() {
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center flex-wrap gap-4">
+                    {/* Botão de Restrição do Site */}
+                    <button
+                        onClick={toggleSiteRestriction}
+                        disabled={isUpdatingRestriction}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                            siteRestricted 
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/5"
+                        }`}
+                        title={siteRestricted ? "Ativar Modo Público" : "Ativar Modo Restrito"}
+                    >
+                        <span className="material-symbols-outlined !text-[18px]">
+                            {siteRestricted ? "lock" : "lock_open"}
+                        </span>
+                        {siteRestricted ? "Restrições: Ativas" : "Restrições: Inativas (Site Público)"}
+                    </button>
+
                     <button
                         onClick={fetchUsers}
                         className="p-2 bg-neutral-dark-surface border border-neutral-dark-border rounded-lg hover:bg-neutral-dark-border transition-colors text-slate-400 hover:text-white"
