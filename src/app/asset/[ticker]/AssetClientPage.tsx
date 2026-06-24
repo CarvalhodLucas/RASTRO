@@ -1401,19 +1401,31 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
                         `/reports/${tickerLimpoUpper}.html`,
                         `/reports/${tickerLimpoUpper}.HTML`
                     ];
-                    try {
-                        const fetchVariant = async (url: string) => {
+                    
+                    let foundResponse = null;
+                    for (const url of variants) {
+                        try {
                             const res = await fetch(url);
-                            if (!res.ok) throw new Error("Not found");
-                            return res;
-                        };
-                        response = await Promise.any(variants.map(fetchVariant));
-                    } catch (e) {
-                        throw new Error("No report found");
+                            if (res.ok) {
+                                foundResponse = res;
+                                break;
+                            }
+                        } catch (e) {
+                            // Ignorar falha de rede individual
+                        }
                     }
+                    
+                    if (!foundResponse) {
+                        setHtmlReport(`<p class="text-slate-400 italic">Nenhum relatório especializado encontrado para ${ticker.toUpperCase().replace('.SA', '')} no momento.</p>`);
+                        return;
+                    }
+                    response = foundResponse;
                 }
 
-                if (!response.ok) throw new Error("Not found");
+                if (!response || !response.ok) {
+                    setHtmlReport(`<p class="text-slate-400 italic">Nenhum relatório especializado encontrado para ${ticker.toUpperCase().replace('.SA', '')} no momento.</p>`);
+                    return;
+                }
 
                 // Set report date
                 let reportDateToSet = "";
@@ -1448,7 +1460,7 @@ ATENÇÃO: Procure o "Dividend Yield" primariamente no RELATÓRIO DE FUNDAMENTOS
 
                 setHtmlReport(cleanHtml);
             } catch (error) {
-                console.error("Erro ao carregar o relatório:", error);
+                // Erro de rede ou parse não esperado
                 setHtmlReport(`<p class="text-slate-400 italic">Nenhum relatório especializado encontrado para ${ticker.toUpperCase().replace('.SA', '')} no momento.</p>`);
             }
         };
