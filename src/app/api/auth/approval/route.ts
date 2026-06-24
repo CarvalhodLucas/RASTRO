@@ -20,47 +20,8 @@ const supabase = createClient(
 
 // GET: Check approval status of a user
 export async function GET(req: Request) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const email = searchParams.get('email')?.toLowerCase().trim();
-
-        if (!email) {
-            return NextResponse.json({ error: 'Missing email parameter' }, { status: 400 });
-        }
-
-        // --- MODO PÚBLICO FORÇADO: Site sem restrições ---
-        return NextResponse.json({ approved: true, status: 'approved' });
-        // Admins are always approved
-        if (ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email)) {
-            return NextResponse.json({ approved: true, status: 'approved' });
-        }
-
-        // Query waitlist in Supabase
-        const { data: userStatus, error } = await supabase
-            .from('waitlist')
-            .select('*')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (error) {
-            console.error('Supabase query error in GET approval:', error);
-            return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
-        }
-
-        if (!userStatus) {
-            return NextResponse.json({ approved: false, status: 'none' });
-        }
-
-        return NextResponse.json({
-            approved: userStatus.status === 'approved',
-            status: userStatus.status,
-            name: userStatus.name,
-            createdAt: userStatus.created_at
-        });
-    } catch (error) {
-        console.error('Error in GET /api/auth/approval:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
+    // --- MODO PÚBLICO FORÇADO: Site sem restrições ---
+    return NextResponse.json({ approved: true, status: 'approved' });
 }
 
 // POST: Add a new user with 'pending' status (Waitlist or first Login/Signup)
