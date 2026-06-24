@@ -30,7 +30,7 @@ const GUEST_USER: AuthUser = {
     id: "guest-user",
     name: "Visitante",
     email: "guest@rastro.ia",
-    isLoggedIn: false,
+    isLoggedIn: true, // MODO PÚBLICO: Visitantes têm acesso total
     theme: "dark",
     joinedAt: "2026",
     investorType: "curioso",
